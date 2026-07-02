@@ -24,7 +24,7 @@ jobs:
         with:
           version: ${{ matrix.qt }}
           setup-python: false
-          aqtsource: miurahr/aqtinstall@master
+          aqtsource: git+https://github.com/miurahr/aqtinstall@master
         env:
           PIP_BREAK_SYSTEM_PACKAGES: "1"
 
