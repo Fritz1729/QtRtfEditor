@@ -32,7 +32,7 @@ public:
 \f1\fs20 This \i editor\i0 supports \ul RTF\ul0 and \cf1 protected\cf0 references.\r\n
 })";
         try {
-            _editor.load(sampleRtf, Rte::FormatMode::Rtf);
+            _editor.Load(sampleRtf, Rte::FormatMode::Rtf);
             statusBar()->showMessage("Sample RTF loaded");
         } catch (const std::exception &e) {
             statusBar()->showMessage(QString("Error: %1").arg(e.what()));
@@ -45,11 +45,11 @@ private:
 
         QMenu *file = bar->addMenu("&File");
 
-        QAction *load = file->addAction("&Load RTF...");
-        connect(load, &QAction::triggered, this, &DemoWindow::loadFile);
+        QAction *pLoad = file->addAction("&Load RTF...");
+        connect(pLoad, &QAction::triggered, this, &DemoWindow::LoadFile);
 
-        QAction *save = file->addAction("Save &RTF...");
-        connect(save, &QAction::triggered, this, &DemoWindow::saveFile);
+        QAction *pSave = file->addAction("Save &RTF...");
+        connect(pSave, &QAction::triggered, this, &DemoWindow::SaveFile);
 
         file->addSeparator();
 
@@ -70,11 +70,11 @@ private:
         QMenu *protection = bar->addMenu("&Protection");
 
         QAction *setProt = protection->addAction("Set &protection...");
-        connect(setProt, &QAction::triggered, this, &DemoWindow::setProtection);
+        connect(setProt, &QAction::triggered, this, &DemoWindow::SetProtection);
 
         QAction *clearProt = protection->addAction("Clear &protection");
         connect(clearProt, &QAction::triggered, this, [this] {
-            _editor.clearProtection();
+            _editor.ClearProtection();
             statusBar()->showMessage("All protection ranges cleared");
         });
 
@@ -90,7 +90,7 @@ private:
         });
     }
 
-    void loadFile() {
+    void LoadFile() {
         QString path = QFileDialog::getOpenFileName(
             this, "Load RTF", "", "RTF Files (*.rtf);;All Files (*)");
         if (path.isEmpty()) return;
@@ -106,14 +106,14 @@ private:
         file.close();
 
         try {
-            _editor.load(data.toStdString(), Rte::FormatMode::Rtf);
+            _editor.Load(data.toStdString(), Rte::FormatMode::Rtf);
             statusBar()->showMessage(QString("Loaded: %1").arg(path));
         } catch (const std::exception &e) {
             QMessageBox::critical(this, "Error", e.what());
         }
     }
 
-    void saveFile() {
+    void SaveFile() {
         QString path = QFileDialog::getSaveFileName(
             this, "Save RTF", "", "RTF Files (*.rtf);;All Files (*)");
         if (path.isEmpty()) return;
@@ -122,7 +122,7 @@ private:
             path += ".rtf";
         }
 
-        std::string rtf = _editor.save(Rte::FormatMode::Rtf);
+        std::string rtf = _editor.Save(Rte::FormatMode::Rtf);
 
         QFile file(path);
         if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -137,7 +137,7 @@ private:
         statusBar()->showMessage(QString("Saved: %1").arg(path));
     }
 
-    void setProtection() {
+    void SetProtection() {
         QTextCursor cursor = _editor.textCursor();
         if (!cursor.hasSelection()) {
             statusBar()->showMessage("Please select text to protect first");
@@ -162,7 +162,7 @@ private:
         std::size_t end = static_cast<std::size_t>(
             cursor.selectionEnd());
 
-        _editor.setProtection(start, end, type.toStdString(),
+        _editor.SetProtection(start, end, type.toStdString(),
                               target.toStdString());
         statusBar()->showMessage(
             QString("Protection set: [%1] %2").arg(type).arg(target));

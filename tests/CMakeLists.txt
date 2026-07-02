@@ -21,12 +21,12 @@ target_link_libraries(test_protected_ranges
 
 add_test(NAME test_protected_ranges COMMAND test_protected_ranges)
 
-# ── test_rtf_structural: atomic unit tests for compareRtf() ──
+# ── test_rtf_structural: atomic unit tests for CompareRtf() ──
 
 add_executable(test_rtf_structural
     test_rtf_structural.cpp
-    rtf_compare.cpp
-    rtf_compare.h
+    RtfCompare.cpp
+    RtfCompare.h
 )
 
 target_include_directories(test_rtf_structural PRIVATE
@@ -46,8 +46,8 @@ add_test(NAME test_rtf_structural COMMAND test_rtf_structural)
 
 add_executable(test_roundtrip
     test_roundtrip.cpp
-    rtf_compare.cpp
-    rtf_compare.h
+    RtfCompare.cpp
+    RtfCompare.h
 )
 
 target_include_directories(test_roundtrip PRIVATE
@@ -62,3 +62,9 @@ target_link_libraries(test_roundtrip
 )
 
 add_test(NAME test_roundtrip COMMAND test_roundtrip)
+
+add_custom_command(TARGET test_roundtrip POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/testdata
+        ${CMAKE_CURRENT_BINARY_DIR}/testdata
+)

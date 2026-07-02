@@ -18,7 +18,7 @@ namespace Rte {
 
 namespace {
 
-std::string rtfEscape(const std::string &text) {
+std::string RtfEscape(const std::string &text) {
     std::string result;
     result.reserve(text.size());
 
@@ -42,7 +42,7 @@ std::string rtfEscape(const std::string &text) {
     return result;
 }
 
-int colorToCfIndex(const QColor &color) {
+int ColorToCfIndex(const QColor &color) {
     if (color.red() == 0 && color.green() == 0 && color.blue() == 0) return 0;
     if (color.red() > 128 && color.green() == 0 && color.blue() == 0) return 1;
     if (color.red() == 0 && color.green() > 0 && color.blue() == 0) return 2;
@@ -50,7 +50,7 @@ int colorToCfIndex(const QColor &color) {
     return 0;
 }
 
-int fontToIndex(const QStringList &names) {
+int FontToIndex(const QStringList &names) {
     for (const QString &name : names) {
         if (name.contains("Courier", Qt::CaseInsensitive)) return 1;
         if (name.contains("Arial", Qt::CaseInsensitive)) return 2;
@@ -59,7 +59,7 @@ int fontToIndex(const QStringList &names) {
     return 0;
 }
 
-std::string alignmentToRtf(Qt::Alignment alignment) {
+std::string AlignmentToRtf(Qt::Alignment alignment) {
     if (alignment & Qt::AlignRight) return "\\qr";
     if (alignment & Qt::AlignHCenter) return "\\qc";
     if (alignment & Qt::AlignLeft) return "\\ql";
@@ -68,7 +68,7 @@ std::string alignmentToRtf(Qt::Alignment alignment) {
 
 } // namespace
 
-std::string exportRtf(const QTextDocument &document) {
+std::string ExportRtf(const QTextDocument &document) {
     std::ostringstream out;
 
     out << "{\\rtf1\\ansi\\deff0";
@@ -97,7 +97,7 @@ std::string exportRtf(const QTextDocument &document) {
          block = block.next())
     {
         QTextBlockFormat blockFmt = block.blockFormat();
-        out << alignmentToRtf(blockFmt.alignment());
+        out << AlignmentToRtf(blockFmt.alignment());
 
         // Qt 6.11: textIndent() replaces leftIndent/firstIndent
         qreal indent = blockFmt.textIndent();
@@ -110,10 +110,35 @@ std::string exportRtf(const QTextDocument &document) {
         // Separate control words from text with a newline
         out << "\n";
 
-        QString text = block.text();
-        if (!text.isEmpty()) {
-            out << rtfEscape(text.toUtf8().toStdString());
+        if (block.length() > 0) {
+            QTextBlock::iterator it = block.begin();
+            int fontSize = static_cast<int>(
+                it.fragment().charFormat().fontPointSize() * 20);
+            if (fontSize <= 0) {
+                fontSize = static_cast<int>(
+                    document.defaultFont().pointSizeF() * 20);
+            }
+            if (fontSize > 0) out << "\\fs" << fontSize;
         }
+
+        QString text = block.text();
+        bool hasText = !text.trimmed().isEmpty();
+
+        // Skip empty trailing blocks
+        if (!hasText) {
+            bool hasFollowingContent = false;
+            for (QTextBlock b = block.next(); b.isValid(); b = b.next()) {
+                if (!b.text().trimmed().isEmpty()) {
+                    hasFollowingContent = true;
+                    break;
+                }
+            }
+            if (hasFollowingContent) continue;
+            // No following content - trailing empty block, skip
+            continue;
+        }
+
+        out << RtfEscape(text.toUtf8().toStdString());
 
         out << "\\par";
     }
@@ -122,7 +147,7 @@ std::string exportRtf(const QTextDocument &document) {
     return out.str();
 }
 
-std::string exportHtml(const QTextDocument &document) {
+std::string ExportHtml(const QTextDocument &document) {
     QString html = document.toHtml();
     return html.toStdString();
 }

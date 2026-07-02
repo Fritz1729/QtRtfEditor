@@ -2,12 +2,12 @@
 #include <stdexcept>
 #include <future>
 #include <chrono>
-#include "rtf_compare.h"
+#include "RtfCompare.h"
 
 using namespace Rte;
 
 // ── Timeout guard for parser-heavy operations ──────────────────
-// parseRtf() may hang on certain control words (\colortbl, etc.).
+// ParseRtf() may hang on certain control words (\colortbl, etc.).
 // These helpers run the operation in a detached background thread
 // and time out after 3 seconds.
 
@@ -17,11 +17,11 @@ struct CompareResult {
     bool ok = false;
 };
 
-static CompareResult safeCompareRtf(const std::string &rtfA, const std::string &rtfB) {
+static CompareResult SafeCompareRtf(const std::string &rtfA, const std::string &rtfB) {
     CompareResult r;
     try {
         std::string reason;
-        r.result = compareRtf(rtfA, rtfB, reason);
+        r.result = CompareRtf(rtfA, rtfB, reason);
         r.reason = reason;
         r.ok = true;
     } catch (...) {
@@ -30,12 +30,12 @@ static CompareResult safeCompareRtf(const std::string &rtfA, const std::string &
     return r;
 }
 
-static CompareResult compareWithTimeout(const std::string &rtfA, const std::string &rtfB, int sec) {
+static CompareResult CompareWithTimeout(const std::string &rtfA, const std::string &rtfB, int sec) {
     std::promise<CompareResult> promise;
     std::future<CompareResult> future = promise.get_future();
 
     std::thread t([&]() {
-        CompareResult r = safeCompareRtf(rtfA, rtfB);
+        CompareResult r = SafeCompareRtf(rtfA, rtfB);
         promise.set_value(r);
     });
     t.detach();
@@ -47,7 +47,7 @@ static CompareResult compareWithTimeout(const std::string &rtfA, const std::stri
     return future.get();
 }
 
-// ── TestSemanticComparison: atomic unit tests for compareRtf() ──
+// ── TestSemanticComparison: atomic unit tests for CompareRtf() ──
 
 class TestSemanticComparison : public QObject {
     Q_OBJECT
@@ -85,7 +85,7 @@ void TestSemanticComparison::identical_rtf() {
     std::string rtfA = R"({\rtf1\ansi\deff0 Hello\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Hello\par})";
     std::string reason;
-    QCOMPARE(compareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
     QVERIFY(reason.empty());
 }
 
@@ -93,7 +93,7 @@ void TestSemanticComparison::different_text() {
     std::string rtfA = R"({\rtf1\ansi\deff0 Hello\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 World\par})";
     std::string reason;
-    QCOMPARE(compareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
     QVERIFY(!reason.empty());
 }
 
@@ -101,7 +101,7 @@ void TestSemanticComparison::different_formatting() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\b Bold}\b0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Bold\par})";
     std::string reason;
-    QCOMPARE(compareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
     QVERIFY(!reason.empty());
 }
 
@@ -109,7 +109,7 @@ void TestSemanticComparison::different_paragraph_count() {
     std::string rtfA = R"({\rtf1\ansi\deff0 One\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 One\par Two\par})";
     std::string reason;
-    QCOMPARE(compareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
     QVERIFY(!reason.empty());
 }
 
@@ -121,7 +121,7 @@ void TestSemanticComparison::semantic_color() {
     std::string rtfB = R"({\rtf1\ansi\deff0
 {\colortbl ;\red0\green255\blue0;\red255\green0\blue0;}
 \cf2 Red\par})";
-    CompareResult r = compareWithTimeout(rtfA, rtfB, 3);
+    CompareResult r = CompareWithTimeout(rtfA, rtfB, 3);
     if (!r.ok) {
         _timeout++;
         QFAIL("parser timed out — feature not yet implemented");
@@ -140,42 +140,42 @@ void TestSemanticComparison::semantic_font() {
          {\f1\fswiss\fcharset0 Arial;}}
 \f1 Arial\par})";
     std::string reason;
-    QCOMPARE(compareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
 }
 
 void TestSemanticComparison::different_alignment() {
     std::string rtfA = R"({\rtf1\ansi\deff0\ql Left\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\qc Left\par})";
     std::string reason;
-    QCOMPARE(compareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
 }
 
 void TestSemanticComparison::different_indent() {
     std::string rtfA = R"({\rtf1\ansi\deff0\li500 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\li200 Text\par})";
     std::string reason;
-    QCOMPARE(compareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
 }
 
 void TestSemanticComparison::different_superscript() {
     std::string rtfA = R"({\rtf1\ansi\deff0 H\super 2\super0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 H 2\par})";
     std::string reason;
-    QCOMPARE(compareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
 }
 
 void TestSemanticComparison::empty_docs() {
     std::string rtfA = R"({\rtf1\ansi\deff0})";
     std::string rtfB = R"({\rtf1\ansi\deff0})";
     std::string reason;
-    QCOMPARE(compareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
 }
 
 void TestSemanticComparison::header_only() {
     std::string rtfA = R"({\rtf1\ansi\deff0})";
     std::string rtfB = R"({\rtf1\ansi\deff0\rtf1\ansi})";
     std::string reason;
-    QCOMPARE(compareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
 }
 
 void TestSemanticComparison::unknown_tags() {
@@ -183,7 +183,7 @@ void TestSemanticComparison::unknown_tags() {
     std::string rtfA = R"({\rtf1\ansi\deff0 Text\xyz\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Text\par})";
     std::string reason;
-    QCOMPARE(compareRtf(rtfA, rtfB, reason), RtfCompareResult::UnknownTag);
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::UnknownTag);
 }
 
 void TestSemanticComparison::cleanupTestCase() {

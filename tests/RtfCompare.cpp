@@ -1,4 +1,4 @@
-#include "rtf_compare.h"
+#include "RtfCompare.h"
 
 #include <algorithm>
 #include <sstream>
@@ -148,31 +148,31 @@ private:
 
         // Check for known table groups
         skipWhitespace();
-        if (m_pos < m_len) {
-            if (matches("\\colortbl")) {
-                // Consume \\colortbl control word and optional argument
-                m_pos += 9;
-                while (m_pos < m_len && isDigit(m_rtf[m_pos])) m_pos++;
-                skipWhitespace();
+        if (m_pos < m_len && matches("\\colortbl")) {
+            // Consume \\colortbl control word and optional argument
+            m_pos += 9;
+            while (m_pos < m_len && isDigit(m_rtf[m_pos])) m_pos++;
+            skipWhitespace();
 
-                m_inColortbl = true;
-                parseColortbl();
-                m_inColortbl = false;
-                restoreState();
-                return;
-            }
-            if (matches("\\fonttbl")) {
-                // Consume \\fonttbl control word and optional argument
-                m_pos += 7;
-                while (m_pos < m_len && isDigit(m_rtf[m_pos])) m_pos++;
-                skipWhitespace();
+            m_inColortbl = true;
+            parseColortbl();
+            m_inColortbl = false;
+            restoreState();
+            // parseColortbl consumes the closing '}'
+            return;
+        }
+        if (m_pos < m_len && matches("\\fonttbl")) {
+            // Consume \\fonttbl control word and optional argument
+            m_pos += 7;
+            while (m_pos < m_len && isDigit(m_rtf[m_pos])) m_pos++;
+            skipWhitespace();
 
-                m_inFonttbl = true;
-                parseFonttbl();
-                m_inFonttbl = false;
-                restoreState();
-                return;
-            }
+            m_inFonttbl = true;
+            parseFonttbl();
+            m_inFonttbl = false;
+            restoreState();
+            // parseFonttbl consumes the closing '}'
+            return;
         }
 
         // Unknown group — parse contents normally
@@ -289,7 +289,7 @@ private:
 
     void parseColortbl() {
         // {\colortbl ;\red255\green0\blue0;\red0\green128\blue0;}
-        // Parse color entries separated by ';'
+        // Each ';' separates a color entry. First entry is "auto" (may be empty).
         while (m_pos < m_len && m_rtf[m_pos] != '}') {
             if (++m_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
             skipWhitespace();
@@ -303,7 +303,7 @@ private:
                     r = parseInt();
                     haveR = true;
                 } else if (matches("\\green")) {
-                    m_pos += 5;
+                    m_pos += 6;
                     g = parseInt();
                     haveG = true;
                 } else if (matches("\\blue")) {
@@ -317,9 +317,8 @@ private:
                 }
             }
 
-            if (haveR || haveG || haveB) {
-                m_doc.colors.push_back({r, g, b});
-            }
+            // Always add color entry (first entry may be empty "auto" color)
+            m_doc.colors.push_back({r, g, b});
 
             if (m_pos < m_len) m_pos++; // skip ';' or '}'
         }
@@ -380,7 +379,32 @@ private:
         // Paragraph separator
         if (word == "par") {
             finalizeRun();
-            finalizeParagraph();
+            // Apply paragraph formatting to the last non-empty paragraph
+            for (int k = static_cast<int>(m_doc.paragraphs.size()) - 1; k >= 0; --k) {
+                if (!m_doc.paragraphs[k].runs.empty() &&
+                    std::any_of(m_doc.paragraphs[k].runs.begin(), m_doc.paragraphs[k].runs.end(),
+                        [](const RtfRun &r) { return !r.text.empty(); }))
+                {
+                    m_doc.paragraphs[k].alignment = m_para.alignment;
+                    m_doc.paragraphs[k].leftIndent = m_para.leftIndent;
+                    m_doc.paragraphs[k].firstLineIndent = m_para.firstLineIndent;
+                    m_doc.paragraphs[k].rightIndent = m_para.rightIndent;
+                    break;
+                }
+            }
+            // Remove trailing empty paragraphs
+            while (!m_doc.paragraphs.empty()) {
+                const auto &last = m_doc.paragraphs.back();
+                bool hasText = std::any_of(last.runs.begin(), last.runs.end(),
+                    [](const RtfRun &r) { return !r.text.empty(); });
+                if (!hasText) {
+                    m_doc.paragraphs.pop_back();
+                } else {
+                    break;
+                }
+            }
+            // Create paragraph for content that follows
+            m_doc.paragraphs.push_back({});
             // Reset paragraph formatting
             m_para.alignment = 1;
             m_para.leftIndent = 0;
@@ -430,17 +454,12 @@ private:
     }
 
     void finalizeRun() {
-        if (m_doc.paragraphs.empty()) {
-            m_doc.paragraphs.push_back({});
-        }
         if (m_literalText.empty()) return;
 
         // Trim leading/trailing whitespace from the literal
         // but preserve internal whitespace
         std::string trimmed = m_literalText;
-        // Trim leading whitespace
         size_t start = trimmed.find_first_not_of(" \t\n\r");
-        // Trim trailing whitespace
         size_t end = trimmed.find_last_not_of(" \t\n\r");
         if (start == std::string::npos) {
             // All whitespace — skip
@@ -449,45 +468,27 @@ private:
         }
         trimmed = trimmed.substr(start, end - start + 1);
 
-        if (!trimmed.empty()) {
-            RtfRunFormat fmt;
-            fmt.bold = m_format.bold;
-            fmt.italic = m_format.italic;
-            fmt.underline = m_format.underline;
-            fmt.fontIndex = m_format.fontIndex;
-            fmt.fontSize = m_format.fontSize;
-            fmt.colorIndex = m_format.colorIndex;
-            fmt.superscript = m_format.superscript;
-            fmt.subscript = m_format.subscript;
-
-            m_doc.paragraphs.back().runs.emplace_back(trimmed, std::move(fmt));
+        if (trimmed.empty()) {
+            m_literalText.clear();
+            return;
         }
 
-        m_literalText.clear();
-    }
-
-    void finalizeParagraph() {
-        // Skip empty final paragraphs at the end of document
         if (m_doc.paragraphs.empty()) {
             m_doc.paragraphs.push_back({});
-            return;
         }
 
-        const auto &last = m_doc.paragraphs.back();
-        bool hasText = std::any_of(last.runs.begin(), last.runs.end(),
-            [](const RtfRun &r) { return !r.text.empty(); });
+        RtfRunFormat fmt;
+        fmt.bold = m_format.bold;
+        fmt.italic = m_format.italic;
+        fmt.underline = m_format.underline;
+        fmt.fontIndex = m_format.fontIndex;
+        fmt.fontSize = m_format.fontSize;
+        fmt.colorIndex = m_format.colorIndex;
+        fmt.superscript = m_format.superscript;
+        fmt.subscript = m_format.subscript;
 
-        if (!hasText) {
-            // Don't add trailing empty paragraphs
-            return;
-        }
-
-        RtfParagraph para;
-        para.alignment = m_para.alignment;
-        para.leftIndent = m_para.leftIndent;
-        para.firstLineIndent = m_para.firstLineIndent;
-        para.rightIndent = m_para.rightIndent;
-        m_doc.paragraphs.push_back(para);
+        m_doc.paragraphs.back().runs.emplace_back(trimmed, std::move(fmt));
+        m_literalText.clear();
     }
 
     void appendUtf8(int cp) {
@@ -560,11 +561,55 @@ private:
 
 // ── Public API ─────────────────────────────────────────────────
 
-RtfDocument parseRtf(const std::string &rtf) {
+RtfDocument ParseRtf(const std::string &rtf) {
     return RtfParser().parse(rtf);
 }
 
-RtfCompareResult compareRtf(const RtfDocument &a, const RtfDocument &b,
+static bool IsColorInBounds(int index, size_t tableSize) {
+    return index >= 0 && index < static_cast<int>(tableSize);
+}
+
+static bool ResolveAndCompareColors(int paraIdx, int runIdx,
+    const RtfRun &runA, const RtfRun &runB,
+    const RtfDocument &a, const RtfDocument &b,
+    std::string &reason) {
+    // Resolve to actual RGB for semantic comparison
+    RtfColorEntry resolvedA = {0, 0, 0};
+    RtfColorEntry resolvedB = {0, 0, 0};
+    bool hasA = IsColorInBounds(runA.format.colorIndex, a.colors.size());
+    bool hasB = IsColorInBounds(runB.format.colorIndex, b.colors.size());
+    if (hasA) resolvedA = a.colors[runA.format.colorIndex];
+    if (hasB) resolvedB = b.colors[runB.format.colorIndex];
+
+    std::string boundMsg;
+    if (!hasA || !hasB) {
+        boundMsg = " [out-of-bounds: A=" + std::to_string(runA.format.colorIndex) +
+            "/" + std::to_string(a.colors.size()) +
+            ", B=" + std::to_string(runB.format.colorIndex) +
+            "/" + std::to_string(b.colors.size()) + "]";
+    }
+
+    if (hasA && hasB && resolvedA.red == resolvedB.red &&
+        resolvedA.green == resolvedB.green && resolvedA.blue == resolvedB.blue) {
+        // Same resolved color despite different indices — not a diff
+        return false;
+    }
+
+    std::string rgbA = "(" + std::to_string(resolvedA.red) + "," +
+        std::to_string(resolvedA.green) + "," +
+        std::to_string(resolvedA.blue) + ")";
+    std::string rgbB = "(" + std::to_string(resolvedB.red) + "," +
+        std::to_string(resolvedB.green) + "," +
+        std::to_string(resolvedB.blue) + ")";
+    reason = "Paragraph " + std::to_string(paraIdx) +
+        " run " + std::to_string(runIdx) +
+        " colorIndex: " + std::to_string(runA.format.colorIndex) +
+        " (" + rgbA + ") vs " + std::to_string(runB.format.colorIndex) +
+        " (" + rgbB + ")" + boundMsg;
+    return true;
+}
+
+RtfCompareResult CompareRtf(const RtfDocument &a, const RtfDocument &b,
                             std::string &reason) {
     // Check for unknown tags
     if (!a.unknownTags.empty()) {
@@ -667,11 +712,24 @@ RtfCompareResult compareRtf(const RtfDocument &a, const RtfDocument &b,
                 return RtfCompareResult::StructuralDiff;
             }
             if (runA.format.fontIndex != runB.format.fontIndex) {
-                reason = "Paragraph " + std::to_string(i) +
-                         " run " + std::to_string(j) +
-                         " fontIndex: " + std::to_string(runA.format.fontIndex) +
-                         " vs " + std::to_string(runB.format.fontIndex);
-                return RtfCompareResult::StructuralDiff;
+                // Resolve font family name for semantic comparison
+                std::string familyA, familyB;
+                bool hasFontA = runA.format.fontIndex >= 0 &&
+                    runA.format.fontIndex < static_cast<int>(a.fonts.size());
+                bool hasFontB = runB.format.fontIndex >= 0 &&
+                    runB.format.fontIndex < static_cast<int>(b.fonts.size());
+                if (hasFontA) familyA = a.fonts[runA.format.fontIndex].family;
+                if (hasFontB) familyB = b.fonts[runB.format.fontIndex].family;
+                if (hasFontA && hasFontB && familyA == familyB) {
+                    // Same resolved font family — skip
+                } else {
+                    reason = "Paragraph " + std::to_string(i) +
+                             " run " + std::to_string(j) +
+                             " fontIndex: " + std::to_string(runA.format.fontIndex) +
+                             " (" + familyA + ") vs " + std::to_string(runB.format.fontIndex) +
+                             " (" + familyB + ")";
+                    return RtfCompareResult::StructuralDiff;
+                }
             }
             if (runA.format.fontSize != runB.format.fontSize) {
                 reason = "Paragraph " + std::to_string(i) +
@@ -681,36 +739,19 @@ RtfCompareResult compareRtf(const RtfDocument &a, const RtfDocument &b,
                 return RtfCompareResult::StructuralDiff;
             }
             if (runA.format.colorIndex != runB.format.colorIndex) {
-                // Resolve to actual color value
-                int colorA = -1, colorB = -1;
-                if (runA.format.colorIndex >= 0 &&
-                    runA.format.colorIndex < static_cast<int>(a.colors.size())) {
-                    colorA = runA.format.colorIndex;
+                if (ResolveAndCompareColors(i, j, runA, runB, a, b, reason)) {
+                    return RtfCompareResult::StructuralDiff;
                 }
-                if (runB.format.colorIndex >= 0 &&
-                    runB.format.colorIndex < static_cast<int>(b.colors.size())) {
-                    colorB = runB.format.colorIndex;
-                }
-                if (colorA >= 0 && colorB >= 0) {
-                    const auto &cA = a.colors[runA.format.colorIndex];
-                    const auto &cB = b.colors[runB.format.colorIndex];
-                    std::string rgbA = "(" + std::to_string(cA.red) + "," +
-                                       std::to_string(cA.green) + "," +
-                                       std::to_string(cA.blue) + ")";
-                    std::string rgbB = "(" + std::to_string(cB.red) + "," +
-                                       std::to_string(cB.green) + "," +
-                                       std::to_string(cB.blue) + ")";
-                    reason = "Paragraph " + std::to_string(i) +
-                             " run " + std::to_string(j) +
-                             " colorIndex: " + std::to_string(runA.format.colorIndex) +
-                             " vs " + std::to_string(runB.format.colorIndex) +
-                             " (RGB: " + rgbA + " vs " + rgbB + ")";
-                } else {
-                    reason = "Paragraph " + std::to_string(i) +
-                             " run " + std::to_string(j) +
-                             " colorIndex: " + std::to_string(runA.format.colorIndex) +
-                             " vs " + std::to_string(runB.format.colorIndex);
-                }
+            }
+            if (runA.format.colorIndex >= 0 &&
+                (!IsColorInBounds(runA.format.colorIndex, a.colors.size()) ||
+                 !IsColorInBounds(runA.format.colorIndex, b.colors.size()))) {
+                reason = "Paragraph " + std::to_string(i) +
+                         " run " + std::to_string(j) +
+                         " colorIndex " + std::to_string(runA.format.colorIndex) +
+                         " out of bounds in color table (A: " +
+                         std::to_string(a.colors.size()) +
+                         ", B: " + std::to_string(b.colors.size()) + ")";
                 return RtfCompareResult::StructuralDiff;
             }
             if (runA.format.superscript != runB.format.superscript) {
@@ -733,11 +774,11 @@ RtfCompareResult compareRtf(const RtfDocument &a, const RtfDocument &b,
     return RtfCompareResult::Identical;
 }
 
-RtfCompareResult compareRtf(const std::string &rtfA, const std::string &rtfB,
+RtfCompareResult CompareRtf(const std::string &rtfA, const std::string &rtfB,
                             std::string &reason) {
-    RtfDocument docA = parseRtf(rtfA);
-    RtfDocument docB = parseRtf(rtfB);
-    return compareRtf(docA, docB, reason);
+    RtfDocument docA = ParseRtf(rtfA);
+    RtfDocument docB = ParseRtf(rtfB);
+    return CompareRtf(docA, docB, reason);
 }
 
 } // namespace Rte

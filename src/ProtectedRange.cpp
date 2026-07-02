@@ -15,11 +15,11 @@ std::size_t ProtectedRange::end() const { return _end; }
 const std::string &ProtectedRange::type() const { return _type; }
 const std::string &ProtectedRange::target() const { return _target; }
 
-bool ProtectedRange::encompasses(std::size_t position) const {
+bool ProtectedRange::Encompasses(std::size_t position) const {
     return position >= _start && position < _end;
 }
 
-bool ProtectedRange::overlaps(std::size_t start, std::size_t end) const {
+bool ProtectedRange::Overlaps(std::size_t start, std::size_t end) const {
     return start < _end && end > _start;
 }
 

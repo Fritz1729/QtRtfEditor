@@ -77,7 +77,7 @@ enum class RtfCompareResult {
  * @param rtf  RTF string (UTF-8).
  * @return     Parsed document.
  */
-RtfDocument parseRtf(const std::string &rtf);
+RtfDocument ParseRtf(const std::string &rtf);
 
 /**
  * @brief Compare two RTF documents for structural equivalence.
@@ -91,13 +91,13 @@ RtfDocument parseRtf(const std::string &rtf);
  *               of the difference (empty if Identical).
  * @return       Identical, UnknownTag, or StructuralDiff.
  */
-RtfCompareResult compareRtf(const RtfDocument &a, const RtfDocument &b,
+RtfCompareResult CompareRtf(const RtfDocument &a, const RtfDocument &b,
                             std::string &reason);
 
 /**
  * @brief Compare two raw RTF strings for structural equivalence.
  */
-RtfCompareResult compareRtf(const std::string &rtfA, const std::string &rtfB,
+RtfCompareResult CompareRtf(const std::string &rtfA, const std::string &rtfB,
                             std::string &reason);
 
 } // namespace Rte

@@ -14,7 +14,7 @@ namespace Rte {
 
 namespace {
 
-std::string extractRtfText(const std::string &rtf) {
+std::string ExtractRtfText(const std::string &rtf) {
     std::string result;
     bool inSkipGroup = false;
     int braceDepth = 0;
@@ -25,7 +25,23 @@ std::string extractRtfText(const std::string &rtf) {
         char c = rtf[i];
 
         if (c == '{') {
-            if (!inSkipGroup) braceDepth++;
+            // Detect groups to skip: fonttbl, colortbl, infotbl, etc.
+            if (braceDepth == 1 && !inSkipGroup) {
+                size_t j = i + 1;
+                while (j < rtf.size() && (rtf[j] == ' ' || rtf[j] == '\t' ||
+                       rtf[j] == '\r' || rtf[j] == '\n')) j++;
+                if (j + 2 < rtf.size() && rtf[j] == '\\' &&
+                    (rtf.compare(j + 1, 7, "fonttbl") == 0 ||
+                     rtf.compare(j + 1, 8, "colortbl") == 0 ||
+                     rtf.compare(j + 1, 7, "infotbl") == 0))
+                {
+                    inSkipGroup = true;
+                    braceDepth = 1;
+                    i++;
+                    continue;
+                }
+            }
+            braceDepth++;
             i++;
             continue;
         }
@@ -33,7 +49,10 @@ std::string extractRtfText(const std::string &rtf) {
         if (c == '}') {
             if (inSkipGroup) {
                 braceDepth--;
-                if (braceDepth <= 0) inSkipGroup = false;
+                if (braceDepth <= 0) {
+                    inSkipGroup = false;
+                    braceDepth = 1;
+                }
             }
             i++;
             continue;
@@ -125,35 +144,35 @@ RichTextEdit::RichTextEdit(QWidget *parent)
 
 RichTextEdit::~RichTextEdit() = default;
 
-void RichTextEdit::load(const std::string &blob, FormatMode mode) {
+void RichTextEdit::Load(const std::string &blob, FormatMode mode) {
     switch (mode) {
         case FormatMode::Rtf:
-            loadRtf(blob);
+            LoadRtf(blob);
             break;
         case FormatMode::Html:
-            loadHtml(blob);
+            LoadHtml(blob);
             break;
     }
-    updateProtection();
+    UpdateProtection();
 }
 
-std::string RichTextEdit::save(FormatMode mode) const {
+std::string RichTextEdit::Save(FormatMode mode) const {
     switch (mode) {
         case FormatMode::Rtf:
-            return serializeRtf();
+            return SerializeRtf();
         case FormatMode::Html:
-            return serializeHtml();
+            return SerializeHtml();
     }
     return {};
 }
 
-void RichTextEdit::setProtection(std::size_t start, std::size_t end,
+void RichTextEdit::SetProtection(std::size_t start, std::size_t end,
                                  std::string type, std::string target)
 {
-    setProtection({ start, end, std::move(type), std::move(target) });
+    SetProtection({ start, end, std::move(type), std::move(target) });
 }
 
-void RichTextEdit::setProtection(const ProtectedRangeInfo &info) {
+void RichTextEdit::SetProtection(const ProtectedRangeInfo &info) {
     // Overwrite any existing range at the same start
     auto it = std::find_if(_protection.begin(), _protection.end(),
         [&info](const ProtectedRangeInfo &p) {
@@ -173,11 +192,11 @@ void RichTextEdit::setProtection(const ProtectedRangeInfo &info) {
         });
 }
 
-void RichTextEdit::clearProtection() {
+void RichTextEdit::ClearProtection() {
     _protection.clear();
 }
 
-void RichTextEdit::checkProtection(const QTextCursor &cursor,
+void RichTextEdit::CheckProtection(const QTextCursor &cursor,
                                    bool &allowed) const
 {
     allowed = true;
@@ -221,30 +240,30 @@ void RichTextEdit::checkProtection(const QTextCursor &cursor,
     }
 }
 
-bool RichTextEdit::isProtected(std::size_t position) const {
-    return positionInProtection(position);
+bool RichTextEdit::IsProtected(std::size_t position) const {
+    return PositionInProtection(position);
 }
 
-std::vector<ProtectedRangeInfo> RichTextEdit::allProtection() const {
+std::vector<ProtectedRangeInfo> RichTextEdit::AllProtection() const {
     return _protection;
 }
 
-void RichTextEdit::setProtectionPolicy(ProtectionPolicy policy) {
+void RichTextEdit::SetProtectionPolicy(ProtectionPolicy policy) {
     _protectionPolicy = policy;
 }
 
-ProtectionPolicy RichTextEdit::protectionPolicy() const {
+ProtectionPolicy RichTextEdit::GetProtectionPolicy() const {
     return _protectionPolicy;
 }
 
-void RichTextEdit::setProtectionViolationHandler(
+void RichTextEdit::SetProtectionViolationHandler(
     ProtectionViolationHandler handler)
 {
     _protectionViolationHandler = std::move(handler);
 }
 
 const ProtectionViolationHandler &
-RichTextEdit::protectionViolationHandler() const
+RichTextEdit::GetProtectionViolationHandler() const
 {
     return _protectionViolationHandler;
 }
@@ -259,7 +278,7 @@ void RichTextEdit::keyPressEvent(QKeyEvent *event) {
         if (cursor.hasSelection() ||
             cursor.position() != cursor.anchor())
         {
-            checkProtection(cursor, allowed);
+            CheckProtection(cursor, allowed);
             if (!allowed) {
                 event->ignore();
                 return;
@@ -274,7 +293,7 @@ void RichTextEdit::insertFromMimeData(const QMimeData *source) {
     bool allowed = true;
     QTextCursor cursor = textCursor();
 
-    checkProtection(cursor, allowed);
+    CheckProtection(cursor, allowed);
     if (!allowed) {
         return;
     }
@@ -282,40 +301,40 @@ void RichTextEdit::insertFromMimeData(const QMimeData *source) {
     QTextEdit::insertFromMimeData(source);
 }
 
-void RichTextEdit::checkProtection(const QTextCursor &cursor, bool &allowed) {
+void RichTextEdit::CheckProtection(const QTextCursor &cursor, bool &allowed) {
     // Delegate to the const version
     const RichTextEdit &c = *this;
-    c.checkProtection(cursor, allowed);
+    c.CheckProtection(cursor, allowed);
 }
 
 void RichTextEdit::keyReleaseEvent(QKeyEvent *event) {
     QTextEdit::keyReleaseEvent(event);
 }
 
-void RichTextEdit::loadRtf(const std::string &blob) {
+void RichTextEdit::LoadRtf(const std::string &blob) {
     // Extract plain text content from RTF, stripping control words
     // and groups. For true RTF import with full Delphi compatibility,
     // a dedicated RTF parser will be implemented later.
-    std::string text = extractRtfText(blob);
+    std::string text = ExtractRtfText(blob);
     QString textStr = QString::fromUtf8(text.data(),
-                                        static_cast<int>(text.size()));
+                                         static_cast<int>(text.size()));
     document()->setPlainText(textStr);
 }
 
-void RichTextEdit::loadHtml(const std::string &blob) {
+void RichTextEdit::LoadHtml(const std::string &blob) {
     setHtml(QString::fromUtf8(blob.data(),
                               static_cast<int>(blob.size())));
 }
 
-std::string RichTextEdit::serializeRtf() const {
-    return exportRtf(*document());
+std::string RichTextEdit::SerializeRtf() const {
+    return ExportRtf(*document());
 }
 
-std::string RichTextEdit::serializeHtml() const {
-    return exportHtml(*document());
+std::string RichTextEdit::SerializeHtml() const {
+    return ExportHtml(*document());
 }
 
-bool RichTextEdit::positionInProtection(std::size_t position) const {
+bool RichTextEdit::PositionInProtection(std::size_t position) const {
     for (const auto &p : _protection) {
         if (position >= p.start && position < p.end) {
             return true;
@@ -324,7 +343,7 @@ bool RichTextEdit::positionInProtection(std::size_t position) const {
     return false;
 }
 
-void RichTextEdit::updateProtection() {
+void RichTextEdit::UpdateProtection() {
     std::size_t docLen = static_cast<std::size_t>(
         document()->toPlainText().size());
 

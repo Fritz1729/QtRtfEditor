@@ -27,52 +27,52 @@ void TestProtectedRanges::test_basic_protection() {
     Rte::RichTextEdit editor;
     editor.setPlainText("Hello World");
 
-    editor.setProtection(0, 5, "test-type", "test-target");
+    editor.SetProtection(0, 5, "test-type", "test-target");
 
-    QVERIFY(editor.isProtected(0));
-    QVERIFY(editor.isProtected(2));
-    QVERIFY(editor.isProtected(4));
-    QVERIFY(!editor.isProtected(5));
-    QVERIFY(!editor.isProtected(10));
+    QVERIFY(editor.IsProtected(0));
+    QVERIFY(editor.IsProtected(2));
+    QVERIFY(editor.IsProtected(4));
+    QVERIFY(!editor.IsProtected(5));
+    QVERIFY(!editor.IsProtected(10));
 }
 
 void TestProtectedRanges::test_multiple_ranges() {
     Rte::RichTextEdit editor;
     editor.setPlainText("AAA BBB CCC");
 
-    editor.setProtection(0, 3, "type1", "target1");
-    editor.setProtection(5, 8, "type2", "target2");
+    editor.SetProtection(0, 3, "type1", "target1");
+    editor.SetProtection(5, 8, "type2", "target2");
 
-    QVERIFY(editor.isProtected(1));
-    QVERIFY(editor.isProtected(6));
-    QVERIFY(!editor.isProtected(3));
-    QVERIFY(!editor.isProtected(4));
-    QVERIFY(!editor.isProtected(8));
+    QVERIFY(editor.IsProtected(1));
+    QVERIFY(editor.IsProtected(6));
+    QVERIFY(!editor.IsProtected(3));
+    QVERIFY(!editor.IsProtected(4));
+    QVERIFY(!editor.IsProtected(8));
 }
 
 void TestProtectedRanges::test_overlapping_ranges() {
     Rte::RichTextEdit editor;
     editor.setPlainText("ABCDEF");
 
-    editor.setProtection(0, 4, "type1", "target1");
-    editor.setProtection(2, 6, "type2", "target2");
+    editor.SetProtection(0, 4, "type1", "target1");
+    editor.SetProtection(2, 6, "type2", "target2");
 
-    std::vector<Rte::ProtectedRangeInfo> all = editor.allProtection();
+    std::vector<Rte::ProtectedRangeInfo> all = editor.AllProtection();
     QCOMPARE(all.size(), static_cast<std::size_t>(2));
 
-    QVERIFY(editor.isProtected(0));
-    QVERIFY(editor.isProtected(1));
-    QVERIFY(editor.isProtected(2));
-    QVERIFY(editor.isProtected(3));
-    QVERIFY(editor.isProtected(4));
-    QVERIFY(editor.isProtected(5));
+    QVERIFY(editor.IsProtected(0));
+    QVERIFY(editor.IsProtected(1));
+    QVERIFY(editor.IsProtected(2));
+    QVERIFY(editor.IsProtected(3));
+    QVERIFY(editor.IsProtected(4));
+    QVERIFY(editor.IsProtected(5));
 }
 
 void TestProtectedRanges::test_protection_policy_none() {
     Rte::RichTextEdit editor;
     editor.setPlainText("Hello World");
-    editor.setProtectionPolicy(Rte::ProtectionPolicy::None);
-    editor.setProtection(0, 5, "test", "target");
+    editor.SetProtectionPolicy(Rte::ProtectionPolicy::None);
+    editor.SetProtection(0, 5, "test", "target");
 
     QKeyEvent event(QKeyEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
     editor.keyPressEvent(&event);
@@ -81,8 +81,8 @@ void TestProtectedRanges::test_protection_policy_none() {
 void TestProtectedRanges::test_protection_policy_block() {
     Rte::RichTextEdit editor;
     editor.setPlainText("Hello World");
-    editor.setProtectionPolicy(Rte::ProtectionPolicy::Block);
-    editor.setProtection(0, 5, "test", "target");
+    editor.SetProtectionPolicy(Rte::ProtectionPolicy::Block);
+    editor.SetProtection(0, 5, "test", "target");
 
     QTextCursor cursor = editor.textCursor();
     cursor.setPosition(0, QTextCursor::KeepAnchor);
@@ -98,11 +98,11 @@ void TestProtectedRanges::test_protection_policy_block() {
 void TestProtectedRanges::test_protection_policy_warn() {
     Rte::RichTextEdit editor;
     editor.setPlainText("Hello World");
-    editor.setProtectionPolicy(Rte::ProtectionPolicy::Warn);
-    editor.setProtection(0, 5, "test", "target");
+    editor.SetProtectionPolicy(Rte::ProtectionPolicy::Warn);
+    editor.SetProtection(0, 5, "test", "target");
 
     bool handlerCalled = false;
-    editor.setProtectionViolationHandler(
+    editor.SetProtectionViolationHandler(
         [&](const Rte::ProtectedRangeInfo &,
             const QTextCursor &) -> bool {
             handlerCalled = true;
@@ -124,13 +124,13 @@ void TestProtectedRanges::test_protection_policy_warn() {
 void TestProtectedRanges::test_handler() {
     Rte::RichTextEdit editor;
     editor.setPlainText("Hello World");
-    editor.setProtectionPolicy(Rte::ProtectionPolicy::Warn);
-    editor.setProtection(0, 5, "test", "target");
+    editor.SetProtectionPolicy(Rte::ProtectionPolicy::Warn);
+    editor.SetProtection(0, 5, "test", "target");
 
     std::string receivedType;
     std::string receivedTarget;
     bool handlerCalled = false;
-    editor.setProtectionViolationHandler(
+    editor.SetProtectionViolationHandler(
         [&](const Rte::ProtectedRangeInfo &info,
             const QTextCursor &) -> bool {
             handlerCalled = true;
@@ -158,10 +158,10 @@ void TestProtectedRanges::test_all_protection() {
     Rte::RichTextEdit editor;
     editor.setPlainText("ABC DEF GHI");
 
-    editor.setProtection(0, 3, "type1", "target1");
-    editor.setProtection(5, 8, "type2", "target2");
+    editor.SetProtection(0, 3, "type1", "target1");
+    editor.SetProtection(5, 8, "type2", "target2");
 
-    std::vector<Rte::ProtectedRangeInfo> all = editor.allProtection();
+    std::vector<Rte::ProtectedRangeInfo> all = editor.AllProtection();
     QCOMPARE(all.size(), static_cast<std::size_t>(2));
     QCOMPARE(all[0].type, std::string("type1"));
     QCOMPARE(all[0].target, std::string("target1"));
@@ -173,26 +173,26 @@ void TestProtectedRanges::test_is_protected() {
     Rte::RichTextEdit editor;
     editor.setPlainText("Test");
 
-    QVERIFY(!editor.isProtected(0));
-    QVERIFY(!editor.isProtected(1));
+    QVERIFY(!editor.IsProtected(0));
+    QVERIFY(!editor.IsProtected(1));
 
-    editor.setProtection(1, 3, "test", "target");
-    QVERIFY(!editor.isProtected(0));
-    QVERIFY(editor.isProtected(1));
-    QVERIFY(editor.isProtected(2));
-    QVERIFY(!editor.isProtected(3));
+    editor.SetProtection(1, 3, "test", "target");
+    QVERIFY(!editor.IsProtected(0));
+    QVERIFY(editor.IsProtected(1));
+    QVERIFY(editor.IsProtected(2));
+    QVERIFY(!editor.IsProtected(3));
 }
 
 void TestProtectedRanges::test_clear_protection() {
     Rte::RichTextEdit editor;
     editor.setPlainText("ABC");
 
-    editor.setProtection(0, 3, "test", "target");
-    QCOMPARE(editor.allProtection().size(), static_cast<std::size_t>(1));
+    editor.SetProtection(0, 3, "test", "target");
+    QCOMPARE(editor.AllProtection().size(), static_cast<std::size_t>(1));
 
-    editor.clearProtection();
-    QCOMPARE(editor.allProtection().size(), static_cast<std::size_t>(0));
-    QVERIFY(!editor.isProtected(0));
+    editor.ClearProtection();
+    QCOMPARE(editor.AllProtection().size(), static_cast<std::size_t>(0));
+    QVERIFY(!editor.IsProtected(0));
 }
 
 void TestProtectedRanges::test_key_press_backspace() {

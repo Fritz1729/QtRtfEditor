@@ -74,7 +74,7 @@ using ProtectionViolationHandler =
  * class MvEditor : public Rte::RichTextEdit
  * {
  * protected:
- *     void checkProtection(const QTextCursor &cursor, bool &allowed) override
+ *     void CheckProtection(const QTextCursor &cursor, bool &allowed) override
  *     {
  *         // MV-specific logic: translate protection types,
  *         // show custom dialogs
@@ -104,9 +104,9 @@ public:
      * Loaded content replaces all document content.
      * Protected ranges are not automatically restored.
      */
-    void load(const std::string &blob, FormatMode mode);
+    void Load(const std::string &blob, FormatMode mode);
 
-    std::string save(FormatMode mode) const;
+    std::string Save(FormatMode mode) const;
 
     // === Protected ranges ===
 
@@ -120,10 +120,10 @@ public:
      * An existing range at the same start is overwritten.
      * New ranges are inserted in sorted order.
      */
-    void setProtection(std::size_t start, std::size_t end,
+    void SetProtection(std::size_t start, std::size_t end,
                        std::string type, std::string target);
 
-    void clearProtection();
+    void ClearProtection();
 
     /**
      * @brief Check whether a cursor may perform an operation on
@@ -132,26 +132,26 @@ public:
      * @param allowed Set to true if the operation is allowed,
      *                otherwise false.
      */
-    void checkProtection(const QTextCursor &cursor, bool &allowed) const;
+    void CheckProtection(const QTextCursor &cursor, bool &allowed) const;
 
     /**
      * @brief Check whether a position lies within a protected range.
      * @param position  Cursor position in the document.
      * @return          true if the position is protected.
      */
-    [[nodiscard]] bool isProtected(std::size_t position) const;
+    [[nodiscard]] bool IsProtected(std::size_t position) const;
 
     /**
      * @brief Retrieve all protected ranges.
      * @return  List of all protection information.
      */
-    [[nodiscard]] std::vector<ProtectedRangeInfo> allProtection() const;
+    [[nodiscard]] std::vector<ProtectedRangeInfo> AllProtection() const;
 
     // === Configuration ===
 
-    void setProtectionPolicy(ProtectionPolicy policy);
+    void SetProtectionPolicy(ProtectionPolicy policy);
 
-    [[nodiscard]] ProtectionPolicy protectionPolicy() const;
+    [[nodiscard]] ProtectionPolicy GetProtectionPolicy() const;
 
     /**
      * @brief Set a handler for protection violations.
@@ -161,9 +161,9 @@ public:
      *
      * @param handler  Callback function.
      */
-    void setProtectionViolationHandler(ProtectionViolationHandler handler);
+    void SetProtectionViolationHandler(ProtectionViolationHandler handler);
 
-    [[nodiscard]] const ProtectionViolationHandler &protectionViolationHandler() const;
+    [[nodiscard]] const ProtectionViolationHandler &GetProtectionViolationHandler() const;
 
     // === Subclassing (virtual methods) ===
 
@@ -172,7 +172,7 @@ public:
     void insertFromMimeData(const QMimeData *source) override;
 
 protected:
-    void setProtection(const ProtectedRangeInfo &info);
+    void SetProtection(const ProtectedRangeInfo &info);
 
     /**
      * @brief Protection check for deletion operations.
@@ -184,27 +184,27 @@ protected:
      * @param cursor  Cursor position of the operation.
      * @param allowed Set to true/false.
      */
-    virtual void checkProtection(const QTextCursor &cursor, bool &allowed);
+    virtual void CheckProtection(const QTextCursor &cursor, bool &allowed);
 
     void keyReleaseEvent(QKeyEvent *event) override;
 
 private:
-    void loadRtf(const std::string &blob);
+    void LoadRtf(const std::string &blob);
 
-    void loadHtml(const std::string &blob);
+    void LoadHtml(const std::string &blob);
 
-    std::string serializeRtf() const;
+    std::string SerializeRtf() const;
 
-    std::string serializeHtml() const;
+    std::string SerializeHtml() const;
 
-    [[nodiscard]] bool positionInProtection(std::size_t position) const;
+    [[nodiscard]] bool PositionInProtection(std::size_t position) const;
 
     /**
      * @brief Update the internal list of protected ranges.
      *
      * Called after every document content change.
      */
-    void updateProtection();
+    void UpdateProtection();
 
     // Members
     ProtectionPolicy _protectionPolicy = ProtectionPolicy::None;

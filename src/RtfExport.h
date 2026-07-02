@@ -24,13 +24,13 @@ namespace Rte {
  * This ensures round-trip compatibility when data is shared with
  * Delphi applications.
  */
-std::string exportRtf(const QTextDocument &document);
+std::string ExportRtf(const QTextDocument &document);
 
 /**
  * @brief Serialize QTextDocument as HTML string.
  * @param document  The QTextDocument to serialize.
  * @return          HTML string (UTF-8, q:-namespaced).
  */
-std::string exportHtml(const QTextDocument &document);
+std::string ExportHtml(const QTextDocument &document);
 
 } // namespace Rte

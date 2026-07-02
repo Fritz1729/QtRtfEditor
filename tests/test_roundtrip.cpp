@@ -4,7 +4,7 @@
 #include <QFile>
 #include <QCoreApplication>
 #include <stdexcept>
-#include "rtf_compare.h"
+#include "RtfCompare.h"
 
 using namespace Rte;
 
@@ -24,9 +24,9 @@ private:
     int _exception = 0;
 };
 
-static bool hasUnknownTags(const std::string &rtf) {
+static bool HasUnknownTags(const std::string &rtf) {
     try {
-        auto doc = parseRtf(rtf);
+        auto doc = ParseRtf(rtf);
         return !doc.unknownTags.empty();
     } catch (...) {
         // Iteration limit or crash — counts as unsupported
@@ -34,8 +34,8 @@ static bool hasUnknownTags(const std::string &rtf) {
     }
 }
 
-static std::string extractText(const std::string &rtf) {
-    auto doc = parseRtf(rtf);
+static std::string ExtractText(const std::string &rtf) {
+    auto doc = ParseRtf(rtf);
     std::string text;
     for (const auto &para : doc.paragraphs) {
         for (const auto &run : para.runs) {
@@ -47,7 +47,7 @@ static std::string extractText(const std::string &rtf) {
     return text;
 }
 
-static std::string readFile(const std::string &path) {
+static std::string ReadFile(const std::string &path) {
     QFile file(QString::fromStdString(path));
     if (!file.exists()) {
         throw std::runtime_error(("File not found: " + path).c_str());
@@ -58,15 +58,12 @@ static std::string readFile(const std::string &path) {
     return file.readAll().toStdString();
 }
 
-static void reportCase(const QString &filename, const char *result) {
+static void ReportCase(const QString &filename, const char *result) {
     qDebug().noquote() << "[" << result << "]" << filename;
 }
 
 void TestRoundtrip::test_rtf_suite() {
-    QString testDataDir = QCoreApplication::applicationDirPath() + "/../testdata";
-    if (!QDir(testDataDir).exists()) {
-        testDataDir = "../testdata";
-    }
+    QString testDataDir = QCoreApplication::applicationDirPath() + "/testdata";
 
     QDir dir(testDataDir);
     QStringList files = dir.entryList(QStringList() << "*.rtf", QDir::Files);
@@ -84,17 +81,17 @@ void TestRoundtrip::test_rtf_suite() {
 
         std::string original;
         try {
-            original = readFile(filepath.toStdString());
+            original = ReadFile(filepath.toStdString());
         } catch (const std::exception &e) {
-            reportCase(filename, "EXCEPTION");
+            ReportCase(filename, "EXCEPTION");
             qWarning() << "File:" << filename << ":" << e.what();
             _exception++;
             continue;
         }
 
         // Skip files with unsupported features (parser iteration limit = unsupported)
-        if (hasUnknownTags(original)) {
-            reportCase(filename, "SKIP (unsupported features)");
+        if (HasUnknownTags(original)) {
+            ReportCase(filename, "SKIP (unsupported features)");
             _skip++;
             continue;
         }
@@ -102,33 +99,31 @@ void TestRoundtrip::test_rtf_suite() {
         // Load/save in main thread
         try {
             Rte::RichTextEdit editor;
-            editor.load(original, Rte::FormatMode::Rtf);
-            std::string saved = editor.save(Rte::FormatMode::Rtf);
+            editor.Load(original, Rte::FormatMode::Rtf);
+            std::string saved = editor.Save(Rte::FormatMode::Rtf);
 
             // Check output for unsupported features too
-            if (hasUnknownTags(saved)) {
-                reportCase(filename, "SKIP (output has unsupported features)");
+            if (HasUnknownTags(saved)) {
+                ReportCase(filename, "SKIP (output has unsupported features)");
                 _skip++;
                 continue;
             }
 
             // Both parse cleanly — compare
-            std::string inputText = extractText(original);
-            std::string outputText = extractText(saved);
-            bool passed = (inputText == outputText);
+            std::string reason;
+            RtfCompareResult result = CompareRtf(original, saved, reason);
+            bool passed = (result == RtfCompareResult::Identical);
 
-            reportCase(filename, passed ? "PASS" : "FAIL");
+            ReportCase(filename, passed ? "PASS" : "FAIL");
 
             if (!passed) {
-                qDebug() << "File:" << filename;
-                qDebug() << "Input text:" << inputText.c_str();
-                qDebug() << "Output text:" << outputText.c_str();
+                qDebug() << "File:" << filename << ":" << QString::fromStdString(reason);
             }
 
             if (passed) _pass++;
             else _fail++;
         } catch (const std::exception &e) {
-            reportCase(filename, "EXCEPTION");
+            ReportCase(filename, "EXCEPTION");
             qWarning() << "File:" << filename << "crashed:" << e.what();
             _exception++;
         }
