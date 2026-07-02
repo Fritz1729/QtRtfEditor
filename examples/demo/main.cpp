@@ -13,7 +13,7 @@ class DemoWindow : public QMainWindow {
     Q_OBJECT
 
 public:
-    explicit DemoWindow(QWidget *parent = nullptr)
+    explicit DemoWindow(QWidget* parent = nullptr)
         : QMainWindow(parent)
     {
         setWindowTitle("QtRtfEditor Demo");
@@ -34,31 +34,31 @@ public:
         try {
             _editor.Load(sampleRtf, Rte::FormatMode::Rtf);
             statusBar()->showMessage("Sample RTF loaded");
-        } catch (const std::exception &e) {
+        } catch (const std::exception& e) {
             statusBar()->showMessage(QString("Error: %1").arg(e.what()));
         }
     }
 
 private:
     void setupMenu() {
-        QMenuBar *bar = menuBar();
+        QMenuBar* bar = menuBar();
 
-        QMenu *file = bar->addMenu("&File");
+        QMenu* file = bar->addMenu("&File");
 
-        QAction *pLoad = file->addAction("&Load RTF...");
+        QAction* pLoad = file->addAction("&Load RTF...");
         connect(pLoad, &QAction::triggered, this, &DemoWindow::LoadFile);
 
-        QAction *pSave = file->addAction("Save &RTF...");
+        QAction* pSave = file->addAction("Save &RTF...");
         connect(pSave, &QAction::triggered, this, &DemoWindow::SaveFile);
 
         file->addSeparator();
 
-        QAction *quit = file->addAction("E&xit");
+        QAction* quit = file->addAction("E&xit");
         connect(quit, &QAction::triggered, this, &QApplication::quit);
 
-        QMenu *format = bar->addMenu("&Format");
+        QMenu* format = bar->addMenu("&Format");
 
-        QAction *bold = format->addAction("&Bold");
+        QAction* bold = format->addAction("&Bold");
         bold->setShortcut(Qt::CTRL | Qt::Key_B);
         connect(bold, &QAction::triggered, this, [this] {
             QTextCharFormat fmt;
@@ -67,20 +67,20 @@ private:
             mergeFormatOnSelection(fmt);
         });
 
-        QMenu *protection = bar->addMenu("&Protection");
+        QMenu* protection = bar->addMenu("&Protection");
 
-        QAction *setProt = protection->addAction("Set &protection...");
+        QAction* setProt = protection->addAction("Set &protection...");
         connect(setProt, &QAction::triggered, this, &DemoWindow::SetProtection);
 
-        QAction *clearProt = protection->addAction("Clear &protection");
+        QAction* clearProt = protection->addAction("Clear &protection");
         connect(clearProt, &QAction::triggered, this, [this] {
             _editor.ClearProtection();
             statusBar()->showMessage("All protection ranges cleared");
         });
 
-        QMenu *help = bar->addMenu("&Help");
+        QMenu* help = bar->addMenu("&Help");
 
-        QAction *about = help->addAction("&About QtRtfEditor");
+        QAction* about = help->addAction("&About QtRtfEditor");
         connect(about, &QAction::triggered, this, [this] {
             QMessageBox::about(this, "About QtRtfEditor",
                 "QtRtfEditor Demo\n"
@@ -108,7 +108,7 @@ private:
         try {
             _editor.Load(data.toStdString(), Rte::FormatMode::Rtf);
             statusBar()->showMessage(QString("Loaded: %1").arg(path));
-        } catch (const std::exception &e) {
+        } catch (const std::exception& e) {
             QMessageBox::critical(this, "Error", e.what());
         }
     }
@@ -168,7 +168,7 @@ private:
             QString("Protection set: [%1] %2").arg(type).arg(target));
     }
 
-    void mergeFormatOnSelection(const QTextCharFormat &format) {
+    void mergeFormatOnSelection(const QTextCharFormat& format) {
         QTextCursor cursor = _editor.textCursor();
         if (cursor.hasSelection()) {
             cursor.mergeCharFormat(format);
@@ -179,7 +179,7 @@ private:
     Rte::RichTextEdit _editor;
 };
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
 
     DemoWindow window;

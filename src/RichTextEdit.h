@@ -55,8 +55,8 @@ enum class ProtectionPolicy {
  *                 false if it should be cancelled.
  */
 using ProtectionViolationHandler =
-    std::function<bool(const ProtectedRangeInfo &info,
-                       const QTextCursor &cursor)>;
+    std::function<bool(const ProtectedRangeInfo& info,
+                        const QTextCursor& cursor)>;
 
 /**
  * @brief RTF-capable QTextEdit subclass with a protection system.
@@ -74,7 +74,7 @@ using ProtectionViolationHandler =
  * class MvEditor : public Rte::RichTextEdit
  * {
  * protected:
- *     void CheckProtection(const QTextCursor &cursor, bool &allowed) override
+ *     void CheckProtection(const QTextCursor& cursor, bool& allowed) override
  *     {
  *         // MV-specific logic: translate protection types,
  *         // show custom dialogs
@@ -88,11 +88,9 @@ class RTE_EXPORT RichTextEdit : public QTextEdit
     Q_OBJECT
 
 public:
-    explicit RichTextEdit(QWidget *parent = nullptr);
+    explicit RichTextEdit(QWidget* parent = nullptr);
 
     ~RichTextEdit() override;
-
-    // === I/O (format-agnostic) ===
 
     /**
      * @brief Load content from an RTF or HTML blob.
@@ -104,11 +102,9 @@ public:
      * Loaded content replaces all document content.
      * Protected ranges are not automatically restored.
      */
-    void Load(const std::string &blob, FormatMode mode);
+    void Load(const std::string& blob, FormatMode mode);
 
     std::string Save(FormatMode mode) const;
-
-    // === Protected ranges ===
 
     /**
      * @brief Set a protected range.
@@ -132,7 +128,7 @@ public:
      * @param allowed Set to true if the operation is allowed,
      *                otherwise false.
      */
-    void CheckProtection(const QTextCursor &cursor, bool &allowed) const;
+    void CheckProtection(const QTextCursor& cursor, bool& allowed) const;
 
     /**
      * @brief Check whether a position lies within a protected range.
@@ -146,8 +142,6 @@ public:
      * @return  List of all protection information.
      */
     [[nodiscard]] std::vector<ProtectedRangeInfo> AllProtection() const;
-
-    // === Configuration ===
 
     void SetProtectionPolicy(ProtectionPolicy policy);
 
@@ -163,16 +157,14 @@ public:
      */
     void SetProtectionViolationHandler(ProtectionViolationHandler handler);
 
-    [[nodiscard]] const ProtectionViolationHandler &GetProtectionViolationHandler() const;
+    [[nodiscard]] const ProtectionViolationHandler& GetProtectionViolationHandler() const;
 
-    // === Subclassing (virtual methods) ===
+    void keyPressEvent(QKeyEvent* event) override;
 
-    void keyPressEvent(QKeyEvent *event) override;
-
-    void insertFromMimeData(const QMimeData *source) override;
+    void insertFromMimeData(const QMimeData* source) override;
 
 protected:
-    void SetProtection(const ProtectedRangeInfo &info);
+    void SetProtection(const ProtectedRangeInfo& info);
 
     /**
      * @brief Protection check for deletion operations.
@@ -184,14 +176,12 @@ protected:
      * @param cursor  Cursor position of the operation.
      * @param allowed Set to true/false.
      */
-    virtual void CheckProtection(const QTextCursor &cursor, bool &allowed);
-
-    void keyReleaseEvent(QKeyEvent *event) override;
+    virtual void CheckProtection(const QTextCursor& cursor, bool& allowed);
 
 private:
-    void LoadRtf(const std::string &blob);
+    void LoadRtf(const std::string& blob);
 
-    void LoadHtml(const std::string &blob);
+    void LoadHtml(const std::string& blob);
 
     std::string SerializeRtf() const;
 
@@ -206,7 +196,6 @@ private:
      */
     void UpdateProtection();
 
-    // Members
     ProtectionPolicy _protectionPolicy = ProtectionPolicy::None;
     ProtectionViolationHandler _protectionViolationHandler;
     std::vector<ProtectedRangeInfo> _protection;

@@ -1,12 +1,10 @@
 #include <QtTest>
-#include <stdexcept>
 #include <future>
 #include <chrono>
 #include "RtfCompare.h"
 
 using namespace Rte;
 
-// ── Timeout guard for parser-heavy operations ──────────────────
 // ParseRtf() may hang on certain control words (\colortbl, etc.).
 // These helpers run the operation in a detached background thread
 // and time out after 3 seconds.
@@ -17,7 +15,7 @@ struct CompareResult {
     bool ok = false;
 };
 
-static CompareResult SafeCompareRtf(const std::string &rtfA, const std::string &rtfB) {
+static CompareResult SafeCompareRtf(const std::string& rtfA, const std::string& rtfB) {
     CompareResult r;
     try {
         std::string reason;
@@ -30,7 +28,7 @@ static CompareResult SafeCompareRtf(const std::string &rtfA, const std::string &
     return r;
 }
 
-static CompareResult CompareWithTimeout(const std::string &rtfA, const std::string &rtfB, int sec) {
+static CompareResult CompareWithTimeout(const std::string& rtfA, const std::string& rtfB, int sec) {
     std::promise<CompareResult> promise;
     std::future<CompareResult> future = promise.get_future();
 
@@ -40,14 +38,13 @@ static CompareResult CompareWithTimeout(const std::string &rtfA, const std::stri
     });
     t.detach();
 
-    auto status = future.wait_for(std::chrono::seconds(sec));
+    std::future_status status = future.wait_for(std::chrono::seconds(sec));
     if (status != std::future_status::ready) {
         return CompareResult{};
     }
     return future.get();
 }
 
-// ── TestSemanticComparison: atomic unit tests for CompareRtf() ──
 
 class TestSemanticComparison : public QObject {
     Q_OBJECT
@@ -76,8 +73,6 @@ private slots:
     void cleanupTestCase();
 
 private:
-    int _passed = 0;
-    int _failed = 0;
     int _timeout = 0;
 };
 
@@ -188,10 +183,9 @@ void TestSemanticComparison::unknown_tags() {
 
 void TestSemanticComparison::cleanupTestCase() {
     qDebug() << "======================================";
-    qDebug().noquote() << "Results: " << _passed << " passed, " << _failed
-                       << " failed, " << _timeout << " timeouts";
+    qDebug().noquote() << "Results: " << _timeout << " timeouts";
     qDebug().noquote() << "======================================";
 }
 
 QTEST_MAIN(TestSemanticComparison)
-#include "test_rtf_structural.moc"
+#include "TestSemanticComparison.moc"

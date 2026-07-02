@@ -51,22 +51,26 @@ The agent applies rules but never adds to the list itself.
 - No separator lines or code repetitions in comments.
 
 ### Language Constructs
-- Use `const` wherever possible; never use `const_cast`
-- Avoid `auto`; exception: structured binding (e.g. `auto [a, b] = ...`)
+- Use `const` wherever possible; `const_cast` is allowed only to add const, never to remove it
+- Avoid `auto`; exceptions: structured binding (e.g. `auto [a, b] = ...`) and iterator declarations (e.g. `auto it = container.begin()`)
 - Raw pointers allowed only as non-owning views; ownership always in `unique_ptr`; avoid `shared_ptr`
 
 ### Formatting
 - 4-space indentation, no tabs
 - Each statement on its own line
 - `const` always before the identifier
-- `*` and `&` immediately after the identifier they qualify
+- `*` and `&` attached to the type, not the variable (e.g. `QWidget* _pWidget`, `const std::string& text`)
 
 ### Naming Conventions
 - Identifiers in English where possible
 - Classes/Structs: `PascalCase`
 - Functions/Methods: `PascalCase`
 - Member variables: `_camelCase` (leading underscore)
-- Pointer/unique_ptr: prefix `p` / `up` in name (e.g. `_pRichTextEdit`, `_upDocument`)
+- Prefixes (after underscore in members)
+  - Not used to show which type is used
+  - pointer: 'p', e.g. 'pText'
+  - unique_ptr: 'up'
+  - non-const reference: 'r'
 
 ### Documentation
 - Use `//` comments for inline notes and implementation context.

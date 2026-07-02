@@ -12,8 +12,8 @@ ProtectedRange::ProtectedRange(std::size_t start, std::size_t end,
 std::size_t ProtectedRange::start() const { return _start; }
 std::size_t ProtectedRange::end() const { return _end; }
 
-const std::string &ProtectedRange::type() const { return _type; }
-const std::string &ProtectedRange::target() const { return _target; }
+const std::string& ProtectedRange::type() const { return _type; }
+const std::string& ProtectedRange::target() const { return _target; }
 
 bool ProtectedRange::Encompasses(std::size_t position) const {
     return position >= _start && position < _end;

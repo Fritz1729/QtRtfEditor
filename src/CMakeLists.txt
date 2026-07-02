@@ -7,6 +7,10 @@ add_library(QtRtfEditor
     ProtectedRange.cpp
     RtfExport.h
     RtfExport.cpp
+    RtfParser.h
+    RtfParser.cpp
+    RtfImport.h
+    RtfImport.cpp
 )
 
 add_library(QtRtfEditor::QtRtfEditor ALIAS QtRtfEditor)
@@ -16,6 +20,7 @@ target_include_directories(QtRtfEditor
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../tests>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 

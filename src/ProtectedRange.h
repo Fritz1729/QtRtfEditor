@@ -29,8 +29,8 @@ public:
 
     [[nodiscard]] std::size_t start() const;
     [[nodiscard]] std::size_t end() const;
-    [[nodiscard]] const std::string &type() const;
-    [[nodiscard]] const std::string &target() const;
+    [[nodiscard]] const std::string& type() const;
+    [[nodiscard]] const std::string& target() const;
 
     [[nodiscard]] bool Encompasses(std::size_t position) const;
     [[nodiscard]] bool Overlaps(std::size_t start, std::size_t end) const;

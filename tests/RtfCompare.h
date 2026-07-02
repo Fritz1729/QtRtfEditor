@@ -7,12 +7,12 @@ namespace Rte {
 
 struct RtfColorEntry {
     int red = 0, green = 0, blue = 0;
-    bool operator==(const RtfColorEntry &) const;
+    bool operator==(const RtfColorEntry &) const = default;
 };
 
 struct RtfFontEntry {
     std::string family;
-    bool operator==(const RtfFontEntry &) const;
+    bool operator==(const RtfFontEntry &) const = default;
 };
 
 struct RtfRunFormat {
@@ -25,7 +25,7 @@ struct RtfRunFormat {
     bool superscript = false;
     bool subscript = false;
 
-    bool operator==(const RtfRunFormat &) const;
+    bool operator==(const RtfRunFormat &) const = default;
 };
 
 struct RtfRun {
@@ -35,22 +35,23 @@ struct RtfRun {
     RtfRun() = default;
     RtfRun(std::string t, RtfRunFormat f) : text(std::move(t)), format(std::move(f)) {}
 
-    bool operator==(const RtfRun &) const;
+    bool operator==(const RtfRun &) const = default;
 };
 
 struct RtfParagraph {
     int alignment = 1;            // Qt::AlignLeft = 1
     int leftIndent = 0;           // half-points
     int firstLineIndent = 0;      // half-points
-    int rightIndent = 0;          // half-points
     std::vector<RtfRun> runs;
 
     RtfParagraph() = default;
 
-    bool operator==(const RtfParagraph &) const;
+    bool operator==(const RtfParagraph &) const = default;
 };
 
 struct RtfDocument {
+    int defaultFontIndex = 0;
+    int defaultFontSize = 0;      // half-points (\fs in header)
     std::vector<RtfColorEntry> colors;
     std::vector<RtfFontEntry> fonts;
     std::vector<RtfParagraph> paragraphs;
@@ -64,22 +65,6 @@ enum class RtfCompareResult {
 };
 
 /**
- * @brief Parse an RTF string into a structural representation.
- *
- * Recognized control words:
- *   Paragraph: \ql, \qc, \qr, \li, \fi, \ri
- *   Character: \b, \b0, \i, \i0, \ul, \ul0, \f, \fs, \cf,
- *              \sub, \sub0, \super, \super0
- *   Tables:    {\colortbl ...}, {\fonttbl ...}
- *
- * Unknown tags are collected and reported via unknownTags.
- *
- * @param rtf  RTF string (UTF-8).
- * @return     Parsed document.
- */
-RtfDocument ParseRtf(const std::string &rtf);
-
-/**
  * @brief Compare two RTF documents for structural equivalence.
  *
  * Compares semantic values (resolved color/ font indices), not raw
@@ -91,13 +76,13 @@ RtfDocument ParseRtf(const std::string &rtf);
  *               of the difference (empty if Identical).
  * @return       Identical, UnknownTag, or StructuralDiff.
  */
-RtfCompareResult CompareRtf(const RtfDocument &a, const RtfDocument &b,
-                            std::string &reason);
+RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
+                             std::string& reason);
 
 /**
  * @brief Compare two raw RTF strings for structural equivalence.
  */
-RtfCompareResult CompareRtf(const std::string &rtfA, const std::string &rtfB,
-                            std::string &reason);
+RtfCompareResult CompareRtf(const std::string& rtfA, const std::string& rtfB,
+                             std::string& reason);
 
 } // namespace Rte

@@ -4,8 +4,6 @@
 class TestProtectedRanges : public QObject {
     Q_OBJECT
 
-    friend class RichTextEdit;
-
 private slots:
     void initTestCase();
     void test_basic_protection();
@@ -131,7 +129,7 @@ void TestProtectedRanges::test_handler() {
     std::string receivedTarget;
     bool handlerCalled = false;
     editor.SetProtectionViolationHandler(
-        [&](const Rte::ProtectedRangeInfo &info,
+        [&](const Rte::ProtectedRangeInfo& info,
             const QTextCursor &) -> bool {
             handlerCalled = true;
             receivedType = info.type;
@@ -204,4 +202,4 @@ void TestProtectedRanges::test_key_press_backspace() {
 }
 
 QTEST_MAIN(TestProtectedRanges)
-#include "test_protected_ranges.moc"
+#include "TestProtectedRanges.moc"
