@@ -30,7 +30,6 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ matrix.qt }}
-          modules: svg
           setup-python: false
         env:
           PIP_BREAK_SYSTEM_PACKAGES: "1"
