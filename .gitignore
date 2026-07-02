@@ -1,0 +1,25 @@
+# Build artifacts
+build/
+CMakeCache.txt
+cmake_install.cmake
+CMakeFiles/
+Makefile
+*.cmake.ninja
+*.ninja
+
+# IDE
+*.pro.user*
+*.sln
+*.vscode/
+.idea/
+*.swp
+*.swo
+
+# Qt
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+
+# OS
+.DS_Store
+Thumbs.db
