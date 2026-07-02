@@ -26,7 +26,7 @@ target_link_libraries(QtRtfEditor
 
 # Export-Symbol-Makro für DLL/Shared-Builds
 target_compile_definitions(QtRtfEditor
-    PRIVATE QRTFEDITOR_BUILD_LIBRARY
+    PRIVATE RTE_BUILD_LIBRARY
 )
 
 set_target_properties(QtRtfEditor PROPERTIES

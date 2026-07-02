@@ -4,25 +4,25 @@
 
 namespace Rte {
 
-ProtectedRange::ProtectedRange(std::size_t start, std::size_t ende,
-                               std::string typ, std::string ziel)
-    : _start(start), _ende(ende), _typ(std::move(typ)),
-      _ziel(std::move(ziel))
+ProtectedRange::ProtectedRange(std::size_t start, std::size_t end,
+                               std::string type, std::string target)
+    : _start(start), _end(end), _type(std::move(type)),
+      _target(std::move(target))
 {
 }
 
 std::size_t ProtectedRange::start() const { return _start; }
-std::size_t ProtectedRange::ende() const { return _ende; }
+std::size_t ProtectedRange::end() const { return _end; }
 
-const std::string &ProtectedRange::typ() const { return _typ; }
-const std::string &ProtectedRange::ziel() const { return _ziel; }
+const std::string &ProtectedRange::type() const { return _type; }
+const std::string &ProtectedRange::target() const { return _target; }
 
-bool ProtectedRange::umfasst(std::size_t position) const {
-    return position >= _start && position < _ende;
+bool ProtectedRange::encompasses(std::size_t position) const {
+    return position >= _start && position < _end;
 }
 
-bool ProtectedRange::ueberschneidet(std::size_t start, std::size_t ende) const {
-    return start < _ende && ende > _start;
+bool ProtectedRange::overlaps(std::size_t start, std::size_t end) const {
+    return start < _end && end > _start;
 }
 
 } // namespace Rte

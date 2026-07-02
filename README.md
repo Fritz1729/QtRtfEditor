@@ -1,25 +1,25 @@
 # QtRtfEditor
 
-Wiederverwendbare **RTF-faehige QTextEdit-Subclass** fuer Qt6.
+A reusable **RTF-capable QTextEdit subclass** for Qt6.
 
 ## Features
 
-- **RTF-Ein- und -Ausgabe**: Laden und Serialisieren von RTF-Daten
-  (Delphi/TRichEdit-kompatibel).
-- **Geschuetzte Textbereiche**: Konfigurierbarer Schutz von
-  Textblöcken vor Loeschoperationen (None, Warn, Block).
-- **Subclassing**: Alle kritischen Methoden sind virtuell,
-  um anwendungsspezifische Erweiterungen zu ermoglichen.
-- **Dual-Licensing**: LGPL-3.0-or-later oder kommerzielle Lizenz.
+- **RTF I/O**: Load and serialize RTF data
+  (Delphi/TRichEdit-compatible).
+- **Protected text ranges**: Configurable protection of
+  text blocks against deletion (None, Warn, Block).
+- **Subclassing**: All critical methods are virtual,
+  enabling application-specific extensions.
+- **Dual licensing**: LGPL-3.0-or-later or commercial license.
 
-## Schnellstart
+## Quick Start
 
 ```bash
-# Bauen
+# Build
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 
-# Demo starten
+# Run demo
 ./build/examples/demo/demo
 
 # Tests
@@ -27,10 +27,10 @@ cd build
 ctest --output-on-failure
 ```
 
-## Integration in CMake-Projekte
+## Integration in CMake Projects
 
 ```cmake
-# CMakeLists.txt Ihres Projekts
+# CMakeLists.txt of your project
 include(FetchContent)
 FetchContent_Declare(QtRtfEditor
     GIT_REPOSITORY https://github.com/Fritz1729/QtRtfEditor.git
@@ -38,21 +38,21 @@ FetchContent_Declare(QtRtfEditor
 )
 FetchContent_MakeAvailable(QtRtfEditor)
 
-# Target verlinken
-target_link_libraries(MeinTarget
+# Link target
+target_link_libraries(MyTarget
     PRIVATE QtRtfEditor::QtRtfEditor
 )
 ```
 
-Alternativ nach `make install`:
+Alternatively, after `make install`:
 
 ```cmake
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 find_package(QtRtfEditor REQUIRED)
-target_link_libraries(MeinTarget PRIVATE QtRtfEditor::QtRtfEditor)
+target_link_libraries(MyTarget PRIVATE QtRtfEditor::QtRtfEditor)
 ```
 
-## Beispiel-Code
+## Example Code
 
 ```cpp
 #include <RichTextEdit/RichTextEdit.h>
@@ -60,15 +60,15 @@ target_link_libraries(MeinTarget PRIVATE QtRtfEditor::QtRtfEditor)
 Rte::RichTextEdit editor;
 editor.setProtectionPolicy(Rte::ProtectionPolicy::Warn);
 
-// RTF laden
-std::string rtf = R"({\rtf1\ansi{\b Fett}{\b0 normal})";
-editor.laden(rtf, Rte::FormatMode::Rtf);
+// Load RTF
+std::string rtf = R"({\rtf1\ansi{\b Bold}{\b0 normal})";
+editor.load(rtf, Rte::FormatMode::Rtf);
 
-// Schutz setzen
-editor.setzeSchutz(0, 4, "Lexikon", "Schlagwort:Beispiel");
+// Set protection
+editor.setProtection(0, 4, "lexicon", "entry:Example");
 
-// RTF speichern
-std::string gespeichert = editor.speichern(Rte::FormatMode::Rtf);
+// Save RTF
+std::string saved = editor.save(Rte::FormatMode::Rtf);
 ```
 
 ## Subclassing
@@ -77,16 +77,16 @@ std::string gespeichert = editor.speichern(Rte::FormatMode::Rtf);
 class MvEditor : public Rte::RichTextEdit
 {
 protected:
-    void pruefeSchutz(const QTextCursor &cursor, bool &erlaubt) override
+    void checkProtection(const QTextCursor &cursor, bool &allowed) override
     {
-        // MV-spezifische Logik: Schutztypen übersetzen,
-        // eigene Dialoge anzeigen
-        Rte::RichTextEdit::pruefeSchutz(cursor, erlaubt);
+        // MV-specific logic: translate protection types,
+        // show custom dialogs
+        Rte::RichTextEdit::checkProtection(cursor, allowed);
     }
 };
 ```
 
-## Lizenz
+## License
 
-Dual-Licensing: **LGPL-3.0-or-later** oder **kommerzielle Lizenz**.
-Siehe [Qt Licensing](https://www.qt.io/licensing) fuer Details.
+Dual licensing: **LGPL-3.0-or-later** or **commercial license**.
+See [Qt Licensing](https://www.qt.io/licensing) for details.

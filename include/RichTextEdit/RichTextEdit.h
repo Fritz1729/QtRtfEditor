@@ -1,13 +1,13 @@
 #pragma once
 // include/RichTextEdit/RichTextEdit.h
 //
-// Installations-Header für QtRtfEditor.
+// Install header for QtRtfEditor.
 //
-// Dieser Header wird bei "make install" in den
-// Include-Pfad kopiert und kann von externem Code
-// mit #include <RichTextEdit/RichTextEdit.h> geladen werden.
+// This header is installed to the include path via
+// "make install" and can be used by external code as:
+//   #include <RichTextEdit/RichTextEdit.h>
 //
-// Alle anderen Header sind implizit ueber
-// <RichTextEdit/protected_range.h> etc. verfuegbar.
+// All other headers are implicitly available via
+// <RichTextEdit/protected_range.h>, etc.
 
 #include "rich_text_edit.h"

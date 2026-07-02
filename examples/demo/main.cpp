@@ -1,22 +1,17 @@
 // examples/demo/main.cpp
 //
-// Minimaler Demonstrator fuer QtRtfEditor.
-//
-// Kompilierung:
-//   cmake -B build -DCMAKE_BUILD_TYPE=Debug
-//   cmake --build build
-//   ./build/examples/demo/demo
+// Minimal demonstrator for QtRtfEditor.
 
-#include <RichTextEdit/RichTextEdit.h>
+#include <QStatusBar>
+#include <rich_text_edit.h>
 #include <QApplication>
-#include <QVBoxLayout>
+#include <QMainWindow>
 #include <QMenuBar>
-#include <QToolBar>
 #include <QAction>
 #include <QFileDialog>
+#include <QInputDialog>
 #include <QMessageBox>
 #include <QFont>
-#include <QStatusBar>
 
 class DemoWindow : public QMainWindow {
     Q_OBJECT
@@ -27,107 +22,92 @@ public:
     {
         setWindowTitle("QtRtfEditor Demo");
         setCentralWidget(&_editor);
-        statusBar()->show();
-        statusBar()->showMessage("Bereit");
+        statusBar()->showMessage("Ready");
 
-        menue();
+        setupMenu();
 
-        // Beispiel: Delphi-kompatiblen RTF laden
-        std::string beispielRtf = R"({\rtf1\ansi\deff0
+        // Example: load Delphi-compatible RTF
+        std::string sampleRtf = R"({\rtf1\ansi\deff0
 {\colortbl ;\red255\green0\blue0;\red0\green128\blue0;}
-{\fonttbl{\f0\froman\fcharset0 Times New Roman;}{\f1\fswiss\fcharset0 Arial;}}
+{\fonttbl{\f0\froman\fcharset0 Times New Roman;}
+         {\f1\fswiss\fcharset0 Arial;}}
 \f0\fs24\ql
-\b Medienverwaltung\b0 Beispiel\r\n
+\b Medienverwaltung\b0 example\r\n
 \r\n
-\f1\fs20 Dieser \i Editor\i0 unterstuetzt \ul RTF\ul0 und \cf1 geschuetzte\cf0 Verweise.\r\n
+\f1\fs20 This \i editor\i0 supports \ul RTF\ul0 and \cf1 protected\cf0 references.\r\n
 })";
         try {
-            _editor.laden(beispielRtf, Rte::FormatMode::Rtf);
-            statusBar()->showMessage("Beispiel-RTF geladen");
+            _editor.load(sampleRtf, Rte::FormatMode::Rtf);
+            statusBar()->showMessage("Sample RTF loaded");
         } catch (const std::exception &e) {
-            statusBar()->showMessage(QString("Fehler: %1").arg(e.what()));
+            statusBar()->showMessage(QString("Error: %1").arg(e.what()));
         }
     }
 
 private:
-    void menue() {
-        QMenuBar *menueBar = menuBar();
+    void setupMenu() {
+        QMenuBar *bar = menuBar();
 
-        // Datei-Menue
-        QMenu *datei = menueBar->addMenu("&Datei");
+        // File menu
+        QMenu *file = bar->addMenu("&File");
 
-        QAction *laden = datei->addAction("&RTF laden...");
-        connect(laden, &QAction::triggered, this, &DemoWindow::dateiLaden);
+        QAction *load = file->addAction("&Load RTF...");
+        connect(load, &QAction::triggered, this, &DemoWindow::loadFile);
 
-        QAction *speichern = datei->addAction("RTF &speichern...");
-        connect(speichern, &QAction::triggered, this, &DemoWindow::dateiSpeichern);
+        QAction *save = file->addAction("Save &RTF...");
+        connect(save, &QAction::triggered, this, &DemoWindow::saveFile);
 
-        datei->addSeparator();
+        file->addSeparator();
 
-        QAction *beenden = datei->addAction("Be&enden");
-        connect(beenden, &QAction::triggered, this, &QApplication::quit);
+        QAction *quit = file->addAction("E&xit");
+        connect(quit, &QAction::triggered, this, &QApplication::quit);
 
-        // Format-Menue
-        QMenu *format = menueBar->addMenu("&Format");
+        // Format menu
+        QMenu *format = bar->addMenu("&Format");
 
-        QAction *fett = format->addAction("&Fett");
-        fett->setShortcut(Qt::CTRL | Qt::Key_B);
-        connect(fett, &QAction::triggered, this, [this] {
+        QAction *bold = format->addAction("&Bold");
+        bold->setShortcut(Qt::CTRL | Qt::Key_B);
+        connect(bold, &QAction::triggered, this, [this] {
             QTextCharFormat fmt;
-            fmt.setFontWeight(fmt.fontWeight() == QFont::Bold ? QFont::Normal : QFont::Bold);
+            fmt.setFontWeight(fmt.fontWeight() == QFont::Bold
+                              ? QFont::Normal : QFont::Bold);
             mergeFormatOnSelection(fmt);
         });
 
-        QAction *kursiv = format->addAction("K&ursiv");
-        kursiv->setShortcut(Qt::CTRL | Qt::Key_I);
-        connect(kursiv, &QAction::triggered, this, [this] {
-            QTextCharFormat fmt;
-            fmt.setFontItalic(!fmt.fontItalic());
-            mergeFormatOnSelection(fmt);
+        // Protection menu
+        QMenu *protection = bar->addMenu("&Protection");
+
+        QAction *setProt = protection->addAction("Set &protection...");
+        connect(setProt, &QAction::triggered, this, &DemoWindow::setProtection);
+
+        QAction *clearProt = protection->addAction("Clear &protection");
+        connect(clearProt, &QAction::triggered, this, [this] {
+            _editor.clearProtection();
+            statusBar()->showMessage("All protection ranges cleared");
         });
 
-        QAction *unterstrichen = format->addAction("&Unterstrichen");
-        unterstrichen->setShortcut(Qt::CTRL | Qt::Key_U);
-        connect(unterstrichen, &QAction::triggered, this, [this] {
-            QTextCharFormat fmt;
-            fmt.setFontUnderline(!fmt.fontUnderline());
-            mergeFormatOnSelection(fmt);
-        });
+        // Help menu
+        QMenu *help = bar->addMenu("&Help");
 
-        // Schutz-Menue
-        QMenu *schutz = menueBar->addMenu("&Schutz");
-
-        QAction *schutzSetzen = schutz->addAction("Schutz &setzen...");
-        connect(schutzSetzen, &QAction::triggered, this, &DemoWindow::schutzSetzen);
-
-        QAction *schutzLoeschen = schutz->addAction("Schutz &loeschen");
-        connect(schutzLoeschen, &QAction::triggered, this, [this] {
-            _editor.loescheSchutz();
-            statusBar()->showMessage("Alle Schutz-Bereiche geloescht");
-        });
-
-        // Hilfe-Menue
-        QMenu *hilfe = menueBar->addMenu("&Hilfe");
-
-        QAction *ueber = hilfe->addAction("&About QtRtfEditor");
-        connect(ueber, &QAction::triggered, this, [this] {
+        QAction *about = help->addAction("&About QtRtfEditor");
+        connect(about, &QAction::triggered, this, [this] {
             QMessageBox::about(this, "About QtRtfEditor",
                 "QtRtfEditor Demo\n"
-                "Wiederverwendbare RTF-faehige QTextEdit-Subclass\n"
+                "Reusable RTF-capable QTextEdit subclass\n"
                 "\n"
-                "Lizenz: Dual (LGPL-3.0+ / kommerziell)");
+                "License: Dual (LGPL-3.0+ / commercial)");
         });
     }
 
-    void dateiLaden() {
-        QString pfad = QFileDialog::getOpenFileName(this,
-            "RTF laden", "", "RTF-Dateien (*.rtf);;Alle Dateien (*)");
-        if (pfad.isEmpty()) return;
+    void loadFile() {
+        QString path = QFileDialog::getOpenFileName(
+            this, "Load RTF", "", "RTF Files (*.rtf);;All Files (*)");
+        if (path.isEmpty()) return;
 
-        QFile file(pfad);
+        QFile file(path);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            QMessageBox::critical(this, "Fehler",
-                QString("Datei kann nicht geoeffnet werden:\n%1").arg(pfad));
+            QMessageBox::critical(this, "Error",
+                QString("Cannot open file:\n%1").arg(path));
             return;
         }
 
@@ -135,60 +115,66 @@ private:
         file.close();
 
         try {
-            _editor.laden(data.toStdString(), Rte::FormatMode::Rtf);
-            statusBar()->showMessage(QString("Geladen: %1").arg(pfad));
+            _editor.load(data.toStdString(), Rte::FormatMode::Rtf);
+            statusBar()->showMessage(QString("Loaded: %1").arg(path));
         } catch (const std::exception &e) {
-            QMessageBox::critical(this, "Fehler", e.what());
+            QMessageBox::critical(this, "Error", e.what());
         }
     }
 
-    void dateiSpeichern() {
-        QString pfad = QFileDialog::getSaveFileName(this,
-            "RTF speichern", "", "RTF-Dateien (*.rtf);;Alle Dateien (*)");
-        if (pfad.isEmpty()) return;
+    void saveFile() {
+        QString path = QFileDialog::getSaveFileName(
+            this, "Save RTF", "", "RTF Files (*.rtf);;All Files (*)");
+        if (path.isEmpty()) return;
 
-        if (!pfad.endsWith(".rtf", Qt::CaseInsensitive)) {
-            pfad += ".rtf";
+        if (!path.endsWith(".rtf", Qt::CaseInsensitive)) {
+            path += ".rtf";
         }
 
-        std::string rtf = _editor.speichern(Rte::FormatMode::Rtf);
+        std::string rtf = _editor.save(Rte::FormatMode::Rtf);
 
-        QFile file(pfad);
+        QFile file(path);
         if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            QMessageBox::critical(this, "Fehler",
-                QString("Datei kann nicht geschrieben werden:\n%1").arg(pfad));
+            QMessageBox::critical(this, "Error",
+                QString("Cannot write file:\n%1").arg(path));
             return;
         }
 
-        file.write(rtf.c_str(), static_cast<QInt64>(rtf.size()));
+        file.write(rtf.c_str(), static_cast<qint64>(rtf.size()));
         file.close();
 
-        statusBar()->showMessage(QString("Gespeichert: %1").arg(pfad));
+        statusBar()->showMessage(QString("Saved: %1").arg(path));
     }
 
-    void schutzSetzen() {
+    void setProtection() {
         QTextCursor cursor = _editor.textCursor();
         if (!cursor.hasSelection()) {
-            statusBar()->showMessage("Bitte markieren Sie zuerst den zu schuetzenden Text");
+            statusBar()->showMessage("Please select text to protect first");
             return;
         }
 
         bool ok;
-        QString typ = QInputDialog::getText(this, "Schutz setzen",
-            "Typ (z. B. 'Lexikon', 'Person'):", QLineEdit::Normal,
-            "Lexikon", &ok);
-        if (!ok || typ.isEmpty()) return;
+        QString type = QInputDialog::getText(
+            this, "Set Protection",
+            "Type (e.g., 'lexicon', 'person'):",
+            QLineEdit::Normal, "lexicon", &ok);
+        if (!ok || type.isEmpty()) return;
 
-        QString ziel = QInputDialog::getText(this, "Schutz setzen",
-            "Ziel-Referenz (z. B. 'Schlagwort:Beispiel'):", QLineEdit::Normal,
-            "", &ok);
+        QString target = QInputDialog::getText(
+            this, "Set Protection",
+            "Target reference (e.g., 'entry:Example'):",
+            QLineEdit::Normal, "", &ok);
         if (!ok) return;
 
-        std::size_t start = static_cast<std::size_t>(cursor.selectionStart());
-        std::size_t ende = static_cast<std::size_t>(cursor.selectionEnd());
+        std::size_t start = static_cast<std::size_t>(
+            cursor.selectionStart());
+        std::size_t end = static_cast<std::size_t>(
+            cursor.selectionEnd());
 
-        _editor.setzeSchutz(start, ende, typ.toStdString(), ziel.toStdString());
-        statusBar()->showMessage(QString("Schutz gesetzt: [%1] %2").arg(typ).arg(ziel));
+        _editor.setProtection(start, end, type.toStdString(),
+                              target.toStdString());
+        statusBar()->showMessage(
+            QString("Protection set: [%1] %2").arg(type).arg(target));
     }
 
     void mergeFormatOnSelection(const QTextCharFormat &format) {

@@ -1,278 +1,289 @@
 #pragma once
 // src/rich_text_edit.h
 //
-// Wiederverwendbare RTF-fähige QTextEdit-Subclass.
+// Reusable RTF-capable QTextEdit subclass.
 //
-// Unterstuetzt:
-//   - Einlesen/Serialisieren von RTF (Delphi/TRichEdit-kompatibel)
-//   - Geschuetzte Textbereiche mit konfigurierbarer Schutzrichtlinie
-//   - Subclassing (virtuelle Methoden) für anwendungsspezifische
-//     Erweiterungen (z. B. MV-spezifische Verweis-Tags)
+// Supports:
+//   - Loading/saving RTF (Delphi/TRichEdit-compatible)
+//   - Protected text ranges with configurable protection policy
+//   - Subclassing (virtual methods) for application-specific
+//     extensions (e.g., MV-specific reference tags)
 //
-// Lizenz: Dual-Licensing (LGPL-3.0-or-later + kommerzielle Lizenz).
-// Siehe https://www.qt.io/licensing fuer Details.
+// License: Dual (LGPL-3.0-or-later + commercial license).
+// See https://www.qt.io/licensing for details.
 
 #include <QTextEdit>
 #include <QTextCursor>
+#include <QKeyEvent>
+#include <QMimeData>
 #include <memory>
 #include <string>
 #include <vector>
 #include <functional>
+
+// Symbol export macro (DLL/shared builds)
+#ifndef RTE_EXPORT
+#  ifdef RTE_BUILD_LIBRARY
+#    if defined(Q_OS_WIN)
+#      define RTE_EXPORT __declspec(dllexport)
+#    else
+#      define RTE_EXPORT __attribute__((visibility("default")))
+#    endif
+#  else
+#    define RTE_EXPORT
+#  endif
+#endif
 
 #include "protected_range.h"
 
 namespace Rte {
 
 /**
- * @brief Schutzrichtlinie bei Schreiboperationen auf geschuetzten
- *        Textbereichen.
+ * @brief Format mode: RTF or HTML.
+ */
+enum class FormatMode { Rtf, Html };
+
+/**
+ * @brief Protection policy for write operations on protected
+ *        text ranges.
  */
 enum class ProtectionPolicy {
-    None,     // Kein Schutz — geschuetzte Bereiche werden ignoriert
-    Warn,     // Warn-Dialog vor dem Löschen geschuetzter Bereiche
-    Block,    // Loeschoperationen auf geschuetzten Bereichen werden
-              // blockiert (ohne Dialog)
+    None,     // No protection — protected ranges are ignored
+    Warn,     // Warning dialog before deleting protected text
+    Block,    // Delete operations on protected ranges are blocked
+              // (without dialog)
 };
 
 /**
- * @brief Signal-Callback für den Schutz-Verstoß-Fall.
+ * @brief Signal callback for protected-range violations.
  *
- * @param info     Informationen über den geschützten Bereich.
- * @param cursor   Cursor-Position der betroffenen Operation.
- * @return         true wenn die Operation fortgesetzt werden soll,
- *                 false wenn sie abgebrochen werden soll.
+ * @param info     Information about the protected range.
+ * @param cursor   Cursor position of the affected operation.
+ * @return         true if the operation should proceed,
+ *                 false if it should be cancelled.
  */
-using SchutzVerstoßHandler =
-    std::function<bool(const SchutzInfo &info, const QTextCursor &cursor)>;
+using ProtectionViolationHandler =
+    std::function<bool(const ProtectedRangeInfo &info,
+                       const QTextCursor &cursor)>;
 
 /**
- * @brief RTF-fähige QTextEdit-Subclass mit Schutz-System.
+ * @brief RTF-capable QTextEdit subclass with a protection system.
  *
- * RichTextEdit ermoeglicht das Laden und Speichern von RTF-Daten
- * (Delphi/TRichEdit-kompatibel) und bietet ein System zum Schutz
- * von Textbereichen vor Loeschoperationen.
+ * RichTextEdit allows loading and saving RTF data
+ * (Delphi/TRichEdit-compatible) and provides a system for protecting
+ * text ranges from deletion operations.
  *
- * Das Widget ist fuer Subclassing konzipiert: Anwendun-gen
- * (wie Medienverwaltung) koennen virtuelle Methoden ueberschreiben,
- * um anwendungsspezifische Verweis-Tags und Schutz-Dialoge
- * zu integrieren.
+ * The widget is designed for subclassing: applications
+ * (such as Medienverwaltung) can override virtual methods to
+ * integrate application-specific reference tags and protection dialogs.
  *
- * Beispiel (Medienverwaltung):
+ * Example (Medienverwaltung):
  * @code
  * class MvEditor : public Rte::RichTextEdit
  * {
  * protected:
- *     void pruefeSchutz(const QTextCursor &cursor, bool &erlaubt) override
+ *     void checkProtection(const QTextCursor &cursor, bool &allowed) override
  *     {
- *         // MV-spezifische Logik: Schutztypen übersetzen,
- *         // eigene Dialoge anzeigen
- *         Rte::RichTextEdit::pruefeSchutz(cursor, erlaubt);
+ *         // MV-specific logic: translate protection types,
+ *         // show custom dialogs
+ *         Rte::RichTextEdit::checkProtection(cursor, allowed);
  *     }
  * };
  * @endcode
  */
-class QRTFEDITOR_EXPORT RichTextEdit : public QTextEdit
+class RTE_EXPORT RichTextEdit : public QTextEdit
 {
     Q_OBJECT
 
 public:
     /**
-     * @brief RichTextEdit erstellen.
+     * @brief Create a RichTextEdit.
      *
-     * @param parent  Eltern-Widget.
+     * @param parent  Parent widget.
      */
     explicit RichTextEdit(QWidget *parent = nullptr);
 
     ~RichTextEdit() override;
 
-    // === Ein-/Ausgabe (Format-agnostic) ===
+    // === I/O (format-agnostic) ===
 
     /**
-     * @brief Inhalt aus einem RTF- oder HTML-Blob laden.
+     * @brief Load content from an RTF or HTML blob.
      *
-     * @param blob    RTF- oder HTML-String (UTF-8).
-     * @param mode    Formatmodus (Rtf oder Html).
+     * @param blob    RTF or HTML string (UTF-8).
+     * @param mode    Format mode (Rtf or Html).
      *
-     * @throw std::runtime_error bei schwerwiegenden Lesefehlern.
+     * @throws std::runtime_error on serious read errors.
      *
-     * Der geladene Inhalt ersetzt den gesamten Dokumenteninhalt.
-     * Geschützte Bereiche werden nicht automatisch wiederhergestellt —
-     * das muss ggf. vom aufrufenden Code übernommen werden.
+     * The loaded content replaces all document content.
+     * Protected ranges are not automatically restored —
+     * the calling code must handle this if needed.
      */
-    void laden(const std::string &blob, FormatMode mode);
+    void load(const std::string &blob, FormatMode mode);
 
     /**
-     * @brief Inhalt als RTF- oder HTML-String serialisieren.
+     * @brief Serialize content as RTF or HTML string.
      *
-     * @param mode    Formatmodus (Rtf oder Html).
-     * @return        Serialisierter String (UTF-8).
+     * @param mode    Format mode (Rtf or Html).
+     * @return        Serialized string (UTF-8).
      */
-    std::string speichern(FormatMode mode) const;
+    std::string save(FormatMode mode) const;
 
-    // === Geschützte Bereiche ===
+    // === Protected ranges ===
 
     /**
-     * @brief Geschützten Bereich setzen.
+     * @brief Set a protected range.
      *
-     * @param start   Start-Position im Dokument (0-indexiert).
-     * @param ende    Ende-Position (exkl.).
-     * @param typ     Typ-Bezeichnung (z. B. "Lexikon", "Person").
-     * @param ziel    Ziel-Referenz (z. B. "Schlagwort:Beispiel").
+     * @param start   Start position in document (0-indexed).
+     * @param end     End position (exclusive).
+     * @param type    Type label (e.g., "lexicon", "person").
+     * @param target  Target reference (e.g., "entry:Example").
      *
-     * Ein bestehender Bereich am gleichen Start wird überschrieben.
-     * Neue Bereiche werden sortiert eingefügt.
+     * An existing range at the same start is overwritten.
+     * New ranges are inserted in sorted order.
      */
-    void setzeSchutz(std::size_t start, std::size_t ende,
-                     std::string typ, std::string ziel);
+    void setProtection(std::size_t start, std::size_t end,
+                       std::string type, std::string target);
 
     /**
-     * @brief Alle geschützten Bereiche löschen.
+     * @brief Clear all protected ranges.
      */
-    void loescheSchutz();
+    void clearProtection();
 
     /**
-     * @brief Prüfen, ob ein Cursor eine Operation auf geschütztem
-     *        Text durchführen darf.
+     * @brief Check whether a cursor may perform an operation on
+     *        protected text.
      *
-     * @param cursor   Der aktuelle Cursor.
-     * @param erlaubt  Wird auf true gesetzt, wenn die Operation
-     *                 erlaubt ist, sonst auf false.
+     * @param cursor  The current cursor.
+     * @param allowed Set to true if the operation is allowed,
+     *                otherwise false.
      */
-    void pruefeSchutz(const QTextCursor &cursor, bool &erlaubt) const;
+    void checkProtection(const QTextCursor &cursor, bool &allowed) const;
 
     /**
-     * @brief Prüfen, ob eine Position im geschützten Text liegt.
+     * @brief Check whether a position lies within a protected range.
      *
-     * @param position  Cursor-Position im Dokument.
-     * @return          true wenn die Position geschützt ist.
+     * @param position  Cursor position in the document.
+     * @return          true if the position is protected.
      */
-    bool istGeschuetzt(std::size_t position) const;
+    [[nodiscard]] bool isProtected(std::size_t position) const;
 
     /**
-     * @brief Alle geschützten Bereiche abrufen.
+     * @brief Retrieve all protected ranges.
      *
-     * @return  Liste aller Schutz-Informationen.
+     * @return  List of all protection information.
      */
-    [[nodiscard]] std::vector<SchutzInfo> alleSchutz() const;
+    [[nodiscard]] std::vector<ProtectedRangeInfo> allProtection() const;
 
-    // === Konfiguration ===
+    // === Configuration ===
 
     /**
-     * @brief Schutzrichtlinie setzen.
+     * @brief Set the protection policy.
      */
     void setProtectionPolicy(ProtectionPolicy policy);
 
     /**
-     * @brief Schutzrichtlinie abfragen.
+     * @brief Get the protection policy.
      */
     [[nodiscard]] ProtectionPolicy protectionPolicy() const;
 
     /**
-     * @brief Handler für Schutzverstoß-Signale setzen.
+     * @brief Set a handler for protection violations.
      *
-     * Der Handler wird aufgerufen, wenn eine Löschoperation auf
-     * einem geschützten Bereich attempted wird (bei Warn-Modus).
+     * The handler is called when a deletion operation attempts
+     * to modify a protected range (in Warn mode).
      *
-     * @param handler  Callback-Funktion.
+     * @param handler  Callback function.
      */
-    void setSchutzVerstoßHandler(SchutzVerstoßHandler handler);
+    void setProtectionViolationHandler(ProtectionViolationHandler handler);
 
     /**
-     * @brief Handler für Schutzverstoß-Signale abfragen.
+     * @brief Get the current protection violation handler.
      */
-    [[nodiscard]] const SchutzVerstoßHandler &schutzVerstoßHandler() const;
+    [[nodiscard]] const ProtectionViolationHandler &protectionViolationHandler() const;
 
-    // === Subclassing (virtuelle Methoden) ===
+    // === Subclassing (virtual methods) ===
 
     /**
-     * @brief Tastendruck verarbeiten.
+     * @brief Process keyboard input.
      *
-     * Ueberschreiben für MV-spezifische Tastenkuerzel
-     * (z. B. Verweis-Einfuegen per Ctrl+Shift+V).
+     * Override for MV-specific keyboard shortcuts
+     * (e.g., inserting references via Ctrl+Shift+V).
      */
     void keyPressEvent(QKeyEvent *event) override;
 
     /**
-     * @brief Text aus MimeType einfuegen.
+     * @brief Insert text from MIME data.
      *
-     * Ueberschreiben für MV-spezifische Paste-Logik
-     * (z. B. Erkennung von MV-Verweis-Tags).
-     */
-    bool insertFromMimeData(const QString &source) override;
-
-    /**
-     * @brief Text einfügen.
-     *
-     * Ueberschreiben für MV-spezifische Einfüge-Prüfung
-     * (z. B. Schutz-Prüfung an Einfügeposition).
+     * Override for MV-specific paste logic
+     * (e.g., detecting MV reference tags).
      */
     void insertFromMimeData(const QMimeData *source) override;
 
 protected:
     /**
-     * @brief Geschützten Bereich setzen (von Subclasses aufrufbar).
+     * @brief Set a protected range (callable from subclasses).
      *
-     * @param range  Schutz-Information.
+     * @param info  Protection information.
      */
-    void setzeSchutz(const SchutzInfo &range);
+    void setProtection(const ProtectedRangeInfo &info);
 
     /**
-     * @brief Schutz-Prüfung für Löschoperationen.
+     * @brief Protection check for deletion operations.
      *
-     * Diese Methode wird vor keyPressEvent (Backspace/Delete)
-     * und insertFromMimeData aufgerufen. Subclasses können die
-     * Logik erweitern oder durch eigene ersetzen.
+     * This method is called before keyPressEvent (Backspace/Delete)
+     * and insertFromMimeData. Subclasses can extend or replace
+     * the logic with custom behavior.
      *
-     * @param cursor  Cursor-Position der Operation.
-     * @param erlaubt  Wird auf true/false gesetzt.
+     * @param cursor  Cursor position of the operation.
+     * @param allowed Set to true/false.
      */
-    void pruefeSchutz(const QTextCursor &cursor, bool &erlaubt) override;
+    virtual void checkProtection(const QTextCursor &cursor, bool &allowed);
 
     /**
-     * @brief Tastenlose Navigation verarbeiten (z. B. Pfeiltasten).
+     * @brief Process key release events (e.g., arrow keys).
      *
-     * Optional: von Subclasses für spezialisierte Navigation
-     * überschrieben.
+     * Optional: override for specialized navigation.
      */
     void keyReleaseEvent(QKeyEvent *event) override;
 
 private:
     /**
-     * @brief RTF-Blob in QTextDocument laden.
+     * @brief Load an RTF blob into the QTextDocument.
      */
-    void ladeRtf(const std::string &blob);
+    void loadRtf(const std::string &blob);
 
     /**
-     * @brief HTML-Blob in QTextDocument laden.
+     * @brief Load an HTML blob into the QTextDocument.
      */
-    void ladeHtml(const std::string &blob);
+    void loadHtml(const std::string &blob);
 
     /**
-     * @brief QTextDocument als RTF-String serialisieren.
+     * @brief Serialize the QTextDocument as an RTF string.
      */
-    std::string serialisiereRtf() const;
+    std::string serializeRtf() const;
 
     /**
-     * @brief QTextDocument als HTML-String serialisieren.
+     * @brief Serialize the QTextDocument as an HTML string.
      */
-    std::string serialisiereHtml() const;
+    std::string serializeHtml() const;
 
     /**
-     * @brief Prüft, ob eine Position in einem geschützten Bereich liegt.
+     * @brief Check whether a position falls within a protected range.
      */
-    [[nodiscard]] bool positionInSchutz(std::size_t position) const;
+    [[nodiscard]] bool positionInProtection(std::size_t position) const;
 
     /**
-     * @brief Aktualisiert die interne Liste der geschützten Bereiche.
+     * @brief Update the internal list of protected ranges.
      *
-     * Wird nach jedem Dokumenten-Inhaltswechsel aufgerufen.
+     * Called after every document content change.
      */
-    void aktualisiereSchutz();
+    void updateProtection();
 
-    // Member
+    // Members
     ProtectionPolicy _protectionPolicy = ProtectionPolicy::None;
-    SchutzVerstoßHandler _schutzVerstoßHandler;
-    std::vector<ProtectedRange> _schutz;
+    ProtectionViolationHandler _protectionViolationHandler;
+    std::vector<ProtectedRangeInfo> _protection;
 };
 
 } // namespace Rte

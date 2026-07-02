@@ -19,6 +19,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
+
 # --- Bibliothek ---
 add_subdirectory(src)
 
@@ -62,9 +64,11 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/QtRtfEditor
     )
 
-    export(TARGETS QtRtfEditor::QtRtfEditor
-        NAMESPACE QtRtfEditor::
-        FILE "${CMAKE_CURRENT_BINARY_DIR}/QtRtfEditorTargets.cmake"
+    install(TARGETS QtRtfEditor
+        EXPORT QtRtfEditorTargets
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
     install(EXPORT QtRtfEditorTargets
         NAMESPACE QtRtfEditor::
