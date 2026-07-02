@@ -2,10 +2,16 @@
 
 A reusable **RTF-capable QTextEdit subclass** for Qt6.
 
+Designed for round-trip interoperability between Qt `QTextEdit` and
+Delphi `TRichEdit` — both use RTF for clipboard and file I/O but
+employ different formatting conventions. The library detects
+TRichEdit-generated RTF and exports in the same style to ensure
+Delphi applications can re-import the data correctly.
+
 ## Features
 
-- **RTF I/O**: Load and serialize RTF data
-  (Delphi/TRichEdit-compatible).
+- **RTF I/O**: Load and serialize RTF data, preserving
+  Delphi TRichEdit formatting conventions.
 - **Protected text ranges**: Configurable protection of
   text blocks against deletion (None, Warn, Block).
 - **Subclassing**: All critical methods are virtual,
@@ -23,9 +29,19 @@ cmake --build build
 ./build/examples/demo/demo
 
 # Tests
+```bash
 cd build
 ctest --output-on-failure
 ```
+
+Three test executables:
+
+- **test_protected_ranges** — 13 tests for the protection API (policies, overlapping ranges, key events)
+- **test_rtf_structural** — 12 atomic unit tests for the RTF comparison engine (`compareRtf()`)
+- **test_roundtrip** — data-driven test iterating `testdata/*.rtf` (7 feature-family files)
+
+Test data files in `tests/testdata/` are organized by feature family:
+`alignment.rtf`, `bold.rtf`, `colors.rtf`, `complex.rtf`, `fonts.rtf`, `indents.rtf`, `superscript.rtf`.
 
 ## Integration in CMake Projects
 

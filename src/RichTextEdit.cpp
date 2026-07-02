@@ -1,6 +1,5 @@
 #include "RichTextEdit.h"
 
-#include "RtfImport.h"
 #include "RtfExport.h"
 
 #include <QTextDocument>
@@ -12,6 +11,110 @@
 #include <stdexcept>
 
 namespace Rte {
+
+namespace {
+
+std::string extractRtfText(const std::string &rtf) {
+    std::string result;
+    bool inSkipGroup = false;
+    int braceDepth = 0;
+    bool justAfterControl = false;
+    size_t i = 0;
+
+    while (i < rtf.size()) {
+        char c = rtf[i];
+
+        if (c == '{') {
+            if (!inSkipGroup) braceDepth++;
+            i++;
+            continue;
+        }
+
+        if (c == '}') {
+            if (inSkipGroup) {
+                braceDepth--;
+                if (braceDepth <= 0) inSkipGroup = false;
+            }
+            i++;
+            continue;
+        }
+
+        if (inSkipGroup) {
+            i++;
+            continue;
+        }
+
+        if (c == ';' ) {
+            // Semicolon is an RTF separator, sets control mode
+            justAfterControl = true;
+            i++;
+            continue;
+        }
+
+        if (c == '\\' && i + 1 < rtf.size()) {
+            justAfterControl = false;
+            char next = rtf[i + 1];
+            if (next == '\\' || next == '{' || next == '}') {
+                // Control symbol: \\ \{ \}
+                result += next;
+                i += 2;
+                continue;
+            }
+            if (next >= '0' && next <= '9') {
+                // Control symbol: \1, \2, etc.
+                i += 2;
+                if (i < rtf.size() && rtf[i] >= '0' && rtf[i] <= '9') i++;
+                continue;
+            }
+            if (next == 'u' || next == 'U') {
+                // Unicode escape: \uNNN?
+                i += 2;
+                while (i < rtf.size() && rtf[i] >= '0' && rtf[i] <= '9') i++;
+                if (i < rtf.size() && rtf[i] == '?') i++;
+                continue;
+            }
+            // Control word: skip letters and optional numeric arg
+            i++; // skip '\'
+            while (i < rtf.size() &&
+                   ((rtf[i] >= 'a' && rtf[i] <= 'z') ||
+                    (rtf[i] >= 'A' && rtf[i] <= 'Z'))) {
+                i++;
+            }
+            if (i < rtf.size() && rtf[i] >= '0' && rtf[i] <= '9') {
+                while (i < rtf.size() && rtf[i] >= '0' && rtf[i] <= '9') i++;
+            }
+            justAfterControl = true;
+            continue;
+        }
+
+        // Text character
+        if (justAfterControl) {
+            if (c == '\n' || c == '\r') {
+                // Preserve newlines for paragraph separation
+                result += c;
+                justAfterControl = false;
+                i++;
+                continue;
+            }
+            if (c == ' ' || c == '\t') {
+                justAfterControl = false;
+                i++;
+                continue;
+            }
+            // Non-whitespace after control word — skip it (part of control
+            // word or garbage text)
+            i++;
+            continue;
+        }
+
+        result += c;
+        i++;
+    }
+
+    return result;
+}
+
+} // namespace
 
 RichTextEdit::RichTextEdit(QWidget *parent)
     : QTextEdit(parent)
@@ -190,17 +293,13 @@ void RichTextEdit::keyReleaseEvent(QKeyEvent *event) {
 }
 
 void RichTextEdit::loadRtf(const std::string &blob) {
-    // QTextDocument::setHtml() can also parse RTF-like syntax.
-    // For true RTF import with full Delphi compatibility,
+    // Extract plain text content from RTF, stripping control words
+    // and groups. For true RTF import with full Delphi compatibility,
     // a dedicated RTF parser will be implemented later.
-    QString rtfStr = QString::fromUtf8(blob.data(),
-                                       static_cast<int>(blob.size()));
-
-    if (!rtfStr.trimmed().startsWith("{\\rtf")) {
-        rtfStr = "{\\rtf1\\ansi\\deff0 " + rtfStr + "}";
-    }
-
-    document()->setHtml(rtfStr);
+    std::string text = extractRtfText(blob);
+    QString textStr = QString::fromUtf8(text.data(),
+                                        static_cast<int>(text.size()));
+    document()->setPlainText(textStr);
 }
 
 void RichTextEdit::loadHtml(const std::string &blob) {

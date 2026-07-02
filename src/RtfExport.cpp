@@ -105,12 +105,10 @@ std::string exportRtf(const QTextDocument &document) {
 
         for (const QTextLayout::FormatRange &fmtRange : block.textFormats()) {
             if (fmtRange.length <= 0) continue;
-
-            // FormatRange contains only position/length, not the format.
-            // We'd need to walk the text manually and query the format
-            // at each position. For the MVP we generate
-            // plain text with paragraph formatting only.
         }
+
+        // Separate control words from text with a newline
+        out << "\n";
 
         QString text = block.text();
         if (!text.isEmpty()) {

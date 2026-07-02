@@ -5,8 +5,6 @@ add_library(QtRtfEditor
     RichTextEdit.cpp
     ProtectedRange.h
     ProtectedRange.cpp
-    RtfImport.h
-    RtfImport.cpp
     RtfExport.h
     RtfExport.cpp
 )

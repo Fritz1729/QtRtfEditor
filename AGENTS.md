@@ -10,13 +10,13 @@ Out-of-source build into `build/`. Demo executable: `build/examples/demo/demo`.
 - **src/** — Core library (`QtRtfEditor` shared library):
   - `RichTextEdit.{h,cpp}` — `Rte::RichTextEdit`, `QTextEdit` subclass with RTF/HTML I/O and protected text ranges.
   - `ProtectedRange.{h,cpp}` — `ProtectedRange` class and `ProtectedRangeInfo` struct for managing protected text ranges.
-  - `RtfImport.{h,cpp}` — `Rte::isDelphiCompatible()` — checks whether RTF data contains known Delphi/TRichEdit formatting tags.
   - `RtfExport.{h,cpp}` — Manual RTF generator exporting `QTextDocument` as Delphi/TRichEdit-compatible RTF with color table, font table, alignment, and indentation support. Also exports HTML.
 - **include/RichTextEdit/** — Installable public header (`RichTextEdit.h`), re-exports the `Rte` namespace.
 - **tests/** — Test suite with three test executables:
-  - `test_protected_ranges` — 11 tests for protection policies, overlapping ranges, and key events.
-  - `test_rtf_roundtrip` — 3 tests for RTF save/load preservation.
-  - `test_format_compatibility` — 8 tests for Delphi-compatibility detection and RTF header handling.
+  - `test_protected_ranges` — 13 tests for protection policies, overlapping ranges, and key events.
+  - `test_rtf_structural` — 12 atomic unit tests for `compareRtf()` (shared `rtf_compare.{h,cpp}`).
+  - `test_roundtrip` — One data-driven test method iterating over `testdata/*.rtf`.
+- **tests/testdata/** — Feature-family RTF test files used by `test_roundtrip`.
 - **examples/demo/** — Minimal GUI demo application (`demo` executable) exercising load, save, formatting, and protection features.
 - **cmake/** — CMake package configuration files for `find_package()` support.
 
@@ -25,6 +25,14 @@ Out-of-source build into `build/`. Demo executable: `build/examples/demo/demo`.
 cmake -B build && cmake --build build
 ctest --output-on-failure --test-dir build
 ```
+
+Each executable targets a different layer:
+
+**test_protected_ranges** — unit tests for the `RichTextEdit` protection API.
+
+**test_rtf_structural** — atomic tests for `compareRtf()`. Each test exercises one specific comparison scenario (text, formatting, alignment, colors, fonts, edge cases). Failures document parser or comparison gaps; timeouts are tracked separately.
+
+**test_roundtrip** — data-driven roundtrip test. One method iterates `testdata/*.rtf`, loads each file via `RichTextEdit`, saves it back, and compares the extracted text. Files with unsupported features (parser iteration limit) are skipped. Five outcome counters are tracked: pass, fail, skip, timeout, exception.
 
 ## Version
 `VERSION`-date embedded in `CMakeLists.txt` (`PROJECT_VERSION` → `QtRtfEditorConfigVersion.cmake`).
@@ -69,6 +77,8 @@ The agent applies rules but never adds to the list itself.
 - Information-less section headers (e.g. `// === I/O ===`) are omitted.
 
 ## Working Practices
-- Commit: Never commit without the user's review and approval. Keep messages short. Mention AI assistance (e.g. "AI-assisted").
+- Commit: Never commit without the user's explicit approval. Present a
+  concise summary of all changes and wait for the user to say "commit".
+  Keep commit messages short. Mention AI assistance (e.g. "AI-assisted").
 - Never change the user's design decisions without consultation.
 - Report when design decisions hinder your work.
