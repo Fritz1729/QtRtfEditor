@@ -1,6 +1,4 @@
-// src/protected_range.cpp
-
-#include "protected_range.h"
+#include "ProtectedRange.h"
 
 namespace Rte {
 

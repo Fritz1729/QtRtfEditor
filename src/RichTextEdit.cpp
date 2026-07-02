@@ -1,9 +1,7 @@
-// src/rich_text_edit.cpp
+#include "RichTextEdit.h"
 
-#include "rich_text_edit.h"
-
-#include "rtf_import.h"
-#include "rtf_export.h"
+#include "RtfImport.h"
+#include "RtfExport.h"
 
 #include <QTextDocument>
 #include <QTextCursor>
@@ -23,8 +21,6 @@ RichTextEdit::RichTextEdit(QWidget *parent)
 }
 
 RichTextEdit::~RichTextEdit() = default;
-
-// === I/O ===
 
 void RichTextEdit::load(const std::string &blob, FormatMode mode) {
     switch (mode) {
@@ -47,8 +43,6 @@ std::string RichTextEdit::save(FormatMode mode) const {
     }
     return {};
 }
-
-// === Protected ranges ===
 
 void RichTextEdit::setProtection(std::size_t start, std::size_t end,
                                  std::string type, std::string target)
@@ -96,7 +90,6 @@ void RichTextEdit::checkProtection(const QTextCursor &cursor,
     std::size_t start = static_cast<std::size_t>(cursor.selectionStart());
     std::size_t end = static_cast<std::size_t>(cursor.selectionEnd());
 
-    // Check if the selection overlaps any protected range
     for (const auto &p : _protection) {
         if (start < p.end && end > p.start) {
             if (_protectionPolicy == ProtectionPolicy::Block) {
@@ -104,11 +97,9 @@ void RichTextEdit::checkProtection(const QTextCursor &cursor,
                 return;
             }
 
-            // Warn mode: call handler
             if (_protectionViolationHandler) {
                 allowed = _protectionViolationHandler(p, cursor);
             } else {
-                // Default dialog
                 QMessageBox msgBox;
                 msgBox.setIcon(QMessageBox::Warning);
                 msgBox.setWindowTitle("Protected Text");
@@ -135,8 +126,6 @@ std::vector<ProtectedRangeInfo> RichTextEdit::allProtection() const {
     return _protection;
 }
 
-// === Configuration ===
-
 void RichTextEdit::setProtectionPolicy(ProtectionPolicy policy) {
     _protectionPolicy = policy;
 }
@@ -157,13 +146,10 @@ RichTextEdit::protectionViolationHandler() const
     return _protectionViolationHandler;
 }
 
-// === Subclassing ===
-
 void RichTextEdit::keyPressEvent(QKeyEvent *event) {
     bool allowed = true;
     QTextCursor cursor = textCursor();
 
-    // Backspace / Delete: check protection
     if (event->key() == Qt::Key_Backspace ||
         event->key() == Qt::Key_Delete)
     {
@@ -203,8 +189,6 @@ void RichTextEdit::keyReleaseEvent(QKeyEvent *event) {
     QTextEdit::keyReleaseEvent(event);
 }
 
-// === Private ===
-
 void RichTextEdit::loadRtf(const std::string &blob) {
     // QTextDocument::setHtml() can also parse RTF-like syntax.
     // For true RTF import with full Delphi compatibility,
@@ -212,7 +196,6 @@ void RichTextEdit::loadRtf(const std::string &blob) {
     QString rtfStr = QString::fromUtf8(blob.data(),
                                        static_cast<int>(blob.size()));
 
-    // Add minimal RTF header if needed
     if (!rtfStr.trimmed().startsWith("{\\rtf")) {
         rtfStr = "{\\rtf1\\ansi\\deff0 " + rtfStr + "}";
     }
@@ -246,7 +229,6 @@ void RichTextEdit::updateProtection() {
     std::size_t docLen = static_cast<std::size_t>(
         document()->toPlainText().size());
 
-    // Truncate ranges with start >= docLen
     _protection.erase(
         std::remove_if(_protection.begin(), _protection.end(),
             [docLen](const ProtectedRangeInfo &p) {

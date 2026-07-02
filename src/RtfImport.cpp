@@ -1,6 +1,4 @@
-// src/rtf_import.cpp
-
-#include "rtf_import.h"
+#include "RtfImport.h"
 
 #include <QString>
 

@@ -8,10 +8,10 @@ Out-of-source build into `build/`. Demo executable: `build/examples/demo/demo`.
 
 ## Structure
 - **src/** — Core library (`QtRtfEditor` shared library):
-  - `rich_text_edit.{h,cpp}` — `Rte::RichTextEdit`, `QTextEdit` subclass with RTF/HTML I/O and protected text ranges.
-  - `protected_range.{h,cpp}` — `ProtectedRange` class and `ProtectedRangeInfo` struct for managing protected text ranges.
-  - `rtf_import.{h,cpp}` — `Rte::isDelphiCompatible()` — checks whether RTF data contains known Delphi/TRichEdit formatting tags.
-  - `rtf_export.{h,cpp}` — Manual RTF generator exporting `QTextDocument` as Delphi/TRichEdit-compatible RTF with color table, font table, alignment, and indentation support. Also exports HTML.
+  - `RichTextEdit.{h,cpp}` — `Rte::RichTextEdit`, `QTextEdit` subclass with RTF/HTML I/O and protected text ranges.
+  - `ProtectedRange.{h,cpp}` — `ProtectedRange` class and `ProtectedRangeInfo` struct for managing protected text ranges.
+  - `RtfImport.{h,cpp}` — `Rte::isDelphiCompatible()` — checks whether RTF data contains known Delphi/TRichEdit formatting tags.
+  - `RtfExport.{h,cpp}` — Manual RTF generator exporting `QTextDocument` as Delphi/TRichEdit-compatible RTF with color table, font table, alignment, and indentation support. Also exports HTML.
 - **include/RichTextEdit/** — Installable public header (`RichTextEdit.h`), re-exports the `Rte` namespace.
 - **tests/** — Test suite with three test executables:
   - `test_protected_ranges` — 11 tests for protection policies, overlapping ranges, and key events.
@@ -59,6 +59,14 @@ The agent applies rules but never adds to the list itself.
 - Functions/Methods: `PascalCase`
 - Member variables: `_camelCase` (leading underscore)
 - Pointer/unique_ptr: prefix `p` / `up` in name (e.g. `_pRichTextEdit`, `_upDocument`)
+
+### Documentation
+- Use `//` comments for inline notes and implementation context.
+- Use `/** @brief */` Doxygen blocks on public API declarations where the signature alone doesn't convey the meaning — this enables IDE hover tooltips.
+- Doxygen blocks include `@param`/`@return`/`@throws` when parameter meanings, return conventions, or exception behavior aren't obvious (e.g., exclusive end positions, out-parameters, handler return semantics, protected-range semantics).
+- Doxygen blocks are omitted where the method name is self-evident (e.g. `clearProtection()`, `protectionPolicy()`, `keyPressEvent()`).
+- Top-level file-path comment lines (e.g. `// src/foo.h`) are omitted.
+- Information-less section headers (e.g. `// === I/O ===`) are omitted.
 
 ## Working Practices
 - Commit: Never commit without the user's review and approval. Keep messages short. Mention AI assistance (e.g. "AI-assisted").

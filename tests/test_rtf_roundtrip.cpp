@@ -1,11 +1,4 @@
-// tests/test_rtf_roundtrip.cpp
-//
-// Tests for RTF I/O of RichTextEdit.
-//
-// These tests validate that RTF data can be loaded into
-// RichTextEdit and serialized back to RTF.
-
-#include <rich_text_edit.h>
+#include <RichTextEdit.h>
 #include <QtTest>
 
 class TestRtfRoundtrip : public QObject {
@@ -40,13 +33,11 @@ void TestRtfRoundtrip::test_roundtrip() {
 
     std::string original = editor.save(Rte::FormatMode::Rtf);
 
-    // Load again
     Rte::RichTextEdit editor2;
     editor2.load(original, Rte::FormatMode::Rtf);
 
     std::string loaded = editor2.save(Rte::FormatMode::Rtf);
 
-    // Both RTF blobs should contain the same plain text
     QVERIFY(!original.empty());
     QVERIFY(!loaded.empty());
 }

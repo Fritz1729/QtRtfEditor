@@ -1,12 +1,4 @@
-// src/rtf_export.cpp
-//
-// Generiert RTF aus einem QTextDocument.
-//
-// Hinweis: Die Indent-/Fragment-API von Qt wurde in Qt 6.11
-// grundlegend geaendert. Diese Implementierung deckt die
-// wesentlichen Delphi/TRichEdit-Formatierungen ab.
-
-#include "rtf_export.h"
+#include "RtfExport.h"
 
 #include <QTextDocument>
 #include <QTextBlock>
@@ -50,16 +42,16 @@ std::string rtfEscape(const std::string &text) {
     return result;
 }
 
-int farbeZuCfIndex(const QColor &farbe) {
-    if (farbe.red() == 0 && farbe.green() == 0 && farbe.blue() == 0) return 0;
-    if (farbe.red() > 128 && farbe.green() == 0 && farbe.blue() == 0) return 1;
-    if (farbe.red() == 0 && farbe.green() > 0 && farbe.blue() == 0) return 2;
-    if (farbe.red() == 0 && farbe.green() == 0 && farbe.blue() > 128) return 3;
+int colorToCfIndex(const QColor &color) {
+    if (color.red() == 0 && color.green() == 0 && color.blue() == 0) return 0;
+    if (color.red() > 128 && color.green() == 0 && color.blue() == 0) return 1;
+    if (color.red() == 0 && color.green() > 0 && color.blue() == 0) return 2;
+    if (color.red() == 0 && color.green() == 0 && color.blue() > 128) return 3;
     return 0;
 }
 
-int schriftZuIndex(const QStringList &namen) {
-    for (const QString &name : namen) {
+int fontToIndex(const QStringList &names) {
+    for (const QString &name : names) {
         if (name.contains("Courier", Qt::CaseInsensitive)) return 1;
         if (name.contains("Arial", Qt::CaseInsensitive)) return 2;
         if (name.contains("Symbol", Qt::CaseInsensitive)) return 3;
@@ -67,7 +59,7 @@ int schriftZuIndex(const QStringList &namen) {
     return 0;
 }
 
-std::string ausrichtungZuRtf(Qt::Alignment alignment) {
+std::string alignmentToRtf(Qt::Alignment alignment) {
     if (alignment & Qt::AlignRight) return "\\qr";
     if (alignment & Qt::AlignHCenter) return "\\qc";
     if (alignment & Qt::AlignLeft) return "\\ql";
@@ -76,12 +68,11 @@ std::string ausrichtungZuRtf(Qt::Alignment alignment) {
 
 } // namespace
 
-std::string exportRtf(const QTextDocument &dokument) {
+std::string exportRtf(const QTextDocument &document) {
     std::ostringstream out;
 
     out << "{\\rtf1\\ansi\\deff0";
 
-    // Farbtabelle
     out << "{\\colortbl ;";
     out << "\\red255\\green0\\blue0;";
     out << "\\red0\\green128\\blue0;";
@@ -95,7 +86,6 @@ std::string exportRtf(const QTextDocument &dokument) {
     out << "\\red192\\green192\\blue192;";
     out << "}";
 
-    // Schriftart-Tabelle
     out << "{\\fonttbl";
     out << "{\\f0\\fswiss\\fcharset0 Arial;}";
     out << "{\\f0\\froman\\fcharset0 Times New Roman;}";
@@ -103,26 +93,25 @@ std::string exportRtf(const QTextDocument &dokument) {
     out << "{\\f3\\fnil\\fcharset2 Symbol;}";
     out << "}";
 
-    for (QTextBlock block = dokument.begin(); block.isValid();
+    for (QTextBlock block = document.begin(); block.isValid();
          block = block.next())
     {
         QTextBlockFormat blockFmt = block.blockFormat();
-        out << ausrichtungZuRtf(blockFmt.alignment());
+        out << alignmentToRtf(blockFmt.alignment());
 
-        // Qt 6.11: textIndent() ersetzt leftIndent/firstIndent
+        // Qt 6.11: textIndent() replaces leftIndent/firstIndent
         qreal indent = blockFmt.textIndent();
         if (indent > 0) out << "\\li" << static_cast<int>(indent * 20);
 
         for (const QTextLayout::FormatRange &fmtRange : block.textFormats()) {
             if (fmtRange.length <= 0) continue;
 
-            // FormatRange enthält nur Position/Laenge, nicht das Format.
-            // Wir muessen den Text manuell durchgehen und das Format
-            // an jeder Position abfragen. Fuer das MVP generieren
-            // wir nur Plain-Text mit Absatz-Formatierung.
+            // FormatRange contains only position/length, not the format.
+            // We'd need to walk the text manually and query the format
+            // at each position. For the MVP we generate
+            // plain text with paragraph formatting only.
         }
 
-        // Vereinfacht: Plain-Text des Blocks mit Formatierung
         QString text = block.text();
         if (!text.isEmpty()) {
             out << rtfEscape(text.toUtf8().toStdString());
@@ -135,8 +124,8 @@ std::string exportRtf(const QTextDocument &dokument) {
     return out.str();
 }
 
-std::string exportHtml(const QTextDocument &dokument) {
-    QString html = dokument.toHtml();
+std::string exportHtml(const QTextDocument &document) {
+    QString html = document.toHtml();
     return html.toStdString();
 }
 

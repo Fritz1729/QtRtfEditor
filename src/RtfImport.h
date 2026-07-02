@@ -1,6 +1,5 @@
 #pragma once
-// src/rtf_import.h
-//
+
 // Checks whether an RTF string contains Delphi/TRichEdit-compatible
 // formatting elements.
 
@@ -11,7 +10,6 @@ namespace Rte {
 /**
  * @brief Checks whether an RTF string contains Delphi/TRichEdit-compatible
  *        formatting elements.
- *
  * @param rtf  RTF string.
  * @return     true if known tags (bold, italic, color,
  *             underline, superscript/subscript, alignment, indent)

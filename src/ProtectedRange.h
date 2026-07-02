@@ -1,6 +1,5 @@
 #pragma once
-// src/protected_range.h
-//
+
 // Protected text ranges in RichTextEdit.
 //
 // Each range represents a contiguous text span [start, end)
@@ -22,9 +21,7 @@ struct ProtectedRangeInfo {
     std::string target;       // Target reference (e.g., "entry:Example")
 };
 
-/**
- * @brief Internal representation of a protected range.
- */
+// Internal representation of a protected range.
 class ProtectedRange {
 public:
     ProtectedRange(std::size_t start, std::size_t end,

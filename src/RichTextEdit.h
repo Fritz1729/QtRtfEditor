@@ -1,6 +1,5 @@
 #pragma once
-// src/rich_text_edit.h
-//
+
 // Reusable RTF-capable QTextEdit subclass.
 //
 // Supports:
@@ -34,19 +33,12 @@
 #  endif
 #endif
 
-#include "protected_range.h"
+#include "ProtectedRange.h"
 
 namespace Rte {
 
-/**
- * @brief Format mode: RTF or HTML.
- */
 enum class FormatMode { Rtf, Html };
 
-/**
- * @brief Protection policy for write operations on protected
- *        text ranges.
- */
 enum class ProtectionPolicy {
     None,     // No protection — protected ranges are ignored
     Warn,     // Warning dialog before deleting protected text
@@ -96,11 +88,6 @@ class RTE_EXPORT RichTextEdit : public QTextEdit
     Q_OBJECT
 
 public:
-    /**
-     * @brief Create a RichTextEdit.
-     *
-     * @param parent  Parent widget.
-     */
     explicit RichTextEdit(QWidget *parent = nullptr);
 
     ~RichTextEdit() override;
@@ -109,35 +96,26 @@ public:
 
     /**
      * @brief Load content from an RTF or HTML blob.
-     *
-     * @param blob    RTF or HTML string (UTF-8).
-     * @param mode    Format mode (Rtf or Html).
+     * @param blob  RTF or HTML string (UTF-8).
+     * @param mode  Format mode (Rtf or Html).
      *
      * @throws std::runtime_error on serious read errors.
      *
-     * The loaded content replaces all document content.
-     * Protected ranges are not automatically restored —
-     * the calling code must handle this if needed.
+     * Loaded content replaces all document content.
+     * Protected ranges are not automatically restored.
      */
     void load(const std::string &blob, FormatMode mode);
 
-    /**
-     * @brief Serialize content as RTF or HTML string.
-     *
-     * @param mode    Format mode (Rtf or Html).
-     * @return        Serialized string (UTF-8).
-     */
     std::string save(FormatMode mode) const;
 
     // === Protected ranges ===
 
     /**
      * @brief Set a protected range.
-     *
-     * @param start   Start position in document (0-indexed).
-     * @param end     End position (exclusive).
-     * @param type    Type label (e.g., "lexicon", "person").
-     * @param target  Target reference (e.g., "entry:Example").
+     * @param start  Start position in document (0-indexed).
+     * @param end    End position (exclusive).
+     * @param type   Type label (e.g., "lexicon", "person").
+     * @param target Target reference (e.g., "entry:Example").
      *
      * An existing range at the same start is overwritten.
      * New ranges are inserted in sorted order.
@@ -145,15 +123,11 @@ public:
     void setProtection(std::size_t start, std::size_t end,
                        std::string type, std::string target);
 
-    /**
-     * @brief Clear all protected ranges.
-     */
     void clearProtection();
 
     /**
      * @brief Check whether a cursor may perform an operation on
      *        protected text.
-     *
      * @param cursor  The current cursor.
      * @param allowed Set to true if the operation is allowed,
      *                otherwise false.
@@ -162,7 +136,6 @@ public:
 
     /**
      * @brief Check whether a position lies within a protected range.
-     *
      * @param position  Cursor position in the document.
      * @return          true if the position is protected.
      */
@@ -170,21 +143,14 @@ public:
 
     /**
      * @brief Retrieve all protected ranges.
-     *
      * @return  List of all protection information.
      */
     [[nodiscard]] std::vector<ProtectedRangeInfo> allProtection() const;
 
     // === Configuration ===
 
-    /**
-     * @brief Set the protection policy.
-     */
     void setProtectionPolicy(ProtectionPolicy policy);
 
-    /**
-     * @brief Get the protection policy.
-     */
     [[nodiscard]] ProtectionPolicy protectionPolicy() const;
 
     /**
@@ -197,35 +163,15 @@ public:
      */
     void setProtectionViolationHandler(ProtectionViolationHandler handler);
 
-    /**
-     * @brief Get the current protection violation handler.
-     */
     [[nodiscard]] const ProtectionViolationHandler &protectionViolationHandler() const;
 
     // === Subclassing (virtual methods) ===
 
-    /**
-     * @brief Process keyboard input.
-     *
-     * Override for MV-specific keyboard shortcuts
-     * (e.g., inserting references via Ctrl+Shift+V).
-     */
     void keyPressEvent(QKeyEvent *event) override;
 
-    /**
-     * @brief Insert text from MIME data.
-     *
-     * Override for MV-specific paste logic
-     * (e.g., detecting MV reference tags).
-     */
     void insertFromMimeData(const QMimeData *source) override;
 
 protected:
-    /**
-     * @brief Set a protected range (callable from subclasses).
-     *
-     * @param info  Protection information.
-     */
     void setProtection(const ProtectedRangeInfo &info);
 
     /**
@@ -240,37 +186,17 @@ protected:
      */
     virtual void checkProtection(const QTextCursor &cursor, bool &allowed);
 
-    /**
-     * @brief Process key release events (e.g., arrow keys).
-     *
-     * Optional: override for specialized navigation.
-     */
     void keyReleaseEvent(QKeyEvent *event) override;
 
 private:
-    /**
-     * @brief Load an RTF blob into the QTextDocument.
-     */
     void loadRtf(const std::string &blob);
 
-    /**
-     * @brief Load an HTML blob into the QTextDocument.
-     */
     void loadHtml(const std::string &blob);
 
-    /**
-     * @brief Serialize the QTextDocument as an RTF string.
-     */
     std::string serializeRtf() const;
 
-    /**
-     * @brief Serialize the QTextDocument as an HTML string.
-     */
     std::string serializeHtml() const;
 
-    /**
-     * @brief Check whether a position falls within a protected range.
-     */
     [[nodiscard]] bool positionInProtection(std::size_t position) const;
 
     /**

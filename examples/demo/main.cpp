@@ -1,9 +1,5 @@
-// examples/demo/main.cpp
-//
-// Minimal demonstrator for QtRtfEditor.
-
 #include <QStatusBar>
-#include <rich_text_edit.h>
+#include <RichTextEdit.h>
 #include <QApplication>
 #include <QMainWindow>
 #include <QMenuBar>
@@ -26,7 +22,6 @@ public:
 
         setupMenu();
 
-        // Example: load Delphi-compatible RTF
         std::string sampleRtf = R"({\rtf1\ansi\deff0
 {\colortbl ;\red255\green0\blue0;\red0\green128\blue0;}
 {\fonttbl{\f0\froman\fcharset0 Times New Roman;}
@@ -48,7 +43,6 @@ private:
     void setupMenu() {
         QMenuBar *bar = menuBar();
 
-        // File menu
         QMenu *file = bar->addMenu("&File");
 
         QAction *load = file->addAction("&Load RTF...");
@@ -62,7 +56,6 @@ private:
         QAction *quit = file->addAction("E&xit");
         connect(quit, &QAction::triggered, this, &QApplication::quit);
 
-        // Format menu
         QMenu *format = bar->addMenu("&Format");
 
         QAction *bold = format->addAction("&Bold");
@@ -74,7 +67,6 @@ private:
             mergeFormatOnSelection(fmt);
         });
 
-        // Protection menu
         QMenu *protection = bar->addMenu("&Protection");
 
         QAction *setProt = protection->addAction("Set &protection...");
@@ -86,7 +78,6 @@ private:
             statusBar()->showMessage("All protection ranges cleared");
         });
 
-        // Help menu
         QMenu *help = bar->addMenu("&Help");
 
         QAction *about = help->addAction("&About QtRtfEditor");

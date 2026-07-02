@@ -1,13 +1,5 @@
-// tests/test_format_compatibility.cpp
-//
-// Tests for Delphi/TRichEdit-compatible RTF detection.
-//
-// These tests validate that the function
-// Rte::isDelphiCompatible() correctly recognizes
-// TRichEdit-generated RTF structures.
-
-#include <rich_text_edit.h>
-#include "rtf_import.h"
+#include <RichTextEdit.h>
+#include "RtfImport.h"
 #include <QtTest>
 #include <stdexcept>
 
@@ -51,22 +43,17 @@ void TestFormatCompatibility::test_delphi_compatible_plain() {
 }
 
 void TestFormatCompatibility::test_delphi_compatible_rtf_header() {
-    // Without RTF header (body only)
     std::string rtf = R"({\b Bold})";
     QVERIFY(Rte::isDelphiCompatible(rtf));
 }
 
 void TestFormatCompatibility::test_load_plain_text() {
     Rte::RichTextEdit editor;
-    // Plain text without RTF header — a minimal
-    // header is auto-appended; setHtml() wraps it
     editor.load("Hello World", Rte::FormatMode::Rtf);
-    // MVP: setHtml() may include RTF markup in plain text
     QVERIFY(editor.toPlainText().contains("Hello World"));
 }
 
 void TestFormatCompatibility::test_is_delphi_compatible_html() {
-    // HTML is not Delphi-RTF by definition
     std::string html = "<b>Bold</b>";
     QVERIFY(!Rte::isDelphiCompatible(html));
 }

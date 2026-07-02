@@ -1,6 +1,5 @@
 #pragma once
-// include/RichTextEdit/RichTextEdit.h
-//
+
 // Install header for QtRtfEditor.
 //
 // This header is installed to the include path via
@@ -8,6 +7,6 @@
 //   #include <RichTextEdit/RichTextEdit.h>
 //
 // All other headers are implicitly available via
-// <RichTextEdit/protected_range.h>, etc.
+// <RichTextEdit/ProtectedRange.h>, etc.
 
-#include "rich_text_edit.h"
+#include "RichTextEdit.h"

@@ -1,14 +1,14 @@
 # src/CMakeLists.txt
 
 add_library(QtRtfEditor
-    rich_text_edit.h
-    rich_text_edit.cpp
-    protected_range.h
-    protected_range.cpp
-    rtf_import.h
-    rtf_import.cpp
-    rtf_export.h
-    rtf_export.cpp
+    RichTextEdit.h
+    RichTextEdit.cpp
+    ProtectedRange.h
+    ProtectedRange.cpp
+    RtfImport.h
+    RtfImport.cpp
+    RtfExport.h
+    RtfExport.cpp
 )
 
 add_library(QtRtfEditor::QtRtfEditor ALIAS QtRtfEditor)
@@ -25,7 +25,6 @@ target_link_libraries(QtRtfEditor
         Qt6::Widgets
 )
 
-# Export-Symbol-Makro für DLL/Shared-Builds
 target_compile_definitions(QtRtfEditor
     PRIVATE RTE_BUILD_LIBRARY
 )

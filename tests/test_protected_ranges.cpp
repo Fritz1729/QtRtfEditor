@@ -1,14 +1,9 @@
-// tests/test_protected_ranges.cpp
-//
-// Tests for the protection system of RichTextEdit.
-
-#include <rich_text_edit.h>
+#include <RichTextEdit.h>
 #include <QtTest>
 
 class TestProtectedRanges : public QObject {
     Q_OBJECT
 
-    // Friend access to protected methods
     friend class RichTextEdit;
 
 private slots:
@@ -79,7 +74,6 @@ void TestProtectedRanges::test_protection_policy_none() {
     editor.setProtectionPolicy(Rte::ProtectionPolicy::None);
     editor.setProtection(0, 5, "test", "target");
 
-    // No crash = success
     QKeyEvent event(QKeyEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
     editor.keyPressEvent(&event);
 }
@@ -98,7 +92,6 @@ void TestProtectedRanges::test_protection_policy_block() {
     QKeyEvent event(QKeyEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
     editor.keyPressEvent(&event);
 
-    // Text should be unchanged (blocked)
     QCOMPARE(editor.toPlainText(), QString("Hello World"));
 }
 
@@ -113,7 +106,7 @@ void TestProtectedRanges::test_protection_policy_warn() {
         [&](const Rte::ProtectedRangeInfo &,
             const QTextCursor &) -> bool {
             handlerCalled = true;
-            return false; // block
+            return false;
         });
 
     QTextCursor cursor = editor.textCursor();
@@ -125,7 +118,6 @@ void TestProtectedRanges::test_protection_policy_warn() {
     editor.keyPressEvent(&event);
 
     QVERIFY(handlerCalled);
-    // Text should be unchanged (blocked by handler)
     QCOMPARE(editor.toPlainText(), QString("Hello World"));
 }
 
@@ -144,7 +136,7 @@ void TestProtectedRanges::test_handler() {
             handlerCalled = true;
             receivedType = info.type;
             receivedTarget = info.target;
-            return true; // allow
+            return true;
         });
 
     QTextCursor cursor = editor.textCursor();
@@ -158,7 +150,6 @@ void TestProtectedRanges::test_handler() {
     QVERIFY(handlerCalled);
     QCOMPARE(receivedType, std::string("test"));
     QCOMPARE(receivedTarget, std::string("target"));
-    // Text should be modified (allowed by handler)
     QCOMPARE(editor.toPlainText().size(),
              QString("Hello World").size() - 5);
 }
@@ -210,7 +201,6 @@ void TestProtectedRanges::test_key_press_backspace() {
 
     QKeyEvent event(QKeyEvent::KeyPress, Qt::Key_Backspace, Qt::NoModifier);
     editor.keyPressEvent(&event);
-    // No crash = success
 }
 
 QTEST_MAIN(TestProtectedRanges)
