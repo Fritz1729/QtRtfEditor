@@ -9,4 +9,4 @@
 // All other headers are implicitly available via
 // <RichTextEdit/ProtectedRange.h>, etc.
 
-#include "RichTextEdit.h"
+#include "../src/RichTextEdit.h"
