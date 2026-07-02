@@ -32,6 +32,8 @@ jobs:
           version: ${{ matrix.qt }}
           modules: svg
           setup-python: false
+        env:
+          PIP_BREAK_SYSTEM_PACKAGES: "1"
 
       - name: Configure (Linux/macOS)
         if: runner.os != 'Windows'
