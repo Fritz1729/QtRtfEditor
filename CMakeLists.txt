@@ -1,13 +1,13 @@
 # QtRtfEditor — CMakeLists.txt (Root)
 #
-# Wiederverwendbare RTF-fähige QTextEdit-Subclass.
-# GPLv3-only + kommerzielle Lizenz (Dual-Licensing, Qt-konform).
+# Reusable RTF-capable QTextEdit subclass.
+# GPLv3-only + commercial license (Dual-Licensing, Qt-compliant).
 
 cmake_minimum_required(VERSION 3.16)
 
 project(QtRtfEditor
     VERSION 0.1.0
-    DESCRIPTION "Wiederverwendbare RTF-fähige QTextEdit-Subclass"
+    DESCRIPTION "Reusable RTF-capable QTextEdit subclass"
     HOMEPAGE_URL https://github.com/Fritz1729/QtRtfEditor
     LANGUAGES CXX
 )
@@ -21,7 +21,7 @@ set(CMAKE_AUTOUIC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
-# --- Bibliothek ---
+# --- Library ---
 add_subdirectory(src)
 
 # --- Tests ---
@@ -30,22 +30,22 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     add_subdirectory(tests)
 endif()
 
-# --- Beispiele ---
+# --- Examples ---
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     add_subdirectory(examples/demo)
 endif()
 
-# --- Installation (CMake-Package-Konfiguration) ---
+# --- Installation (CMake Package Configuration) ---
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     include(GNUInstallDirs)
     include(CMakePackageConfigHelpers)
 
-    # Header-Installation
+    # Header Installation
     install(DIRECTORY include/RichTextEdit
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
 
-    # Config-Dateien für find_package()
+    # Config files for find_package()
     configure_package_config_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/cmake/QtRtfEditorConfig.cmake.in"
         "${CMAKE_CURRENT_BINARY_DIR}/QtRtfEditorConfig.cmake"
