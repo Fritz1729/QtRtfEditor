@@ -69,6 +69,7 @@ struct RtfParagraph {
     int spaceBefore = 0;          // half-points
     int spaceAfter = 0;           // half-points
     int lineHeight = 0;           // half-points / twips
+    int slMult = 1;               // line spacing multiplier
     std::vector<RtfRun> runs;
 
     RtfParagraph() = default;

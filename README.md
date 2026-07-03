@@ -76,11 +76,11 @@ ctest --output-on-failure
 
 Three test executables:
 
-- **test_protected_ranges** — 13 tests for the protection API (policies, overlapping ranges, key events)
-- **test_rtf_structural** — 12 atomic unit tests for the RTF comparison engine (`compareRtf()`)
-- **test_roundtrip** — data-driven test iterating `testdata/*.rtf` (7 feature-family files)
+- **test_protected_ranges** — 13 tests for the protection API (`TestProtectedRanges.cpp`)
+- **test_rtf_structural** — 12 atomic unit tests for the RTF comparison engine (`CompareRtf()`, `TestSemanticComparison.cpp`)
+- **test_roundtrip** — data-driven test iterating `tests/TestData/*.rtf` (7 feature-family files)
 
-Test data files in `tests/testdata/` are organized by feature family:
+Test data files in `tests/TestData/` are organized by feature family:
 `alignment.rtf`, `bold.rtf`, `colors.rtf`, `complex.rtf`, `fonts.rtf`, `indents.rtf`, `superscript.rtf`.
 
 ## Integration in CMake Projects

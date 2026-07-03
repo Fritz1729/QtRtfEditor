@@ -7,11 +7,14 @@ using CharProp = RtfControl::CharProp;
 using CharSetProp = RtfControl::CharSetProp;
 using ParaProp = RtfControl::ParaProp;
 using Align = RtfControl::Align;
+using UlStyle = RtfControl::RtfUlStyle;
+using Caps = RtfControl::RtfCaps;
 
 #define DATA(keyword, action, prop) \
     { keyword, action, static_cast<int>(prop) }
 
-const std::array<RtfControl, 38> rtfControlTable = {{
+constexpr RtfControl rtfControlTableEntries[] = {
+    // Character toggles
     DATA("b",        Action::ToggleCharProp,   CharProp::Bold),
     DATA("b0",       Action::ToggleCharProp,   CharProp::Bold),
     DATA("i",        Action::ToggleCharProp,   CharProp::Italic),
@@ -22,21 +25,49 @@ const std::array<RtfControl, 38> rtfControlTable = {{
     DATA("sub0",     Action::ToggleCharProp,   CharProp::Subscript),
     DATA("super",    Action::ToggleCharProp,   CharProp::Superscript),
     DATA("super0",   Action::ToggleCharProp,   CharProp::Superscript),
+    DATA("strike",   Action::ToggleCharProp,   CharProp::Strike),
+    DATA("strike0",  Action::ToggleCharProp,   CharProp::Strike),
 
+    // Character properties with numeric argument
     DATA("f",        Action::SetCharProp,      CharSetProp::FontIndex),
     DATA("fs",       Action::SetCharProp,      CharSetProp::FontSize),
     DATA("cf",       Action::SetCharProp,      CharSetProp::ColorIndex),
+    DATA("cb",       Action::SetCharProp,      CharSetProp::BgColorIndex),
+    DATA("highlight", Action::SetCharProp,     CharSetProp::Highlight),
+    DATA("up",       Action::SetCharProp,      CharSetProp::UpOffset),
+    DATA("dn",       Action::SetCharProp,      CharSetProp::DnOffset),
 
+    // Paragraph properties
     DATA("li",       Action::SetParaProp,      ParaProp::LeftIndent),
     DATA("fi",       Action::SetParaProp,      ParaProp::FirstLineIndent),
+    DATA("ri",       Action::SetParaProp,      ParaProp::RightIndent),
+    DATA("sb",       Action::SetParaProp,      ParaProp::SpaceBefore),
+    DATA("sa",       Action::SetParaProp,      ParaProp::SpaceAfter),
+    DATA("sl",       Action::SetParaProp,      ParaProp::LineHeight),
+    DATA("slmult",   Action::SetParaProp,      ParaProp::SlMult),
 
+    // Alignment
     DATA("ql",       Action::SetAlignment,     Align::Left),
     DATA("qj",       Action::SetAlignment,     Align::Left),
     DATA("qc",       Action::SetAlignment,     Align::Center),
     DATA("qr",       Action::SetAlignment,     Align::Right),
 
+    // Underline styles
+    DATA("uld",      Action::SetUlStyle,       UlStyle::UlDotted),
+    DATA("uldash",   Action::SetUlStyle,       UlStyle::UlDashed),
+    DATA("uldb",     Action::SetUlStyle,       UlStyle::UlDouble),
+    DATA("ulth",     Action::SetUlStyle,       UlStyle::UlThick),
+
+    // Capitalization
+    DATA("caps",     Action::SetCapitalization, Caps::CapsAll),
+    DATA("caps0",    Action::SetCapitalization, Caps::CapsNone),
+    DATA("scaps",    Action::SetCapitalization, Caps::CapsSmall),
+    DATA("scaps0",   Action::SetCapitalization, Caps::CapsNone),
+
+    // Paragraph break
     DATA("par",      Action::EmitParagraph,    0),
 
+    // Header controls
     DATA("rtf",      Action::HeaderControl,    0),
     DATA("ansi",     Action::HeaderControl,    0),
     DATA("deff0",    Action::HeaderControl,    0),
@@ -46,6 +77,7 @@ const std::array<RtfControl, 38> rtfControlTable = {{
     DATA("ucci",     Action::HeaderControl,    0),
     DATA("deff",     Action::HeaderControl,    0),
 
+    // Table controls
     DATA("colortbl", Action::TableControl,     0),
     DATA("fonttbl",  Action::TableControl,     0),
     DATA("red",      Action::TableControl,     0),
@@ -56,6 +88,12 @@ const std::array<RtfControl, 38> rtfControlTable = {{
     DATA("fmodern",  Action::TableControl,     0),
     DATA("fnil",     Action::TableControl,     0),
     DATA("fcharset", Action::TableControl,     0),
-}};
+};
+
+static_assert(std::size(rtfControlTableEntries) == kRtfControlTableSize,
+    "rtfControlTable entry count does not match kRtfControlTableSize in RtfControl.h");
+
+const std::array<RtfControl, std::size(rtfControlTableEntries)> rtfControlTable =
+    std::to_array(rtfControlTableEntries);
 
 } // namespace Rte

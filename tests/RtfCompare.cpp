@@ -12,22 +12,23 @@ static bool IsColorInBounds(int index, size_t tableSize) {
 }
 
 static bool ResolveAndCompareColors(int paraIdx, int runIdx,
-    const RtfRun& runA, const RtfRun& runB,
+    int idxA, int idxB,
     const RtfDocument& a, const RtfDocument& b,
-    std::string& reason) {
+    std::string& reason,
+    const char* fieldName) {
     // Resolve to actual RGB for semantic comparison
     RtfColorEntry resolvedA = {0, 0, 0};
     RtfColorEntry resolvedB = {0, 0, 0};
-    bool hasA = IsColorInBounds(runA.format.colorIndex, a.colors.size());
-    bool hasB = IsColorInBounds(runB.format.colorIndex, b.colors.size());
-    if (hasA) resolvedA = a.colors[runA.format.colorIndex];
-    if (hasB) resolvedB = b.colors[runB.format.colorIndex];
+    bool hasA = IsColorInBounds(idxA, a.colors.size());
+    bool hasB = IsColorInBounds(idxB, b.colors.size());
+    if (hasA) resolvedA = a.colors[idxA];
+    if (hasB) resolvedB = b.colors[idxB];
 
     std::string boundMsg;
     if (!hasA || !hasB) {
-        boundMsg = " [out-of-bounds: A=" + std::to_string(runA.format.colorIndex) +
+        boundMsg = " [out-of-bounds: A=" + std::to_string(idxA) +
             "/" + std::to_string(a.colors.size()) +
-            ", B=" + std::to_string(runB.format.colorIndex) +
+            ", B=" + std::to_string(idxB) +
             "/" + std::to_string(b.colors.size()) + "]";
     }
 
@@ -50,8 +51,8 @@ static bool ResolveAndCompareColors(int paraIdx, int runIdx,
         std::to_string(resolvedB.blue) + ")";
     reason = "Paragraph " + std::to_string(paraIdx) +
         " run " + std::to_string(runIdx) +
-        " colorIndex: " + std::to_string(runA.format.colorIndex) +
-        " (" + rgbA + ") vs " + std::to_string(runB.format.colorIndex) +
+        " " + fieldName + ": " + std::to_string(idxA) +
+        " (" + rgbA + ") vs " + std::to_string(idxB) +
         " (" + rgbB + ")" + boundMsg;
     return true;
 }
@@ -186,6 +187,12 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
                      " vs " + std::to_string(paraB.lineHeight);
             return RtfCompareResult::StructuralDiff;
         }
+        if (paraA.slMult != paraB.slMult) {
+            reason = "Paragraph " + std::to_string(i) +
+                     " slMult: " + std::to_string(paraA.slMult) +
+                     " vs " + std::to_string(paraB.slMult);
+            return RtfCompareResult::StructuralDiff;
+        }
         // Compare runs
         if (paraA.runs.size() != paraB.runs.size()) {
             reason = "Paragraph " + std::to_string(i) +
@@ -256,7 +263,8 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
                 return RtfCompareResult::StructuralDiff;
             }
             if (runA.format.colorIndex != runB.format.colorIndex) {
-                if (ResolveAndCompareColors(i, j, runA, runB, a, b, reason)) {
+                if (ResolveAndCompareColors(i, j, runA.format.colorIndex, runB.format.colorIndex,
+                                           a, b, reason, "colorIndex")) {
                     return RtfCompareResult::StructuralDiff;
                 }
             }
@@ -299,7 +307,8 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
                 return RtfCompareResult::StructuralDiff;
             }
             if (runA.format.bgColorIndex != runB.format.bgColorIndex) {
-                if (ResolveAndCompareColors(i, j, runA, runB, a, b, reason)) {
+                if (ResolveAndCompareColors(i, j, runA.format.bgColorIndex, runB.format.bgColorIndex,
+                                           a, b, reason, "bgColorIndex")) {
                     return RtfCompareResult::StructuralDiff;
                 }
             }

@@ -17,14 +17,26 @@ struct FormatState {
     int fontIndex = 0;
     int fontSize = 0;
     int colorIndex = -1;
+    int bgColorIndex = -1;
+    int highlight = -1;
     bool superscript = false;
     bool subscript = false;
+    bool strikeOut = false;
+    UnderlineStyle underlineStyle = UnderlineStyle::None;
+    Capitalization capitalization = Capitalization::None;
+    int upOffset = 0;
+    int dnOffset = 0;
 };
 
 struct ParagraphState {
     int alignment = 1;            // Qt::AlignLeft
     int leftIndent = 0;
     int firstLineIndent = 0;
+    int rightIndent = 0;
+    int spaceBefore = 0;
+    int spaceAfter = 0;
+    int lineHeight = 0;
+    int slMult = 1;
 };
 
 class RtfParserImpl {
@@ -86,6 +98,8 @@ private:
                 break;
             case RtfControl::CharProp::Underline:
                 m_format.underline = on;
+                if (on) m_format.underlineStyle = UnderlineStyle::Solid;
+                else m_format.underlineStyle = UnderlineStyle::None;
                 break;
             case RtfControl::CharProp::Subscript:
                 m_format.subscript = on;
@@ -93,6 +107,9 @@ private:
             case RtfControl::CharProp::Superscript:
                 m_format.superscript = on;
                 if (on) m_format.subscript = false;
+                break;
+            case RtfControl::CharProp::Strike:
+                m_format.strikeOut = on;
                 break;
             }
             break;
@@ -110,6 +127,18 @@ private:
             case RtfControl::CharSetProp::ColorIndex:
                 if (arg >= 0) m_format.colorIndex = arg;
                 break;
+            case RtfControl::CharSetProp::BgColorIndex:
+                if (arg >= 0) m_format.bgColorIndex = arg;
+                break;
+            case RtfControl::CharSetProp::Highlight:
+                if (arg >= 0) m_format.highlight = arg;
+                break;
+            case RtfControl::CharSetProp::UpOffset:
+                if (arg >= 0) m_format.upOffset = arg;
+                break;
+            case RtfControl::CharSetProp::DnOffset:
+                if (arg >= 0) m_format.dnOffset = arg;
+                break;
             }
             break;
         }
@@ -121,6 +150,21 @@ private:
                 break;
             case RtfControl::ParaProp::FirstLineIndent:
                 m_para.firstLineIndent = arg;
+                break;
+            case RtfControl::ParaProp::RightIndent:
+                m_para.rightIndent = arg;
+                break;
+            case RtfControl::ParaProp::SpaceBefore:
+                m_para.spaceBefore = arg;
+                break;
+            case RtfControl::ParaProp::SpaceAfter:
+                m_para.spaceAfter = arg;
+                break;
+            case RtfControl::ParaProp::LineHeight:
+                m_para.lineHeight = arg;
+                break;
+            case RtfControl::ParaProp::SlMult:
+                if (arg >= 0) m_para.slMult = arg;
                 break;
             }
             break;
@@ -136,6 +180,49 @@ private:
                 break;
             case RtfControl::Align::Right:
                 m_para.alignment = 2;
+                break;
+            }
+            break;
+        }
+        case RtfControl::Action::SetUlStyle: {
+            finalizeRun();
+            auto style = static_cast<RtfControl::RtfUlStyle>(ctrl.value);
+            switch (style) {
+            case RtfControl::RtfUlStyle::UlDotted:
+                m_format.underlineStyle = UnderlineStyle::Dotted;
+                m_format.underline = true;
+                break;
+            case RtfControl::RtfUlStyle::UlDashed:
+                m_format.underlineStyle = UnderlineStyle::Dashed;
+                m_format.underline = true;
+                break;
+            case RtfControl::RtfUlStyle::UlDouble:
+                m_format.underlineStyle = UnderlineStyle::Double;
+                m_format.underline = true;
+                break;
+            case RtfControl::RtfUlStyle::UlThick:
+                m_format.underlineStyle = UnderlineStyle::Thick;
+                m_format.underline = true;
+                break;
+            case RtfControl::RtfUlStyle::UlNone:
+                m_format.underlineStyle = UnderlineStyle::None;
+                m_format.underline = false;
+                break;
+            }
+            break;
+        }
+        case RtfControl::Action::SetCapitalization: {
+            finalizeRun();
+            auto caps = static_cast<RtfControl::RtfCaps>(ctrl.value);
+            switch (caps) {
+            case RtfControl::RtfCaps::CapsAll:
+                m_format.capitalization = Capitalization::AllCaps;
+                break;
+            case RtfControl::RtfCaps::CapsSmall:
+                m_format.capitalization = Capitalization::SmallCaps;
+                break;
+            case RtfControl::RtfCaps::CapsNone:
+                m_format.capitalization = Capitalization::None;
                 break;
             }
             break;
@@ -163,6 +250,11 @@ private:
                 m_doc.paragraphs[k].alignment = m_para.alignment;
                 m_doc.paragraphs[k].leftIndent = m_para.leftIndent;
                 m_doc.paragraphs[k].firstLineIndent = m_para.firstLineIndent;
+                m_doc.paragraphs[k].rightIndent = m_para.rightIndent;
+                m_doc.paragraphs[k].spaceBefore = m_para.spaceBefore;
+                m_doc.paragraphs[k].spaceAfter = m_para.spaceAfter;
+                m_doc.paragraphs[k].lineHeight = m_para.lineHeight;
+                m_doc.paragraphs[k].slMult = m_para.slMult;
                 break;
             }
         }
@@ -183,6 +275,11 @@ private:
         m_para.alignment = 1;
         m_para.leftIndent = 0;
         m_para.firstLineIndent = 0;
+        m_para.rightIndent = 0;
+        m_para.spaceBefore = 0;
+        m_para.spaceAfter = 0;
+        m_para.lineHeight = 0;
+        m_para.slMult = 1;
     }
 
     RtfDocument m_doc;
@@ -496,8 +593,15 @@ private:
         fmt.fontIndex = m_format.fontIndex;
         fmt.fontSize = m_format.fontSize;
         fmt.colorIndex = m_format.colorIndex;
+        fmt.bgColorIndex = m_format.bgColorIndex;
+        fmt.highlight = m_format.highlight;
         fmt.superscript = m_format.superscript;
         fmt.subscript = m_format.subscript;
+        fmt.strikeOut = m_format.strikeOut;
+        fmt.underlineStyle = m_format.underlineStyle;
+        fmt.capitalization = m_format.capitalization;
+        fmt.upOffset = m_format.upOffset;
+        fmt.dnOffset = m_format.dnOffset;
 
         m_doc.paragraphs.back().runs.emplace_back(trimmed, std::move(fmt));
         m_literalText.clear();
