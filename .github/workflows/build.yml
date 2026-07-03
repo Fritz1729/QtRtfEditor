@@ -35,11 +35,7 @@ jobs:
         run: cmake --build build --parallel
 
       - name: Test
-        if: runner.os != 'Windows'
         working-directory: build
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: ctest --output-on-failure --parallel
-
-      - name: Test (Windows)
-        if: runner.os == 'Windows'
-        working-directory: build
-        run: ctest --output-on-failure
