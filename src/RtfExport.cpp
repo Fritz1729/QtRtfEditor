@@ -20,26 +20,6 @@ namespace Rte {
 
 namespace {
 
-constexpr std::array<std::array<uint8_t, 3>, 17> kHighlightPalette = {{
-    {0, 0, 0},       // 0  = black
-    {128, 128, 128}, // 1  = dark gray
-    {128, 0, 0},     // 2  = maroon
-    {0, 128, 0},     // 3  = dark green
-    {128, 128, 0},   // 4  = dark yellow
-    {0, 0, 128},     // 5  = navy
-    {128, 0, 128},   // 6  = purple
-    {0, 128, 128},   // 7  = teal
-    {192, 192, 192}, // 8  = silver
-    {255, 255, 255}, // 9  = white
-    {255, 0, 0},     // 10 = red
-    {0, 255, 0},     // 11 = green
-    {255, 255, 0},   // 12 = yellow
-    {0, 0, 255},     // 13 = blue
-    {255, 0, 255},   // 14 = magenta
-    {0, 255, 255},   // 15 = cyan
-    {128, 128, 128}, // 16 = gray 50%
-}};
-
 static const char* UnderlineStyleTag(UnderlineStyle style) {
     switch (style) {
         case UnderlineStyle::None:       return "";
@@ -50,6 +30,30 @@ static const char* UnderlineStyleTag(UnderlineStyle style) {
         case UnderlineStyle::Thick:      return "\\ulth";
     }
     return "";
+}
+
+static void WriteConditionalFormatOff(std::ostringstream& out, const RtfRunFormat& fmt, bool trailingSpace) {
+    const char* space = trailingSpace ? " " : "";
+    if (fmt.bold) out << "\\b0" << space;
+    if (fmt.italic) out << "\\i0" << space;
+    if (fmt.superscript) out << "\\super0" << space;
+    if (fmt.subscript) out << "\\sub0" << space;
+    if (fmt.colorIndex > 0) out << "\\cf0" << space;
+    if (fmt.bgColorIndex > 0) out << "\\cb0" << space;
+    if (fmt.underlineStyle != UnderlineStyle::None) out << "\\ul0" << space;
+    if (fmt.strikeOut) out << "\\strike0" << space;
+    if (fmt.capitalization == Capitalization::AllCaps) out << "\\caps0" << space;
+    if (fmt.capitalization == Capitalization::SmallCaps) out << "\\scaps0" << space;
+    if (fmt.highlight >= 0) out << "\\highlight0" << space;
+}
+
+static void WriteFormatOff(std::ostringstream& out, const RtfRunFormat& fmt, bool trailingSpace) {
+    const char* space = trailingSpace ? " " : "";
+    if (fmt.underlineStyle != UnderlineStyle::None) out << "\\ul0" << space;
+    if (fmt.strikeOut) out << "\\strike0" << space;
+    if (fmt.capitalization == Capitalization::AllCaps) out << "\\caps0" << space;
+    if (fmt.capitalization == Capitalization::SmallCaps) out << "\\scaps0" << space;
+    if (fmt.highlight >= 0) out << "\\highlight0" << space;
 }
 
 static UnderlineStyle EffectiveUnderlineStyle(const QTextCharFormat& fmt) {
@@ -132,18 +136,15 @@ std::string ExportRtf(const QTextDocument& document) {
                 if (!fam.isEmpty() && fontMap.find(fam.toStdString()) == fontMap.end()) {
                     fontMap[fam.toStdString()] = ++idx;
                 }
-                QColor col = frag.charFormat().foreground().color();
-                if (col.isValid() && col.alpha() == 255 &&
-                    FindColorIndex(colorList, col) < 0) {
-                    colorList.push_back(col);
-                }
-                QBrush bgBrush = frag.charFormat().background();
-                if (bgBrush.style() != Qt::NoBrush) {
-                    QColor bgCol = bgBrush.color();
-                    if (bgCol.isValid() && bgCol.alpha() == 255 &&
-                        FindColorIndex(bgColorList, bgCol) < 0) {
-                        bgColorList.push_back(bgCol);
-                    }
+                auto collectColor = [&](const QColor& col, std::vector<QColor>& list) {
+                    if (col.isValid() && col.alpha() == 255 && FindColorIndex(list, col) < 0)
+                        list.push_back(col);
+                };
+                collectColor(frag.charFormat().foreground().color(), colorList);
+                {
+                    QBrush bgBrush = frag.charFormat().background();
+                    if (bgBrush.style() != Qt::NoBrush)
+                        collectColor(bgBrush.color(), bgColorList);
                 }
                 it++;
             }
@@ -205,33 +206,18 @@ std::string ExportRtf(const QTextDocument& document) {
         QTextBlockFormat blockFmt = block.blockFormat();
         out << AlignmentToRtf(blockFmt.alignment());
 
-        double liVal = blockFmt.leftMargin();
-        if (liVal > 0) {
-            int liHalfPoints = static_cast<int>(liVal * 2.0);
-            out << "\\li" << liHalfPoints;
-        }
-        int indent = blockFmt.indent();
-        if (indent > 0) {
-            int fiHalfPoints = static_cast<int>(indent * 2.0);
-            out << "\\fi" << fiHalfPoints;
-        }
+        auto emitIfPositive = [&](double val, const char* tag) {
+            if (val > 0) {
+                int halfPoints = static_cast<int>(val * 2.0);
+                out << "\\" << tag << halfPoints;
+            }
+        };
 
-        double riVal = blockFmt.rightMargin();
-        if (riVal > 0) {
-            int riHalfPoints = static_cast<int>(riVal * 2.0);
-            out << "\\ri" << riHalfPoints;
-        }
-
-        double sbVal = blockFmt.topMargin();
-        if (sbVal > 0) {
-            int sbHalfPoints = static_cast<int>(sbVal * 2.0);
-            out << "\\sb" << sbHalfPoints;
-        }
-        double saVal = blockFmt.bottomMargin();
-        if (saVal > 0) {
-            int saHalfPoints = static_cast<int>(saVal * 2.0);
-            out << "\\sa" << saHalfPoints;
-        }
+        emitIfPositive(blockFmt.leftMargin(), "li");
+        emitIfPositive(static_cast<double>(blockFmt.indent()), "fi");
+        emitIfPositive(blockFmt.rightMargin(), "ri");
+        emitIfPositive(blockFmt.topMargin(), "sb");
+        emitIfPositive(blockFmt.bottomMargin(), "sa");
 
         int lhType = blockFmt.lineHeightType();
         if (lhType == QTextBlockFormat::FixedHeight) {
@@ -269,22 +255,18 @@ std::string ExportRtf(const QTextDocument& document) {
             auto fIt = fontMap.find(fam.toStdString());
             cur.fontIndex = (fIt != fontMap.end()) ? fIt->second : defaultFontIdx;
 
-            QColor col = charFmt.foreground().color();
-            if (col.isValid() && col.alpha() == 255) {
-                cur.colorIndex = FindColorIndex(colorList, col) + 1;
-            } else {
-                cur.colorIndex = 0;
-            }
-
-            QBrush bgBrush = charFmt.background();
-            if (bgBrush.style() != Qt::NoBrush) {
-                QColor bgCol = bgBrush.color();
-                if (bgCol.isValid() && bgCol.alpha() == 255) {
-                    int bgIdx = FindColorIndex(bgColorList, bgCol);
-                    if (bgIdx >= 0) {
-                        cur.bgColorIndex = bgIdx + 1;
-                    }
+            auto lookupColor = [&](const QColor& col, std::vector<QColor>& list) -> int {
+                if (col.isValid() && col.alpha() == 255) {
+                    int idx = FindColorIndex(list, col);
+                    if (idx >= 0) return idx + 1;
                 }
+                return 0;
+            };
+            cur.colorIndex = lookupColor(charFmt.foreground().color(), colorList);
+            {
+                QBrush bgBrush = charFmt.background();
+                if (bgBrush.style() != Qt::NoBrush)
+                    cur.bgColorIndex = lookupColor(bgBrush.color(), bgColorList);
             }
 
             cur.bold = charFmt.fontWeight() >= 700;
@@ -297,37 +279,20 @@ std::string ExportRtf(const QTextDocument& document) {
 
             if (firstRun || cur != prev) {
                 if (!firstRun) {
-                    if (prev.superscript) out << "\\super0 ";
-                    if (prev.subscript) out << "\\sub0 ";
-                    if (prev.bold) out << "\\b0 ";
-                    if (prev.italic) out << "\\i0 ";
-                    if (prev.colorIndex > 0) out << "\\cf0 ";
-
-                    if (prev.underlineStyle != UnderlineStyle::None) {
-                        out << "\\ul0 ";
-                    }
-                    if (prev.strikeOut) out << "\\strike0 ";
-                    if (prev.capitalization == Capitalization::AllCaps) out << "\\caps0 ";
-                    if (prev.capitalization == Capitalization::SmallCaps) out << "\\scaps0 ";
-                    if (prev.highlight >= 0) out << "\\highlight0 ";
-                    if (prev.bgColorIndex > 0) out << "\\cb0 ";
+                    WriteConditionalFormatOff(out, prev, true);
                 }
 
                 if (cur.fontSize > 0 && (!firstRun || cur.fontSize != prev.fontSize))
                     out << "\\fs" << cur.fontSize << ' ';
                 if (cur.fontIndex != prev.fontIndex)
                     out << "\\f" << cur.fontIndex << ' ';
-                if (cur.colorIndex > 0)
-                    out << "\\cf" << cur.colorIndex << ' ';
-                if (cur.bgColorIndex > 0)
-                    out << "\\cb" << cur.bgColorIndex << ' ';
+                if (cur.colorIndex > 0) out << "\\cf" << cur.colorIndex << ' ';
+                if (cur.bgColorIndex > 0) out << "\\cb" << cur.bgColorIndex << ' ';
                 if (cur.bold) out << "\\b ";
                 if (cur.italic) out << "\\i ";
                 if (cur.strikeOut) out << "\\strike ";
-
                 if (cur.underlineStyle != UnderlineStyle::None)
                     out << UnderlineStyleTag(cur.underlineStyle) << ' ';
-
                 if (cur.superscript) out << "\\super ";
                 if (cur.subscript) out << "\\sub ";
                 if (cur.capitalization == Capitalization::AllCaps) out << "\\caps ";
@@ -342,14 +307,11 @@ std::string ExportRtf(const QTextDocument& document) {
         }
 
         if (!firstRun) {
-            if (prev.underlineStyle != UnderlineStyle::None)
-                out << "\\ul0";
-            if (prev.strikeOut) out << "\\strike0";
-            if (prev.capitalization == Capitalization::AllCaps) out << "\\caps0";
-            if (prev.capitalization == Capitalization::SmallCaps) out << "\\scaps0";
-            if (prev.highlight >= 0) out << "\\highlight0";
+            WriteFormatOff(out, prev, false);
+            out << "\\b0\\i0\\super0\\sub0\\cf0\\par\n";
+        } else {
+            out << "\\b0\\i0\\super0\\sub0\\cf0\\par\n";
         }
-        out << "\\b0\\i0\\super0\\sub0\\cf0\\par\n";
     }
 
     out << "}";

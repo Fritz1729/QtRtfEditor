@@ -34,9 +34,7 @@ void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
     for (const auto& para : doc.paragraphs) {
         QTextBlockFormat blockFmt;
 
-        if (para.alignment == 1) blockFmt.setAlignment(Qt::AlignLeft);
-        else if (para.alignment == 128) blockFmt.setAlignment(Qt::AlignHCenter);
-        else if (para.alignment == 2) blockFmt.setAlignment(Qt::AlignRight);
+        blockFmt.setAlignment(RtfAlignmentToQt(para.alignment));
 
         if (para.leftIndent > 0 || para.firstLineIndent > 0) {
             blockFmt.setLeftMargin(static_cast<double>(para.leftIndent) / 2.0);
@@ -98,23 +96,11 @@ void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
             }
 
             if (run.format.underline) {
-                switch (run.format.underlineStyle) {
-                    case UnderlineStyle::Dotted:
-                        charFmt.setUnderlineStyle(QTextCharFormat::DotLine);
-                        break;
-                    case UnderlineStyle::Dashed:
-                        charFmt.setUnderlineStyle(QTextCharFormat::DashUnderline);
-                        break;
-                    case UnderlineStyle::Double:
-                        charFmt.setUnderlineStyle(QTextCharFormat::SingleUnderline);
-                        break;
-                    case UnderlineStyle::Thick:
-                        charFmt.setUnderlineStyle(QTextCharFormat::WaveUnderline);
-                        break;
-                    case UnderlineStyle::Solid:
-                    case UnderlineStyle::None:
-                        charFmt.setFontUnderline(true);
-                        break;
+                if (run.format.underlineStyle == UnderlineStyle::Solid ||
+                    run.format.underlineStyle == UnderlineStyle::None) {
+                    charFmt.setFontUnderline(true);
+                } else {
+                    charFmt.setUnderlineStyle(qtUnderlineStyleFor(run.format.underlineStyle));
                 }
             }
 

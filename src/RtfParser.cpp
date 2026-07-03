@@ -89,27 +89,28 @@ private:
         case RtfControl::Action::SetCharProp: {
             finalizeRun();
             const RtfControl::CharSetProp prop = ctrl.value.charSetProp;
+            if (arg < 0) break;
             switch (prop) {
             case RtfControl::CharSetProp::FontIndex:
-                if (arg >= 0) _format.fontIndex = arg;
+                _format.fontIndex = arg;
                 break;
             case RtfControl::CharSetProp::FontSize:
-                if (arg >= 0) _format.fontSize = arg;
+                _format.fontSize = arg;
                 break;
             case RtfControl::CharSetProp::ColorIndex:
-                if (arg >= 0) _format.colorIndex = arg;
+                _format.colorIndex = arg;
                 break;
             case RtfControl::CharSetProp::BgColorIndex:
-                if (arg >= 0) _format.bgColorIndex = arg;
+                _format.bgColorIndex = arg;
                 break;
             case RtfControl::CharSetProp::Highlight:
-                if (arg >= 0) _format.highlight = arg;
+                _format.highlight = arg;
                 break;
             case RtfControl::CharSetProp::UpOffset:
-                if (arg >= 0) _format.upOffset = arg;
+                _format.upOffset = arg;
                 break;
             case RtfControl::CharSetProp::DnOffset:
-                if (arg >= 0) _format.dnOffset = arg;
+                _format.dnOffset = arg;
                 break;
             }
             break;
@@ -143,17 +144,8 @@ private:
         }
         case RtfControl::Action::SetAlignment: {
             const RtfControl::Align align = ctrl.value.align;
-            switch (align) {
-            case RtfControl::Align::Left:
-                _para.alignment = 1;
-                break;
-            case RtfControl::Align::Center:
-                _para.alignment = 128;
-                break;
-            case RtfControl::Align::Right:
-                _para.alignment = 2;
-                break;
-            }
+            _para.alignment = align == RtfControl::Align::Center ? 128 :
+                              align == RtfControl::Align::Right ? 2 : 1;
             break;
         }
         case RtfControl::Action::SetUlStyle: {
