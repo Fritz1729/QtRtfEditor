@@ -384,13 +384,26 @@ private:
             // Control symbol: single digit
             m_pos++;
         } else if (c == '{') {
-            // Braced control symbol: \par\par
+            // Braced control symbol: \{
             m_pos++;
             std::string digits;
             while (m_pos < m_len && m_rtf[m_pos] != '}' && isDigit(m_rtf[m_pos])) {
                 digits += m_rtf[m_pos++];
             }
             if (m_pos < m_len) m_pos++; // skip '}'
+        } else if (c == '~') {
+            // Non-breaking space
+            m_pos++;
+            appendUtf8(0x00A0);
+        } else if (c == '\'') {
+            // Hex escape: \\'hh
+            m_pos++;
+            int val = 0;
+            for (int h = 0; h < 2 && m_pos < m_len; ++h) {
+                char hc = m_rtf[m_pos++];
+                val = val * 16 + (hc >= '0' && hc <= '9' ? hc - '0' : (hc >= 'a' && hc <= 'f' ? hc - 'a' + 10 : hc - 'A' + 10));
+            }
+            appendUtf8(val);
         } else if ((c == 'u' || c == 'U') && m_pos + 1 < m_len && isDigit(m_rtf[m_pos + 1])) {
             // Unicode escape: \uNNN? (only if 'u' is immediately followed by digit)
             parseUnicodeEscape();
@@ -543,6 +556,16 @@ private:
             m_doc.defaultFontIndex = arg;
             return;
         }
+
+        // Special typographic characters (RE 2.0)
+        if (word == "bullet") { appendUtf8(0x2022); return; }
+        if (word == "emdash") { appendUtf8(0x2014); return; }
+        if (word == "endash") { appendUtf8(0x2013); return; }
+        if (word == "lquote") { appendUtf8(0x2018); return; }
+        if (word == "rquote") { appendUtf8(0x2019); return; }
+        if (word == "ldblquote") { appendUtf8(0x201C); return; }
+        if (word == "rdblquote") { appendUtf8(0x201D); return; }
+        if (word == "tab") { m_literalText += static_cast<char>(9); return; }
 
         auto* ctrl = findControl(word.c_str());
         if (ctrl) {

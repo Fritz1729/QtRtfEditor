@@ -242,11 +242,10 @@ void TestSemanticComparison::DifferentUnderline() {
 }
 
 void TestSemanticComparison::DifferentTab() {
-    // \tab is not yet recognized by the parser — treated as unknown tag
-    std::string rtfA = R"({\rtf1\ansi\deff0 One\tabTwo\par})";
-    std::string rtfB = R"({\rtf1\ansi\deff0 One Two\par})";
+    std::string rtfA = R"({\rtf1\ansi\deff0 One\tab Two\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0 One  Two\par})";
     std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::UnknownTag);
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
 }
 
 void TestSemanticComparison::DifferentStrike() {
