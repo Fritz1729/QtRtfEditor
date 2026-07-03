@@ -13,26 +13,6 @@ namespace Rte {
 
 namespace {
 
-constexpr int kHighlightPalette[17][3] = {
-    {0, 0, 0},
-    {128, 128, 128},
-    {128, 0, 0},
-    {0, 128, 0},
-    {128, 128, 0},
-    {0, 0, 128},
-    {128, 0, 128},
-    {0, 128, 128},
-    {192, 192, 192},
-    {255, 255, 255},
-    {255, 0, 0},
-    {0, 255, 0},
-    {255, 255, 0},
-    {0, 0, 255},
-    {255, 0, 255},
-    {0, 255, 255},
-    {128, 128, 128},
-};
-
 void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
     document->clear();
 

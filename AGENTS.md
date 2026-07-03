@@ -103,7 +103,7 @@ The agent applies rules but never adds to the list itself.
 - Identifiers in English where possible
 - Classes/Structs: `PascalCase`
 - Functions/Methods: `PascalCase`
-- Member variables: `_camelCase` (leading underscore)
+- Class member variables: `_camelCase` (leading underscore) — applies only to class members, not to plain structs or POD data containers
 - Prefixes (after underscore in members)
   - Not used to show which type is used
   - pointer: 'p', e.g. 'pText'

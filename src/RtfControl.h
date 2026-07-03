@@ -46,7 +46,18 @@ struct RtfControl {
     enum class RtfCaps : uint8_t { CapsNone, CapsAll, CapsSmall };
 
     Action action;
-    int value;
+
+    union Value {
+        int raw;
+        CharProp charProp;
+        CharSetProp charSetProp;
+        ParaProp paraProp;
+        Align align;
+        RtfUlStyle ulStyle;
+        RtfCaps caps;
+    };
+
+    Value value;
 };
 
 constexpr std::size_t kRtfControlTableSize = 57;

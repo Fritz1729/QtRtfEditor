@@ -11,7 +11,7 @@ using UlStyle = RtfControl::RtfUlStyle;
 using Caps = RtfControl::RtfCaps;
 
 #define DATA(keyword, action, prop) \
-    { keyword, action, static_cast<int>(prop) }
+    { keyword, action, { .raw = static_cast<int>(prop) } }
 
 constexpr RtfControl rtfControlTableEntries[] = {
     // Character toggles

@@ -1,4 +1,5 @@
 #include "RtfExport.h"
+#include "RtfTypes.h"
 
 #include <QTextDocument>
 #include <QTextBlock>
@@ -10,6 +11,8 @@
 #include <QtGlobal>
 
 #include <algorithm>
+#include <array>
+#include <cstdint>
 #include <map>
 #include <sstream>
 
@@ -17,49 +20,43 @@ namespace Rte {
 
 namespace {
 
-constexpr int kHighlightPalette[17][3] = {
-    {0, 0, 0},
-    {128, 128, 128},
-    {128, 0, 0},
-    {0, 128, 0},
-    {128, 128, 0},
-    {0, 0, 128},
-    {128, 0, 128},
-    {0, 128, 128},
-    {192, 192, 192},
-    {255, 255, 255},
-    {255, 0, 0},
-    {0, 255, 0},
-    {255, 255, 0},
-    {0, 0, 255},
-    {255, 0, 255},
-    {0, 255, 255},
-    {128, 128, 128},
-};
+constexpr std::array<std::array<uint8_t, 3>, 17> kHighlightPalette = {{
+    {0, 0, 0},       // 0  = black
+    {128, 128, 128}, // 1  = dark gray
+    {128, 0, 0},     // 2  = maroon
+    {0, 128, 0},     // 3  = dark green
+    {128, 128, 0},   // 4  = dark yellow
+    {0, 0, 128},     // 5  = navy
+    {128, 0, 128},   // 6  = purple
+    {0, 128, 128},   // 7  = teal
+    {192, 192, 192}, // 8  = silver
+    {255, 255, 255}, // 9  = white
+    {255, 0, 0},     // 10 = red
+    {0, 255, 0},     // 11 = green
+    {255, 255, 0},   // 12 = yellow
+    {0, 0, 255},     // 13 = blue
+    {255, 0, 255},   // 14 = magenta
+    {0, 255, 255},   // 15 = cyan
+    {128, 128, 128}, // 16 = gray 50%
+}};
 
-constexpr int kHighlightPaletteSize = 17;
-
-struct UnderlineStyleInfo {
-    const char* rtfTag;
-    bool isNone;
-};
-
-UnderlineStyleInfo UnderlineStyleToRtfInfo(QTextCharFormat::UnderlineStyle style) {
+static const char* UnderlineStyleTag(UnderlineStyle style) {
     switch (style) {
-        case QTextCharFormat::NoUnderline:     return {"", true};
-        case QTextCharFormat::SingleUnderline: return {"\\ul", false};
-        case QTextCharFormat::DotLine:         return {"\\uld", false};
-        case QTextCharFormat::DashUnderline:   return {"\\uldash", false};
-        case QTextCharFormat::WaveUnderline:   return {"\\ulth", false};
-        default:                               return {"", true};
+        case UnderlineStyle::None:       return "";
+        case UnderlineStyle::Solid:      return "\\ul";
+        case UnderlineStyle::Dotted:     return "\\uld";
+        case UnderlineStyle::Dashed:     return "\\uldash";
+        case UnderlineStyle::Double:     return "\\uldb";
+        case UnderlineStyle::Thick:      return "\\ulth";
     }
+    return "";
 }
 
-QTextCharFormat::UnderlineStyle EffectiveUnderlineStyle(const QTextCharFormat& fmt) {
-    QTextCharFormat::UnderlineStyle style = fmt.underlineStyle();
-    if (style != QTextCharFormat::NoUnderline) return style;
-    if (fmt.fontUnderline()) return QTextCharFormat::SingleUnderline;
-    return QTextCharFormat::NoUnderline;
+static UnderlineStyle EffectiveUnderlineStyle(const QTextCharFormat& fmt) {
+    UnderlineStyle style = toUnderlineStyle(fmt.underlineStyle());
+    if (style != UnderlineStyle::None) return style;
+    if (fmt.fontUnderline()) return UnderlineStyle::Solid;
+    return UnderlineStyle::None;
 }
 
 int FindColorIndex(const std::vector<QColor>& colorList, const QColor& color) {
@@ -70,7 +67,7 @@ int FindColorIndex(const std::vector<QColor>& colorList, const QColor& color) {
 }
 
 int FindHighlightIndex(const QColor& color) {
-    for (int i = 0; i < kHighlightPaletteSize; ++i) {
+    for (int i = 0; i < static_cast<int>(kHighlightPalette.size()); ++i) {
         QColor pal(kHighlightPalette[i][0], kHighlightPalette[i][1], kHighlightPalette[i][2]);
         if (color == pal) return i;
     }
@@ -108,36 +105,6 @@ std::string AlignmentToRtf(Qt::Alignment alignment) {
     if (alignment & Qt::AlignLeft) return "\\ql";
     return "\\ql";
 }
-
-struct CharFormatState {
-    int fontSize = 0;
-    int fontIndex = 0;
-    int colorIndex = 0;
-    int bgColorIndex = 0;
-    int highlight = -1;
-    bool bold = false;
-    bool italic = false;
-    bool strikeOut = false;
-    bool superscript = false;
-    bool subscript = false;
-    QTextCharFormat::UnderlineStyle underlineStyle = QTextCharFormat::NoUnderline;
-    QFont::Capitalization capitalization = QFont::MixedCase;
-
-    bool operator==(const CharFormatState& other) const {
-        return fontSize == other.fontSize &&
-               fontIndex == other.fontIndex &&
-               colorIndex == other.colorIndex &&
-               bgColorIndex == other.bgColorIndex &&
-               highlight == other.highlight &&
-               bold == other.bold &&
-               italic == other.italic &&
-               strikeOut == other.strikeOut &&
-               superscript == other.superscript &&
-               subscript == other.subscript &&
-               underlineStyle == other.underlineStyle &&
-               capitalization == other.capitalization;
-    }
-};
 
 } // namespace
 
@@ -278,7 +245,7 @@ std::string ExportRtf(const QTextDocument& document) {
 
         out << "\n";
 
-        CharFormatState prev;
+        RtfRunFormat prev;
         bool firstRun = true;
 
         QTextBlock::iterator it = block.begin();
@@ -288,7 +255,7 @@ std::string ExportRtf(const QTextDocument& document) {
 
             QTextCharFormat charFmt = frag.charFormat();
 
-            CharFormatState cur;
+            RtfRunFormat cur;
             qreal ptSize = charFmt.fontPointSize();
             if (ptSize <= 0) ptSize = defaultFont.pointSizeF();
             cur.fontSize = static_cast<int>(ptSize * 2);
@@ -326,7 +293,7 @@ std::string ExportRtf(const QTextDocument& document) {
             cur.superscript = charFmt.verticalAlignment() == QTextCharFormat::AlignSuperScript;
             cur.subscript = charFmt.verticalAlignment() == QTextCharFormat::AlignSubScript;
             cur.underlineStyle = EffectiveUnderlineStyle(charFmt);
-            cur.capitalization = charFmt.fontCapitalization();
+            cur.capitalization = toCapitalization(charFmt.fontCapitalization());
 
             if (firstRun || cur != prev) {
                 if (!firstRun) {
@@ -336,12 +303,12 @@ std::string ExportRtf(const QTextDocument& document) {
                     if (prev.italic) out << "\\i0 ";
                     if (prev.colorIndex > 0) out << "\\cf0 ";
 
-                    if (prev.underlineStyle != QTextCharFormat::NoUnderline) {
+                    if (prev.underlineStyle != UnderlineStyle::None) {
                         out << "\\ul0 ";
                     }
                     if (prev.strikeOut) out << "\\strike0 ";
-                    if (prev.capitalization == QFont::AllUppercase) out << "\\caps0 ";
-                    if (prev.capitalization == QFont::SmallCaps) out << "\\scaps0 ";
+                    if (prev.capitalization == Capitalization::AllCaps) out << "\\caps0 ";
+                    if (prev.capitalization == Capitalization::SmallCaps) out << "\\scaps0 ";
                     if (prev.highlight >= 0) out << "\\highlight0 ";
                     if (prev.bgColorIndex > 0) out << "\\cb0 ";
                 }
@@ -358,13 +325,13 @@ std::string ExportRtf(const QTextDocument& document) {
                 if (cur.italic) out << "\\i ";
                 if (cur.strikeOut) out << "\\strike ";
 
-                auto ulInfo = UnderlineStyleToRtfInfo(cur.underlineStyle);
-                if (!ulInfo.isNone) out << ulInfo.rtfTag << ' ';
+                if (cur.underlineStyle != UnderlineStyle::None)
+                    out << UnderlineStyleTag(cur.underlineStyle) << ' ';
 
                 if (cur.superscript) out << "\\super ";
                 if (cur.subscript) out << "\\sub ";
-                if (cur.capitalization == QFont::AllUppercase) out << "\\caps ";
-                if (cur.capitalization == QFont::SmallCaps) out << "\\scaps ";
+                if (cur.capitalization == Capitalization::AllCaps) out << "\\caps ";
+                if (cur.capitalization == Capitalization::SmallCaps) out << "\\scaps ";
                 if (cur.highlight >= 0) out << "\\highlight" << cur.highlight << ' ';
             }
 
@@ -375,11 +342,11 @@ std::string ExportRtf(const QTextDocument& document) {
         }
 
         if (!firstRun) {
-            if (prev.underlineStyle != QTextCharFormat::NoUnderline)
+            if (prev.underlineStyle != UnderlineStyle::None)
                 out << "\\ul0";
             if (prev.strikeOut) out << "\\strike0";
-            if (prev.capitalization == QFont::AllUppercase) out << "\\caps0";
-            if (prev.capitalization == QFont::SmallCaps) out << "\\scaps0";
+            if (prev.capitalization == Capitalization::AllCaps) out << "\\caps0";
+            if (prev.capitalization == Capitalization::SmallCaps) out << "\\scaps0";
             if (prev.highlight >= 0) out << "\\highlight0";
         }
         out << "\\b0\\i0\\super0\\sub0\\cf0\\par\n";

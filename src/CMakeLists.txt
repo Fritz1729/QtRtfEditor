@@ -7,6 +7,7 @@ add_library(QtRtfEditor
     ProtectedRange.cpp
     RtfExport.h
     RtfExport.cpp
+    RtfTypes.h
     RtfParser.h
     RtfControl.cpp
     RtfParser.cpp

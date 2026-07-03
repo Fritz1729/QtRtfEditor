@@ -8,10 +8,6 @@
 
 namespace Rte {
 
-namespace {
-
-} // namespace
-
 RichTextEdit::RichTextEdit(QWidget* parent)
     : QTextEdit(parent)
 {
