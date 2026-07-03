@@ -33,6 +33,8 @@ node_modules/
 *.pkg.tar.zst
 *.tar.zst
 pkg/
+.opencode/
+RTF_COVERAGE_PLAN.md
 
 # MSVC
 *.lib
