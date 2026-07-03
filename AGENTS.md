@@ -41,6 +41,43 @@ Each executable targets a different layer:
 - C++23, Qt6 (Widgets, Test).
 - `build/` is gitignored.
 
+### Out of Scope
+
+Do NOT implement these features — they have no Qt equivalent and cannot be reasonably emulated:
+
+#### Specific to Windows
+
+- **OLE objects** (`\object`, `\objdata`, `\objalias`, `\objclass`) — Windows COM embedding
+- **Metafiles** (EMF, WMF) — Windows-specific rasterizable formats, no Qt equivalent
+
+#### Document Management
+
+- **Document metadata** (`\info`, `\title`, `\author`, `\subject`, `\keywords`, `\versionN`) — handled by the embedding app
+- **Track changes** (`\revtbl`, `\revN`, `\insrsidN`, `\delrsidN`, `\tridxN`) — version tracking, no Qt equivalent
+- **Styles** (`\stylesheet`, `\sN`, `\snext`, `\sbasedonN`) — Word-specific style system
+- **Fields** (`\field`, `\*\fldinst`, `\*\fldrslt`, `\date`, `\time`) — Word field codes
+- **Index / TOC entries** (`\*{\index ...}`, `\*{\toc ...}`, `\*{\tc ...}`) — document generation, not editing
+- **Document variables** (`\*\docvar`) — low-priority document metadata
+- **User properties** (`\userprops`, `\propname`, `\staticval`) — custom document properties
+- **Paragraph Group Properties** (`\*\pgptbl`, `\pgp`, `\ipgpN`) — Word 2002+ storage optimization
+- **Style restrictions** (`\*\latentstyles`, `\lsd*`) — Word UI style visibility and locking
+- **Password protection** (`\passwordhash`, `\password`) — document-level security
+
+#### Support of Special Languages
+
+- **Asian and East Asian fonts** (`\fscript`, `\fdecor`, `\stshfdbchN`, `\stshfhichN`, `\stshfbiN`, `\fcharset134/136/129`) — East Asian font binding and complex script support requires an external shaping library
+- **Bidirectional text** (`\rtlch`, `\ltrch`, `\rtl`, `\ltrpar`, `\fbidis`) — BiDi layout requires a platform shaping library beyond Qt's basic RTL support
+- **Complex script shaping** (Indic, Thai, Arabic) — requires HarfBuzz/UCDraw, no Qt equivalent
+
+#### Page Layout & Document Structure
+
+- **Section & page setup** (`\sectd`, `\sect`, `\sbk*`, `\pgwsxn`, `\pghsxn`, `\marg*`, `\cols*`, `\deftabN`, `\vertdoc`, `\horzdoc`) — QTextDocument is a flow model, not a page layout model
+- **Comments / annotations** (`\*\annot`, `\*\ftnacc`, `\*\annotrslt`) — no Qt equivalent
+- **Compatibility & document properties** (`\hyph*`, `\lnongrid`, `\donotembedsysfontN`, `\donotembeddingdataN`, `\relyonvmlN`, `\validatexmlN`, `\showxmlerrorsN`, `\trackmovesN`, `\trackformattingN`, `\muser`) — no Qt equivalent
+
+All other RTF 1.9.1 features should be either implemented per `RTF_COVERAGE_PLAN.md` or preserved
+as raw RTF via the protected-range preservation mechanism (Phase 3+).
+
 ## Code Style
 
 **IMPORTANT:** Changes to coding rules are made only by the user, never by the agent.
