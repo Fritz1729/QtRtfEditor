@@ -26,3 +26,19 @@ Thumbs.db
 
 # Reference documentation
 Specifications/
+
+# Build artifacts (additional)
+node_modules/
+*.tar.gz
+*.pkg.tar.zst
+*.tar.zst
+pkg/
+
+# MSVC
+*.lib
+*.pdb
+*.ilk
+*.idb
+*.sdf
+*.suo
+*.user
