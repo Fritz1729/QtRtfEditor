@@ -62,12 +62,22 @@ RTL paragraphs, page breaks, smart quotes, hyphenation flags.
 These are covered in RE 2.0/3.0 phases below.
 
 ### Rich Edit 2.0 (1998) — Phase 1
-Included: Unicode support (`\uN`), background color (`\cbN`), strikethrough (`\strike`),
-more underline types (`\uld`, `\uldb`, `\uldash`, `\ulth`), small caps (`\caps`/`\scaps`),
-space before/after (\sbN / \saN), Word line spacing (\slN / \slmultN),
-tab stops (\txN), tab alignment (\tqr / \tqc),
-superscript/subscript offset (\upN / \dnN), special typographic characters (\bullet, \emdash, \endash, smart quotes),
+
+**Implemented (parser + import + export + compare, full roundtrip):**
+Unicode support (`\uN`), hex escapes (`\'hh`), non-breaking space (`\~`), tab (`\t`),
+background color (`\cbN`), strikethrough (`\strike`), dotted/dashed/thick underline
+(`\uld`, `\uldash`, `\ulth`), small caps (`\caps`/`\scaps`),
+space before/after (`\sbN` / `\saN`), fixed line height (`\slN`),
+superscript/subscript (toggle), special typographic characters
+(`\bullet`, `\emdash`, `\endash`, `\lquote`, `\rquote`, `\ldblquote`, `\rdblquote`),
 right indent (`\riN`).
+
+**Parser + compare only (no Qt roundtrip, tests skipped):**
+- `\highlightN` — 17-color fixed palette; Qt has no persistent highlight property in `QTextCharFormat`
+- `\slmultN` — line-spacing multiplier (1/1.5/2); Qt only supports `FixedHeight`, not "natural × multiplier"
+- `\upN` / `\dnN` — arbitrary positional offset; Qt only supports boolean superscript/subscript
+- `\uldb` — double underline; Qt's `UnderlineStyle` enum has no double-underline variant
+
 Intentionally out of scope: bidirectional text (`\rtlch`/`\ltrch`/`\rtl`/`\ltrpar`),
 complex script support, East Asian fonts, font binding, font pitch/quality (`\fprqN`),
 language IDs (`\langN`), code pages (`\ansicpgN`), hidden text (`\v`),

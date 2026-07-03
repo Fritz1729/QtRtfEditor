@@ -9,6 +9,21 @@
 
 using namespace Rte;
 
+static const char* const kSkippedFiles[] = {
+    "highlighting.rtf",       // \highlightN — no persistent Qt property
+    "line-spacing.rtf",       // \slmultN — Qt only supports FixedHeight, not multiplier
+    "positional-supsub.rtf",  // \upN/\dnN — Qt only supports boolean super/subscript
+    "underline-styles.rtf",   // \uldb — no double underline in Qt UnderlineStyle enum
+    nullptr
+};
+
+static bool IsSkipped(const QString& filename) {
+    for (int i = 0; kSkippedFiles[i]; ++i) {
+        if (filename == QString::fromUtf8(kSkippedFiles[i])) return true;
+    }
+    return false;
+}
+
 class TestRoundtrip : public QObject {
     Q_OBJECT
 
@@ -19,6 +34,7 @@ private slots:
 private:
     int _pass = 0;
     int _fail = 0;
+    int _skip = 0;
     int _exception = 0;
 };
 
@@ -53,15 +69,22 @@ void TestRoundtrip::TestRtfSuite() {
     QDir dir(testDataDir);
     QStringList files = dir.entryList(QStringList() << "*.rtf", QDir::Files);
 
-    _pass = 0;
-    _fail = 0;
-    _exception = 0;
+        _pass = 0;
+        _fail = 0;
+        _skip = 0;
+        _exception = 0;
 
-    for (int i = 0; i < files.size(); ++i) {
-        const QString& filename = files[i];
-        qDebug().noquote() << "[" << i + 1 << "/" << files.size() << "]" << filename;
+        for (int i = 0; i < files.size(); ++i) {
+            const QString& filename = files[i];
+            qDebug().noquote() << "[" << i + 1 << "/" << files.size() << "]" << filename;
 
-        QString filepath = testDataDir + "/" + filename;
+            if (IsSkipped(filename)) {
+                ReportCase(filename, "SKIP (no Qt roundtrip)");
+                _skip++;
+                continue;
+            }
+
+            QString filepath = testDataDir + "/" + filename;
 
         std::string original;
         try {
@@ -119,7 +142,8 @@ void TestRoundtrip::TestRtfSuite() {
 void TestRoundtrip::cleanupTestCase() {
     qDebug() << "======================================";
     qDebug().noquote() << "Results: " << _pass << " passed, " << _fail
-                        << " failed, " << _exception
+                        << " failed, " << _skip
+                        << " skipped, " << _exception
                         << " exceptions";
     qDebug().noquote() << "======================================";
 }

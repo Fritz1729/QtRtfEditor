@@ -13,6 +13,26 @@ namespace Rte {
 
 namespace {
 
+constexpr int kHighlightPalette[17][3] = {
+    {0, 0, 0},
+    {128, 128, 128},
+    {128, 0, 0},
+    {0, 128, 0},
+    {128, 128, 0},
+    {0, 0, 128},
+    {128, 0, 128},
+    {0, 128, 128},
+    {192, 192, 192},
+    {255, 255, 255},
+    {255, 0, 0},
+    {0, 255, 0},
+    {255, 255, 0},
+    {0, 0, 255},
+    {255, 0, 255},
+    {0, 255, 255},
+    {128, 128, 128},
+};
+
 void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
     document->clear();
 
@@ -39,10 +59,24 @@ void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
         else if (para.alignment == 2) blockFmt.setAlignment(Qt::AlignRight);
 
         if (para.leftIndent > 0 || para.firstLineIndent > 0) {
-            int liTwips = para.leftIndent * 20;
-            int fiTwips = para.firstLineIndent * 20;
-            blockFmt.setLeftMargin(static_cast<double>(liTwips) / 20.0);
-            blockFmt.setIndent(fiTwips > 0 ? static_cast<int>(static_cast<double>(fiTwips) / 20.0) : 0);
+            blockFmt.setLeftMargin(static_cast<double>(para.leftIndent) / 2.0);
+            blockFmt.setIndent(para.firstLineIndent > 0 ? static_cast<int>(para.firstLineIndent / 2.0) : 0);
+        }
+
+        if (para.rightIndent > 0) {
+            blockFmt.setRightMargin(static_cast<double>(para.rightIndent) / 2.0);
+        }
+
+        if (para.spaceBefore > 0) {
+            blockFmt.setTopMargin(static_cast<double>(para.spaceBefore) / 2.0);
+        }
+        if (para.spaceAfter > 0) {
+            blockFmt.setBottomMargin(static_cast<double>(para.spaceAfter) / 2.0);
+        }
+
+        if (para.lineHeight > 0) {
+            blockFmt.setLineHeight(static_cast<double>(para.lineHeight) / 2.0,
+                                   QTextBlockFormat::FixedHeight);
         }
 
         cursor.insertBlock(blockFmt);
@@ -59,8 +93,8 @@ void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
             if (run.format.italic) {
                 charFmt.setFontItalic(true);
             }
-            if (run.format.underline) {
-                charFmt.setFontUnderline(true);
+            if (run.format.strikeOut) {
+                charFmt.setFontStrikeOut(true);
             }
 
             if (run.format.fontIndex >= 0 &&
@@ -75,6 +109,39 @@ void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
                 run.format.colorIndex < static_cast<int>(doc.colors.size())) {
                 const auto& col = doc.colors[run.format.colorIndex];
                 charFmt.setForeground(QColor(col.red, col.green, col.blue));
+            }
+
+            if (run.format.bgColorIndex >= 0 &&
+                run.format.bgColorIndex < static_cast<int>(doc.colors.size())) {
+                const auto& col = doc.colors[run.format.bgColorIndex];
+                charFmt.setBackground(QBrush(QColor(col.red, col.green, col.blue)));
+            }
+
+            if (run.format.underline) {
+                switch (run.format.underlineStyle) {
+                    case UnderlineStyle::Dotted:
+                        charFmt.setUnderlineStyle(QTextCharFormat::DotLine);
+                        break;
+                    case UnderlineStyle::Dashed:
+                        charFmt.setUnderlineStyle(QTextCharFormat::DashUnderline);
+                        break;
+                    case UnderlineStyle::Double:
+                        charFmt.setUnderlineStyle(QTextCharFormat::SingleUnderline);
+                        break;
+                    case UnderlineStyle::Thick:
+                        charFmt.setUnderlineStyle(QTextCharFormat::WaveUnderline);
+                        break;
+                    case UnderlineStyle::Solid:
+                    case UnderlineStyle::None:
+                        charFmt.setFontUnderline(true);
+                        break;
+                }
+            }
+
+            if (run.format.capitalization == Capitalization::AllCaps) {
+                charFmt.setFontCapitalization(QFont::AllUppercase);
+            } else if (run.format.capitalization == Capitalization::SmallCaps) {
+                charFmt.setFontCapitalization(QFont::SmallCaps);
             }
 
             if (run.format.superscript) {

@@ -391,6 +391,10 @@ private:
                 digits += m_rtf[m_pos++];
             }
             if (m_pos < m_len) m_pos++; // skip '}'
+        } else if (c == 't') {
+            // Tab character
+            m_pos++;
+            m_literalText += static_cast<char>(9);
         } else if (c == '~') {
             // Non-breaking space
             m_pos++;
