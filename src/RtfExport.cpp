@@ -332,8 +332,8 @@ std::string ExportRtf(const QTextDocument& document) {
                 if (!firstRun) {
                     if (prev.superscript) out << "\\super0 ";
                     if (prev.subscript) out << "\\sub0 ";
-                    if (!prev.bold) out << "\\b0 ";
-                    if (!prev.italic) out << "\\i0 ";
+                    if (prev.bold) out << "\\b0 ";
+                    if (prev.italic) out << "\\i0 ";
                     if (prev.colorIndex > 0) out << "\\cf0 ";
 
                     if (prev.underlineStyle != QTextCharFormat::NoUnderline) {
