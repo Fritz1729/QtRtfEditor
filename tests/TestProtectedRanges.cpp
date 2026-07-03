@@ -6,22 +6,22 @@ class TestProtectedRanges : public QObject {
 
 private slots:
     void initTestCase();
-    void test_basic_protection();
-    void test_multiple_ranges();
-    void test_overlapping_ranges();
-    void test_protection_policy_none();
-    void test_protection_policy_block();
-    void test_protection_policy_warn();
-    void test_handler();
-    void test_all_protection();
-    void test_is_protected();
-    void test_clear_protection();
-    void test_key_press_backspace();
+    void TestBasicProtection();
+    void TestMultipleRanges();
+    void TestOverlappingRanges();
+    void TestProtectionPolicyNone();
+    void TestProtectionPolicyBlock();
+    void TestProtectionPolicyWarn();
+    void TestHandler();
+    void TestAllProtection();
+    void TestIsProtected();
+    void TestClearProtection();
+    void TestKeyPressBackspace();
 };
 
 void TestProtectedRanges::initTestCase() {}
 
-void TestProtectedRanges::test_basic_protection() {
+void TestProtectedRanges::TestBasicProtection() {
     Rte::RichTextEdit editor;
     editor.setPlainText("Hello World");
 
@@ -34,7 +34,7 @@ void TestProtectedRanges::test_basic_protection() {
     QVERIFY(!editor.IsProtected(10));
 }
 
-void TestProtectedRanges::test_multiple_ranges() {
+void TestProtectedRanges::TestMultipleRanges() {
     Rte::RichTextEdit editor;
     editor.setPlainText("AAA BBB CCC");
 
@@ -48,7 +48,7 @@ void TestProtectedRanges::test_multiple_ranges() {
     QVERIFY(!editor.IsProtected(8));
 }
 
-void TestProtectedRanges::test_overlapping_ranges() {
+void TestProtectedRanges::TestOverlappingRanges() {
     Rte::RichTextEdit editor;
     editor.setPlainText("ABCDEF");
 
@@ -66,7 +66,7 @@ void TestProtectedRanges::test_overlapping_ranges() {
     QVERIFY(editor.IsProtected(5));
 }
 
-void TestProtectedRanges::test_protection_policy_none() {
+void TestProtectedRanges::TestProtectionPolicyNone() {
     Rte::RichTextEdit editor;
     editor.setPlainText("Hello World");
     editor.SetProtectionPolicy(Rte::ProtectionPolicy::None);
@@ -76,7 +76,7 @@ void TestProtectedRanges::test_protection_policy_none() {
     editor.keyPressEvent(&event);
 }
 
-void TestProtectedRanges::test_protection_policy_block() {
+void TestProtectedRanges::TestProtectionPolicyBlock() {
     Rte::RichTextEdit editor;
     editor.setPlainText("Hello World");
     editor.SetProtectionPolicy(Rte::ProtectionPolicy::Block);
@@ -93,7 +93,7 @@ void TestProtectedRanges::test_protection_policy_block() {
     QCOMPARE(editor.toPlainText(), QString("Hello World"));
 }
 
-void TestProtectedRanges::test_protection_policy_warn() {
+void TestProtectedRanges::TestProtectionPolicyWarn() {
     Rte::RichTextEdit editor;
     editor.setPlainText("Hello World");
     editor.SetProtectionPolicy(Rte::ProtectionPolicy::Warn);
@@ -119,7 +119,7 @@ void TestProtectedRanges::test_protection_policy_warn() {
     QCOMPARE(editor.toPlainText(), QString("Hello World"));
 }
 
-void TestProtectedRanges::test_handler() {
+void TestProtectedRanges::TestHandler() {
     Rte::RichTextEdit editor;
     editor.setPlainText("Hello World");
     editor.SetProtectionPolicy(Rte::ProtectionPolicy::Warn);
@@ -152,7 +152,7 @@ void TestProtectedRanges::test_handler() {
              QString("Hello World").size() - 5);
 }
 
-void TestProtectedRanges::test_all_protection() {
+void TestProtectedRanges::TestAllProtection() {
     Rte::RichTextEdit editor;
     editor.setPlainText("ABC DEF GHI");
 
@@ -167,7 +167,7 @@ void TestProtectedRanges::test_all_protection() {
     QCOMPARE(all[1].target, std::string("target2"));
 }
 
-void TestProtectedRanges::test_is_protected() {
+void TestProtectedRanges::TestIsProtected() {
     Rte::RichTextEdit editor;
     editor.setPlainText("Test");
 
@@ -181,7 +181,7 @@ void TestProtectedRanges::test_is_protected() {
     QVERIFY(!editor.IsProtected(3));
 }
 
-void TestProtectedRanges::test_clear_protection() {
+void TestProtectedRanges::TestClearProtection() {
     Rte::RichTextEdit editor;
     editor.setPlainText("ABC");
 
@@ -193,7 +193,7 @@ void TestProtectedRanges::test_clear_protection() {
     QVERIFY(!editor.IsProtected(0));
 }
 
-void TestProtectedRanges::test_key_press_backspace() {
+void TestProtectedRanges::TestKeyPressBackspace() {
     Rte::RichTextEdit editor;
     editor.setPlainText("Hello World");
 

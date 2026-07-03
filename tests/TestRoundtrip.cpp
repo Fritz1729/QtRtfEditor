@@ -13,7 +13,7 @@ class TestRoundtrip : public QObject {
     Q_OBJECT
 
 private slots:
-    void test_rtf_suite();
+    void TestRtfSuite();
     void cleanupTestCase();
 
 private:
@@ -47,7 +47,7 @@ static void ReportCase(const QString& filename, const char* result) {
     qDebug().noquote() << "[" << result << "]" << filename;
 }
 
-void TestRoundtrip::test_rtf_suite() {
+void TestRoundtrip::TestRtfSuite() {
     QString testDataDir = QCoreApplication::applicationDirPath() + "/testdata";
 
     QDir dir(testDataDir);
