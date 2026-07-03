@@ -8,6 +8,7 @@ add_library(QtRtfEditor
     RtfExport.h
     RtfExport.cpp
     RtfParser.h
+    RtfControl.cpp
     RtfParser.cpp
     RtfImport.h
     RtfImport.cpp

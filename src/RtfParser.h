@@ -2,6 +2,7 @@
 
 #include <string>
 #include "RtfCompare.h"
+#include "RtfControl.h"
 
 namespace Rte {
 

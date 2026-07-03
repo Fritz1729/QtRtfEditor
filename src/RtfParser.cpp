@@ -1,4 +1,5 @@
 #include "RtfParser.h"
+#include "RtfControl.h"
 
 #include <algorithm>
 #include <sstream>
@@ -28,6 +29,7 @@ struct ParagraphState {
 
 class RtfParserImpl {
 public:
+
     RtfDocument parse(const std::string& rtf) {
         m_doc = RtfDocument{};
         m_rtf = rtf;
@@ -60,6 +62,128 @@ public:
 
 private:
     static constexpr size_t kMaxIter = 10'000'000;
+
+    const RtfControl* findControl(const char* word) const {
+        for (auto& ctrl : rtfControlTable) {
+            if (strcmp(word, ctrl.keyword) == 0) return &ctrl;
+        }
+        return nullptr;
+    }
+
+    void dispatch(const RtfControl& ctrl, int arg) {
+        switch (ctrl.action) {
+        case RtfControl::Action::ToggleCharProp: {
+            finalizeRun();
+            // arg < 0 = no argument provided → treat as on
+            bool on = (arg >= 0) ? (arg != 0) : true;
+            auto prop = static_cast<RtfControl::CharProp>(ctrl.value);
+            switch (prop) {
+            case RtfControl::CharProp::Bold:
+                m_format.bold = on;
+                break;
+            case RtfControl::CharProp::Italic:
+                m_format.italic = on;
+                break;
+            case RtfControl::CharProp::Underline:
+                m_format.underline = on;
+                break;
+            case RtfControl::CharProp::Subscript:
+                m_format.subscript = on;
+                break;
+            case RtfControl::CharProp::Superscript:
+                m_format.superscript = on;
+                if (on) m_format.subscript = false;
+                break;
+            }
+            break;
+        }
+        case RtfControl::Action::SetCharProp: {
+            finalizeRun();
+            auto prop = static_cast<RtfControl::CharSetProp>(ctrl.value);
+            switch (prop) {
+            case RtfControl::CharSetProp::FontIndex:
+                if (arg >= 0) m_format.fontIndex = arg;
+                break;
+            case RtfControl::CharSetProp::FontSize:
+                if (arg >= 0) m_format.fontSize = arg;
+                break;
+            case RtfControl::CharSetProp::ColorIndex:
+                if (arg >= 0) m_format.colorIndex = arg;
+                break;
+            }
+            break;
+        }
+        case RtfControl::Action::SetParaProp: {
+            auto prop = static_cast<RtfControl::ParaProp>(ctrl.value);
+            switch (prop) {
+            case RtfControl::ParaProp::LeftIndent:
+                m_para.leftIndent = arg;
+                break;
+            case RtfControl::ParaProp::FirstLineIndent:
+                m_para.firstLineIndent = arg;
+                break;
+            }
+            break;
+        }
+        case RtfControl::Action::SetAlignment: {
+            auto align = static_cast<RtfControl::Align>(ctrl.value);
+            switch (align) {
+            case RtfControl::Align::Left:
+                m_para.alignment = 1;
+                break;
+            case RtfControl::Align::Center:
+                m_para.alignment = 128;
+                break;
+            case RtfControl::Align::Right:
+                m_para.alignment = 2;
+                break;
+            }
+            break;
+        }
+        case RtfControl::Action::EmitParagraph:
+            handleParagraph();
+            return;
+
+        case RtfControl::Action::HeaderControl:
+        case RtfControl::Action::TableControl:
+            break;
+        case RtfControl::Action::Unknown:
+            break;
+        }
+    }
+
+    void handleParagraph() {
+        finalizeRun();
+        // Apply paragraph formatting to the last non-empty paragraph
+        for (int k = static_cast<int>(m_doc.paragraphs.size()) - 1; k >= 0; --k) {
+            if (!m_doc.paragraphs[k].runs.empty() &&
+                std::any_of(m_doc.paragraphs[k].runs.begin(), m_doc.paragraphs[k].runs.end(),
+                    [](const RtfRun& r) { return !r.text.empty(); }))
+            {
+                m_doc.paragraphs[k].alignment = m_para.alignment;
+                m_doc.paragraphs[k].leftIndent = m_para.leftIndent;
+                m_doc.paragraphs[k].firstLineIndent = m_para.firstLineIndent;
+                break;
+            }
+        }
+        // Remove trailing empty paragraphs
+        while (!m_doc.paragraphs.empty()) {
+            const auto& last = m_doc.paragraphs.back();
+            bool hasText = std::any_of(last.runs.begin(), last.runs.end(),
+                [](const RtfRun& r) { return !r.text.empty(); });
+            if (!hasText) {
+                m_doc.paragraphs.pop_back();
+            } else {
+                break;
+            }
+        }
+        // Create paragraph for content that follows
+        m_doc.paragraphs.push_back({});
+        // Reset paragraph formatting
+        m_para.alignment = 1;
+        m_para.leftIndent = 0;
+        m_para.firstLineIndent = 0;
+    }
 
     RtfDocument m_doc;
     std::string m_rtf;
@@ -317,85 +441,23 @@ private:
         // Table group markers (should have been caught in parseGroup)
         if (word == "colortbl" || word == "fonttbl") return;
 
-        // Paragraph formatting
-        if (word == "ql" || word == "qj") { m_para.alignment = 1; return; }
-        if (word == "qc") { m_para.alignment = 128; return; }
-        if (word == "qr") { m_para.alignment = 2; return; }
-        if (word == "li") { m_para.leftIndent = arg; return; }
-        if (word == "fi") { m_para.firstLineIndent = arg; return; }
-
-        // Paragraph separator
-        if (word == "par") {
-            finalizeRun();
-            // Apply paragraph formatting to the last non-empty paragraph
-            for (int k = static_cast<int>(m_doc.paragraphs.size()) - 1; k >= 0; --k) {
-                if (!m_doc.paragraphs[k].runs.empty() &&
-                    std::any_of(m_doc.paragraphs[k].runs.begin(), m_doc.paragraphs[k].runs.end(),
-                        [](const RtfRun& r) { return !r.text.empty(); }))
-                {
-                    m_doc.paragraphs[k].alignment = m_para.alignment;
-                    m_doc.paragraphs[k].leftIndent = m_para.leftIndent;
-                    m_doc.paragraphs[k].firstLineIndent = m_para.firstLineIndent;
-                    break;
-                }
-            }
-            // Remove trailing empty paragraphs
-            while (!m_doc.paragraphs.empty()) {
-            const auto& last = m_doc.paragraphs.back();
-                bool hasText = std::any_of(last.runs.begin(), last.runs.end(),
-                [](const RtfRun& r) { return !r.text.empty(); });
-                if (!hasText) {
-                    m_doc.paragraphs.pop_back();
-                } else {
-                    break;
-                }
-            }
-            // Create paragraph for content that follows
-            m_doc.paragraphs.push_back({});
-            // Reset paragraph formatting
-            m_para.alignment = 1;
-            m_para.leftIndent = 0;
-            m_para.firstLineIndent = 0;
+        // Handle \deffN separately — set default font index
+        if (word == "deff") {
+            m_doc.defaultFontIndex = arg;
             return;
         }
 
-        // Character formatting
-        if (word == "b" && arg == 0) { finalizeRun(); m_format.bold = false; return; }
-        if (word == "b0") { finalizeRun(); m_format.bold = false; return; }
-        if (word == "b") { finalizeRun(); m_format.bold = true; return; }
-        if (word == "i" && arg == 0) { finalizeRun(); m_format.italic = false; return; }
-        if (word == "i0") { finalizeRun(); m_format.italic = false; return; }
-        if (word == "i") { finalizeRun(); m_format.italic = true; return; }
-        if (word == "ul" && arg == 0) { finalizeRun(); m_format.underline = false; return; }
-        if (word == "ul0") { finalizeRun(); m_format.underline = false; return; }
-        if (word == "ul") { finalizeRun(); m_format.underline = true; return; }
-        if (word == "sub" && arg == 0) { finalizeRun(); m_format.subscript = false; return; }
-        if (word == "sub0") { finalizeRun(); m_format.subscript = false; return; }
-        if (word == "sub") { finalizeRun(); m_format.subscript = true; m_format.superscript = false; return; }
-        if (word == "super" && arg == 0) { finalizeRun(); m_format.superscript = false; m_format.subscript = false; return; }
-        if (word == "super0") { finalizeRun(); m_format.superscript = false; m_format.subscript = false; return; }
-        if (word == "super") { finalizeRun(); m_format.superscript = true; m_format.subscript = false; return; }
-        if (word == "f" && arg >= 0) { finalizeRun(); m_format.fontIndex = arg; return; }
-        if (word == "fs" && arg >= 0) { finalizeRun(); m_format.fontSize = arg; return; }
-        if (word == "cf" && arg >= 0) { finalizeRun(); m_format.colorIndex = arg; return; }
-
-        // Table entry markers (inside table groups, handled by table parsers)
-        if (word == "red" || word == "green" || word == "blue") return;
-        if (word == "froman" || word == "fswiss" || word == "fmodern" || word == "fnil") return;
-        if (word == "fcharset") return;
-
-        // RTF header control words — capture deffN, ignore rest
-        if (word == "deff") { m_doc.defaultFontIndex = arg; return; }
-        if (word == "rtf" || word == "ansi" || word == "deff0" ||
-            word == "mac" || word == "pca" || word == "ansicpg" ||
-            word == "ucci") return;
-
-        // Unknown tag
-        std::string tag = "\\" + word;
-        if (arg >= 0) {
-            tag += std::to_string(arg);
+        auto* ctrl = findControl(word.c_str());
+        if (ctrl) {
+            dispatch(*ctrl, arg);
+        } else {
+            // Unknown tag — record for preservation
+            std::string tag = "\\" + word;
+            if (arg >= 0) {
+                tag += std::to_string(arg);
+            }
+            m_doc.unknownTags.push_back(tag);
         }
-        m_doc.unknownTags.push_back(tag);
     }
 
     void accumulateLiteral(char c) {
