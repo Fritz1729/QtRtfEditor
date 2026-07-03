@@ -56,6 +56,59 @@ static bool ResolveAndCompareColors(int paraIdx, int runIdx,
     return true;
 }
 
+static bool ResolveAndCompareHighlight(int paraIdx, int runIdx,
+    const RtfRun& runA, const RtfRun& runB,
+    const RtfDocument& a, const RtfDocument& b,
+    std::string& reason) {
+    // Highlight uses a fixed palette of 16 colors
+    // Map highlight index (1-16) to known RTF highlight colors
+    static const std::vector<RtfColorEntry> highlightPalette = {
+        {0, 0, 0},        // 1 - black
+        {255, 255, 255},  // 2 - white
+        {255, 0, 0},      // 3 - red
+        {0, 255, 0},      // 4 - green
+        {255, 255, 0},    // 5 - yellow
+        {0, 0, 255},      // 6 - blue
+        {255, 0, 255},    // 7 - magenta
+        {0, 255, 255},    // 8 - cyan
+        {128, 0, 0},      // 9 - dark red
+        {0, 128, 0},      // 10 - dark green
+        {128, 128, 0},    // 11 - dark yellow
+        {0, 0, 128},      // 12 - dark blue
+        {128, 0, 128},    // 13 - dark magenta
+        {0, 128, 128},    // 14 - dark cyan
+        {192, 192, 192},  // 15 - light gray
+        {128, 128, 128},  // 16 - dark gray
+    };
+
+    RtfColorEntry resolvedA = {0, 0, 0};
+    RtfColorEntry resolvedB = {0, 0, 0};
+    bool hasA = runA.format.highlight >= 1 &&
+                runA.format.highlight <= 16 &&
+                runA.format.highlight >= 0;
+    bool hasB = runB.format.highlight >= 1 &&
+                runB.format.highlight <= 16 &&
+                runB.format.highlight >= 0;
+
+    if (hasA) resolvedA = highlightPalette[runA.format.highlight - 1];
+    if (hasB) resolvedB = highlightPalette[runB.format.highlight - 1];
+
+    if (hasA && hasB && resolvedA.red == resolvedB.red &&
+        resolvedA.green == resolvedB.green && resolvedA.blue == resolvedB.blue) {
+        return false;
+    }
+    if (resolvedA.red == resolvedB.red &&
+        resolvedA.green == resolvedB.green && resolvedA.blue == resolvedB.blue) {
+        return false;
+    }
+
+    reason = "Paragraph " + std::to_string(paraIdx) +
+        " run " + std::to_string(runIdx) +
+        " highlight: " + std::to_string(runA.format.highlight) +
+        " vs " + std::to_string(runB.format.highlight);
+    return true;
+}
+
 RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
                               std::string& reason) {
     // Check for unknown tags
@@ -107,6 +160,30 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
             reason = "Paragraph " + std::to_string(i) +
                      " firstLineIndent: " + std::to_string(paraA.firstLineIndent) +
                      " vs " + std::to_string(paraB.firstLineIndent);
+            return RtfCompareResult::StructuralDiff;
+        }
+        if (paraA.rightIndent != paraB.rightIndent) {
+            reason = "Paragraph " + std::to_string(i) +
+                     " rightIndent: " + std::to_string(paraA.rightIndent) +
+                     " vs " + std::to_string(paraB.rightIndent);
+            return RtfCompareResult::StructuralDiff;
+        }
+        if (paraA.spaceBefore != paraB.spaceBefore) {
+            reason = "Paragraph " + std::to_string(i) +
+                     " spaceBefore: " + std::to_string(paraA.spaceBefore) +
+                     " vs " + std::to_string(paraB.spaceBefore);
+            return RtfCompareResult::StructuralDiff;
+        }
+        if (paraA.spaceAfter != paraB.spaceAfter) {
+            reason = "Paragraph " + std::to_string(i) +
+                     " spaceAfter: " + std::to_string(paraA.spaceAfter) +
+                     " vs " + std::to_string(paraB.spaceAfter);
+            return RtfCompareResult::StructuralDiff;
+        }
+        if (paraA.lineHeight != paraB.lineHeight) {
+            reason = "Paragraph " + std::to_string(i) +
+                     " lineHeight: " + std::to_string(paraA.lineHeight) +
+                     " vs " + std::to_string(paraB.lineHeight);
             return RtfCompareResult::StructuralDiff;
         }
         // Compare runs
@@ -212,6 +289,51 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
                          " run " + std::to_string(j) +
                          " subscript: " + std::string(runA.format.subscript ? "true" : "false") +
                          " vs " + std::string(runB.format.subscript ? "true" : "false");
+                return RtfCompareResult::StructuralDiff;
+            }
+            if (runA.format.strikeOut != runB.format.strikeOut) {
+                reason = "Paragraph " + std::to_string(i) +
+                         " run " + std::to_string(j) +
+                         " strikeOut: " + std::string(runA.format.strikeOut ? "true" : "false") +
+                         " vs " + std::string(runB.format.strikeOut ? "true" : "false");
+                return RtfCompareResult::StructuralDiff;
+            }
+            if (runA.format.bgColorIndex != runB.format.bgColorIndex) {
+                if (ResolveAndCompareColors(i, j, runA, runB, a, b, reason)) {
+                    return RtfCompareResult::StructuralDiff;
+                }
+            }
+            if (runA.format.highlight != runB.format.highlight) {
+                if (ResolveAndCompareHighlight(i, j, runA, runB, a, b, reason)) {
+                    return RtfCompareResult::StructuralDiff;
+                }
+            }
+            if (runA.format.underlineStyle != runB.format.underlineStyle) {
+                reason = "Paragraph " + std::to_string(i) +
+                         " run " + std::to_string(j) +
+                         " underlineStyle: " + std::to_string(static_cast<int>(runA.format.underlineStyle)) +
+                         " vs " + std::to_string(static_cast<int>(runB.format.underlineStyle));
+                return RtfCompareResult::StructuralDiff;
+            }
+            if (runA.format.capitalization != runB.format.capitalization) {
+                reason = "Paragraph " + std::to_string(i) +
+                         " run " + std::to_string(j) +
+                         " capitalization: " + std::to_string(static_cast<int>(runA.format.capitalization)) +
+                         " vs " + std::to_string(static_cast<int>(runB.format.capitalization));
+                return RtfCompareResult::StructuralDiff;
+            }
+            if (runA.format.upOffset != runB.format.upOffset) {
+                reason = "Paragraph " + std::to_string(i) +
+                         " run " + std::to_string(j) +
+                         " upOffset: " + std::to_string(runA.format.upOffset) +
+                         " vs " + std::to_string(runB.format.upOffset);
+                return RtfCompareResult::StructuralDiff;
+            }
+            if (runA.format.dnOffset != runB.format.dnOffset) {
+                reason = "Paragraph " + std::to_string(i) +
+                         " run " + std::to_string(j) +
+                         " dnOffset: " + std::to_string(runA.format.dnOffset) +
+                         " vs " + std::to_string(runB.format.dnOffset);
                 return RtfCompareResult::StructuralDiff;
             }
         }

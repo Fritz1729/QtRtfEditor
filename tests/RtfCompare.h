@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -15,15 +16,37 @@ struct RtfFontEntry {
     bool operator==(const RtfFontEntry &) const = default;
 };
 
+enum class UnderlineStyle : uint8_t {
+    None,
+    Solid,
+    Dotted,
+    Dashed,
+    Double,
+    Thick,
+};
+
+enum class Capitalization : uint8_t {
+    None,
+    AllCaps,
+    SmallCaps,
+};
+
 struct RtfRunFormat {
     bool bold = false;
     bool italic = false;
     bool underline = false;
+    bool strikeOut = false;
     int fontIndex = 0;
     int fontSize = 0;
     int colorIndex = -1;
+    int bgColorIndex = -1;
+    int highlight = -1;
     bool superscript = false;
     bool subscript = false;
+    UnderlineStyle underlineStyle = UnderlineStyle::None;
+    Capitalization capitalization = Capitalization::None;
+    int upOffset = 0;
+    int dnOffset = 0;
 
     bool operator==(const RtfRunFormat &) const = default;
 };
@@ -42,6 +65,10 @@ struct RtfParagraph {
     int alignment = 1;            // Qt::AlignLeft = 1
     int leftIndent = 0;           // half-points
     int firstLineIndent = 0;      // half-points
+    int rightIndent = 0;          // half-points
+    int spaceBefore = 0;          // half-points
+    int spaceAfter = 0;           // half-points
+    int lineHeight = 0;           // half-points / twips
     std::vector<RtfRun> runs;
 
     RtfParagraph() = default;
