@@ -11,8 +11,8 @@ license=('GPL-3.0-only' 'custom')
 depends=('qt6-base')
 makedepends=('cmake' 'ninja' 'qt6-base')
 checkdepends=('qt6-base')
-source=("${_pkgbasename}-${pkgver}.tar.gz::https://github.com/Fritz1729/QtRtfEditor/archive/refs/tags/v${pkgver}.tar.gz")
-sha256sums=('b9c3debec5270da96acea293dd9c030d15798e8082c883d3f3473cd44390b6ba')
+source=("${_pkgbasename}-${pkgver}.tar.gz")
+sha256sums=('2786eaff8528621fff5cbd2a6e0ad2e778873d7a483494415def675e3be5e095')
 
 build() {
   cmake -B build -S "${srcdir}/${_pkgbasename}-${pkgver}" \
