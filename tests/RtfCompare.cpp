@@ -136,7 +136,24 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
         if (CompareField(i, SIZE_MAX, "lineHeight",
                          paraA.lineHeight, paraB.lineHeight, reason)) return RtfCompareResult::StructuralDiff;
         if (CompareField(i, SIZE_MAX, "slMult",
-                         paraA.slMult, paraB.slMult, reason)) return RtfCompareResult::StructuralDiff;
+                          paraA.slMult, paraB.slMult, reason)) return RtfCompareResult::StructuralDiff;
+        if (paraA.tabStops.size() != paraB.tabStops.size()) {
+            reason = "Paragraph " + std::to_string(i) +
+                     " tabStops count: " + std::to_string(paraA.tabStops.size()) +
+                     " vs " + std::to_string(paraB.tabStops.size());
+            return RtfCompareResult::StructuralDiff;
+        }
+        for (size_t t = 0; t < paraA.tabStops.size(); ++t) {
+            if (paraA.tabStops[t] != paraB.tabStops[t]) {
+                reason = "Paragraph " + std::to_string(i) +
+                         " tabStops[" + std::to_string(t) +
+                         "]: position(" + std::to_string(paraA.tabStops[t].position) +
+                         "/" + std::to_string(paraB.tabStops[t].position) +
+                         ") align(" + std::to_string(paraA.tabStops[t].alignment) +
+                         "/" + std::to_string(paraB.tabStops[t].alignment) + ")";
+                return RtfCompareResult::StructuralDiff;
+            }
+        }
         // Compare runs
         if (paraA.runs.size() != paraB.runs.size()) {
             reason = "Paragraph " + std::to_string(i) +

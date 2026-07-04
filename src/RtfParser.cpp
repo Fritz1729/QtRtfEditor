@@ -139,6 +139,12 @@ private:
             case RtfControl::ParaProp::SlMult:
                 if (arg >= 0) _para.slMult = arg;
                 break;
+            case RtfControl::ParaProp::TabStop:
+                if (arg >= 0) {
+                    _para.tabStops.push_back({arg, _pendingTabAlignment});
+                    _pendingTabAlignment = 1;
+                }
+                break;
             }
             break;
         }
@@ -146,6 +152,24 @@ private:
             const RtfControl::Align align = ctrl.value.align;
             _para.alignment = align == RtfControl::Align::Center ? 128 :
                               align == RtfControl::Align::Right ? 2 : 1;
+            break;
+        }
+        case RtfControl::Action::SetTabAlign: {
+            const RtfControl::TabAlign tabAlign = ctrl.value.tabAlign;
+            switch (tabAlign) {
+            case RtfControl::TabAlign::Left:
+                _pendingTabAlignment = 1;
+                break;
+            case RtfControl::TabAlign::Center:
+                _pendingTabAlignment = 128;
+                break;
+            case RtfControl::TabAlign::Right:
+                _pendingTabAlignment = 2;
+                break;
+            case RtfControl::TabAlign::Decimal:
+                _pendingTabAlignment = 3;
+                break;
+            }
             break;
         }
         case RtfControl::Action::SetUlStyle: {
@@ -230,6 +254,7 @@ private:
         _doc.paragraphs.push_back({});
         // Reset paragraph formatting
         _para = ParagraphFormatting{};
+        _pendingTabAlignment = 1;
     }
 
     RtfDocument _doc;
@@ -244,6 +269,8 @@ private:
     bool _inColortbl = false;
     bool _inFonttbl = false;
     std::vector<ParagraphFormatting> _paraStateStack;
+    std::vector<int> _pendingTabAlignmentStack;
+    int _pendingTabAlignment = 1;
 
     void parse() {
         while (_pos < _len) {
@@ -270,6 +297,7 @@ private:
         // Push state
         _formatStack.push_back(_format);
         _paraStateStack.push_back(_para);
+        _pendingTabAlignmentStack.push_back(_pendingTabAlignment);
 
         // Check for known table groups
         skipWhitespace();
@@ -320,6 +348,10 @@ private:
         if (!_paraStateStack.empty()) {
             _para = _paraStateStack.back();
             _paraStateStack.pop_back();
+        }
+        if (!_pendingTabAlignmentStack.empty()) {
+            _pendingTabAlignment = _pendingTabAlignmentStack.back();
+            _pendingTabAlignmentStack.pop_back();
         }
     }
 

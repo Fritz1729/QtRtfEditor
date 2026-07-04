@@ -54,6 +54,13 @@ struct RtfRun {
     bool operator==(const RtfRun &) const = default;
 };
 
+struct TabStop {
+    int position;
+    int alignment; // 1=left, 128=center, 2=right
+
+    bool operator==(const TabStop& other) const = default;
+};
+
 struct ParagraphFormatting {
     int alignment = 1;
     int leftIndent = 0;
@@ -63,6 +70,7 @@ struct ParagraphFormatting {
     int spaceAfter = 0;
     int lineHeight = 0;
     int slMult = 1;
+    std::vector<TabStop> tabStops;
 };
 
 struct RtfParagraph : ParagraphFormatting {
@@ -83,6 +91,7 @@ inline std::string AlignmentToString(int align) {
         case 1: return "left";
         case 128: return "center";
         case 2: return "right";
+        case 3: return "decimal";
         default: return "unknown(" + std::to_string(align) + ")";
     }
 }

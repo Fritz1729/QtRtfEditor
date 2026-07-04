@@ -7,11 +7,14 @@ using CharProp = RtfControl::CharProp;
 using CharSetProp = RtfControl::CharSetProp;
 using ParaProp = RtfControl::ParaProp;
 using Align = RtfControl::Align;
+using TabAlign = RtfControl::TabAlign;
 using UlStyle = RtfControl::RtfUlStyle;
 using Caps = RtfControl::RtfCaps;
 
 #define DATA(keyword, action, prop) \
     { keyword, action, { .raw = static_cast<int>(prop) } }
+#define DATA_TAB(keyword, action, align) \
+    { keyword, action, { .tabAlign = align } }
 
 constexpr RtfControl rtfControlTableEntries[] = {
     // Character toggles
@@ -51,6 +54,14 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("qj",       Action::SetAlignment,     Align::Left),
     DATA("qc",       Action::SetAlignment,     Align::Center),
     DATA("qr",       Action::SetAlignment,     Align::Right),
+
+    // Tab stop alignment
+    DATA_TAB("tqc",   Action::SetTabAlign,      TabAlign::Center),
+    DATA_TAB("tqd",   Action::SetTabAlign,      TabAlign::Decimal),
+    DATA_TAB("tqr",   Action::SetTabAlign,      TabAlign::Right),
+
+    // Tab stop position
+    DATA("tx",       Action::SetParaProp,      ParaProp::TabStop),
 
     // Underline styles
     DATA("uld",      Action::SetUlStyle,       UlStyle::UlDotted),

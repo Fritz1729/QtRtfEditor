@@ -72,6 +72,10 @@ private slots:
     void DifferentItalic();
     void DifferentUnderline();
     void DifferentTab();
+    void DifferentTabStops();
+    void TabAlignDecimalVsCenter();
+    void TabAlignDecimalVsRight();
+    void TabAlignDecimalVsLeft();
 
     // RE 2.0 — True positives (must detect differences)
     void DifferentStrike();
@@ -246,6 +250,37 @@ void TestSemanticComparison::DifferentTab() {
     std::string rtfB = R"({\rtf1\ansi\deff0 One  Two\par})";
     std::string reason;
     QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+}
+
+void TestSemanticComparison::DifferentTabStops() {
+    std::string rtfA = R"({\rtf1\ansi\deff0\tx1000\tqc\tx2000\tx3000\tqr Text\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0\tx1000\tx2000\tx3000\tx4000\tqc Text\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+}
+
+void TestSemanticComparison::TabAlignDecimalVsCenter() {
+    std::string rtfA = R"({\rtf1\ansi\deff0\tqd\tx1000 Text\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0\tqc\tx1000 Text\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::TabAlignDecimalVsRight() {
+    std::string rtfA = R"({\rtf1\ansi\deff0\tqd\tx1000 Text\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0\tqr\tx1000 Text\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::TabAlignDecimalVsLeft() {
+    std::string rtfA = R"({\rtf1\ansi\deff0\tqd\tx1000 Text\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0\tx1000 Text\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
 }
 
 void TestSemanticComparison::DifferentStrike() {

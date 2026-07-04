@@ -25,6 +25,7 @@ struct RtfControl {
         EmitParagraph,
         HeaderControl,
         TableControl,
+        SetTabAlign,
         Unknown,
     };
 
@@ -34,7 +35,7 @@ struct RtfControl {
     enum class Align : uint8_t { Left, Center, Right };
     enum class ParaProp : uint8_t {
         LeftIndent, FirstLineIndent, RightIndent, SpaceBefore, SpaceAfter,
-        LineHeight, SlMult,
+        LineHeight, SlMult, TabStop,
     };
     enum class CharSetProp : uint8_t {
         FontIndex, FontSize, ColorIndex, BgColorIndex, Highlight, UpOffset,
@@ -44,6 +45,7 @@ struct RtfControl {
         UlNone, UlSolid, UlDotted, UlDashed, UlDouble, UlThick,
     };
     enum class RtfCaps : uint8_t { CapsNone, CapsAll, CapsSmall };
+    enum class TabAlign : uint8_t { Left, Center, Right, Decimal };
 
     Action action;
 
@@ -55,12 +57,13 @@ struct RtfControl {
         Align align;
         RtfUlStyle ulStyle;
         RtfCaps caps;
+        TabAlign tabAlign;
     };
 
     Value value;
 };
 
-constexpr std::size_t kRtfControlTableSize = 57;
+constexpr std::size_t kRtfControlTableSize = 61;
 
 extern const std::array<RtfControl, kRtfControlTableSize> rtfControlTable;
 

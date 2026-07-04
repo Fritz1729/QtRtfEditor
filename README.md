@@ -23,8 +23,7 @@ Delphi applications can re-import the data correctly.
 ### Supported
 
 RichEdit 2.0 with the exceptions of highlight (`\highlightN`), double underline (`\uldb`),
-line-spacing multiplier (`\slmultN`), positional superscript/subscript (`\upN`/`\dnN`),
-and tab stops (`\txN`, `\tqd`, `\tqc`).
+line-spacing multiplier (`\slmultN`), and positional superscript/subscript (`\upN`/`\dnN`).
 
 **Character formatting:** bold (`\b`), italic (`\i`), underline (solid `\ul`, dotted `\uld`, dashed `\uldash`, thick `\ulth`),
 strikethrough (`\strike`), font family (`\fN`), font size (`\fsN`), text color (`\cfN`), background color (`\cbN`),
@@ -37,7 +36,7 @@ right indent (`\riN`), spacing before (`\sbN`) / after (`\saN`), line height (`\
 
 **Unicode:** escape (`\uN`), hex (`\'hh`), non-breaking space (`\~`), typographic characters (`\bullet`, `\emdash`, `\endash`, `\lquote`, `\rquote`, `\ldblquote`, `\rdblquote`).
 
-**Tabs:** simple tab separator (`\t`).
+**Tabs:** simple tab separator (`\t`) and tab stops with alignment (`\txN`, `\tqc`, `\tqd`, `\tqr`).
 
 ### No Support Planned
 

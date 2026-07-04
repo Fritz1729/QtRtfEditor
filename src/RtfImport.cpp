@@ -6,6 +6,7 @@
 #include <QTextCursor>
 #include <QTextCharFormat>
 #include <QTextBlockFormat>
+#include <QTextOption>
 #include <QFont>
 #include <QColor>
 
@@ -54,7 +55,23 @@ void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
 
         if (para.lineHeight > 0) {
             blockFmt.setLineHeight(static_cast<double>(para.lineHeight) / 2.0,
-                                   QTextBlockFormat::FixedHeight);
+                                    QTextBlockFormat::FixedHeight);
+        }
+
+        if (!para.tabStops.empty()) {
+            QList<QTextOption::Tab> tabs;
+            for (const auto& ts : para.tabStops) {
+                QTextOption::TabType type;
+                switch (ts.alignment) {
+                case 1: type = QTextOption::LeftTab; break;
+                case 128: type = QTextOption::CenterTab; break;
+                case 2: type = QTextOption::RightTab; break;
+                case 3: type = QTextOption::LeftTab; break;
+                default: type = QTextOption::LeftTab; break;
+                }
+                tabs << QTextOption::Tab(static_cast<double>(ts.position) / 2.0, type);
+            }
+            blockFmt.setTabPositions(tabs);
         }
 
         cursor.insertBlock(blockFmt);

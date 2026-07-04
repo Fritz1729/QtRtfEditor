@@ -7,6 +7,7 @@
 #include <QTextFragment>
 #include <QFont>
 #include <QTextBlockFormat>
+#include <QTextOption>
 #include <QString>
 #include <QtGlobal>
 
@@ -226,6 +227,26 @@ std::string ExportRtf(const QTextDocument& document) {
             if (lhTwips > 0) {
                 out << "\\sl" << lhTwips;
                 out << "\\slmult1";
+            }
+        }
+
+        {
+            const QList<QTextOption::Tab> tabs = blockFmt.tabPositions();
+            for (const QTextOption::Tab& tab : tabs) {
+                switch (tab.type) {
+                case QTextOption::LeftTab:
+                    out << "\\tx" << static_cast<int>(tab.position * 2.0);
+                    break;
+                case QTextOption::RightTab:
+                    out << "\\tqr\\tx" << static_cast<int>(tab.position * 2.0);
+                    break;
+                case QTextOption::CenterTab:
+                    out << "\\tqc\\tx" << static_cast<int>(tab.position * 2.0);
+                    break;
+                default:
+                    out << "\\tx" << static_cast<int>(tab.position * 2.0);
+                    break;
+                }
             }
         }
 
