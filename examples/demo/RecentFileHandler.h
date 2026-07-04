@@ -2,12 +2,14 @@
 
 #include <QStringList>
 #include <QMenu>
+#include <QObject>
 
-#include "DemoWindow.h"
+class DemoWindow;
 
-class RecentFileHandler {
+class RecentFileHandler : public QObject {
+    Q_OBJECT
 public:
-    RecentFileHandler(DemoWindow* pWindow);
+    explicit RecentFileHandler(DemoWindow* pWindow, QObject* parent = nullptr);
 
     void AddRecentFile(const QString& path);
     void UpdateRecentFilesMenu(QMenu* pMenu);

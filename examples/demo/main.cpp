@@ -32,7 +32,7 @@ DemoWindow::DemoWindow(QWidget* parent)
     _pMenuBuilder = new MenuBuilder(menuBar(), this);
     _pMenuBuilder->Build();
 
-    _pRecentFileHandler = new RecentFileHandler(this);
+    _pRecentFileHandler = new RecentFileHandler(this, this);
 }
 
 void DemoWindow::MergeFormatOnSelection(const QTextCharFormat& format) {

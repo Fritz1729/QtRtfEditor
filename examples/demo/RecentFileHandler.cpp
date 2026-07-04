@@ -1,4 +1,5 @@
 #include "RecentFileHandler.h"
+#include "DemoWindow.h"
 #include <QSettings>
 #include <QFileInfo>
 #include <QFileDialog>
@@ -7,12 +8,12 @@
 #include <RichTextEdit.h>
 #include <QStatusBar>
 
-#include <QObject>
-
-RecentFileHandler::RecentFileHandler(DemoWindow* pWindow)
-    : _pWindow(pWindow)
+RecentFileHandler::RecentFileHandler(DemoWindow* pWindow, QObject* parent)
+    : QObject(parent)
+    , _pWindow(pWindow)
 {
     LoadRecentFiles();
+    UpdateRecentFilesMenu(_pWindow->RecentFilesMenu());
 }
 
 void RecentFileHandler::LoadRecentFiles() {
@@ -26,6 +27,7 @@ void RecentFileHandler::LoadRecentFiles() {
 void RecentFileHandler::SaveRecentFiles() const {
     QSettings settings;
     settings.setValue("recentFiles", QVariant(_recentFiles));
+    settings.sync();
 }
 
 void RecentFileHandler::AddRecentFile(const QString& path) {

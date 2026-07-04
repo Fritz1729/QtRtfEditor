@@ -20,6 +20,7 @@ public:
         _pos = 0;
         _len = rtf.size();
         _literalText.clear();
+        _skipLeadingWsTrim = false;
         _iter = 0;
 
         _format = RtfRunFormat{};
@@ -61,6 +62,10 @@ private:
             finalizeRun();
             // arg < 0 = no argument provided → treat as on
             bool on = (arg >= 0) ? (arg != 0) : true;
+            // Preserve leading whitespace after toggle-OFF (e.g. \b0),
+            // but trim it after toggle-ON (e.g. \b) since it's just
+            // whitespace inside a formatted group.
+            _skipLeadingWsTrim = !on;
             const RtfControl::CharProp prop = ctrl.value.charProp;
             switch (prop) {
             case RtfControl::CharProp::Bold:
@@ -68,11 +73,6 @@ private:
                 break;
             case RtfControl::CharProp::Italic:
                 _format.italic = on;
-                break;
-            case RtfControl::CharProp::Underline:
-                _format.underline = on;
-                if (on) _format.underlineStyle = UnderlineStyle::Solid;
-                else _format.underlineStyle = UnderlineStyle::None;
                 break;
             case RtfControl::CharProp::Subscript:
                 _format.subscript = on;
@@ -180,6 +180,12 @@ private:
             finalizeRun();
             const RtfControl::RtfUlStyle style = ctrl.value.ulStyle;
             switch (style) {
+            case RtfControl::RtfUlStyle::UlSolid:
+                // arg < 0 = no argument → toggle on
+                // arg >= 0 = explicit argument (e.g. \ul0) → arg is ignored
+                _format.underlineStyle = UnderlineStyle::Solid;
+                _format.underline = true;
+                break;
             case RtfControl::RtfUlStyle::UlDotted:
                 _format.underlineStyle = UnderlineStyle::Dotted;
                 _format.underline = true;
@@ -241,6 +247,7 @@ private:
 
     void handleParagraph() {
         finalizeRun();
+        _skipLeadingWsTrim = false;
         // Apply paragraph formatting to the last non-empty paragraph
         for (int k = static_cast<int>(_doc.paragraphs.size()) - 1; k >= 0; --k) {
             if (!_doc.paragraphs[k].runs.empty() &&
@@ -274,6 +281,7 @@ private:
     size_t _pos = 0;
     size_t _len = 0;
     std::string _literalText;
+    bool _skipLeadingWsTrim = false;
     size_t _iter = 0;
     RtfRunFormat _format;
     ParagraphFormatting _para;
@@ -724,21 +732,21 @@ private:
     void finalizeRun() {
         if (_literalText.empty()) return;
 
-        // Trim leading/trailing whitespace from the literal
-        // but preserve internal whitespace
         std::string trimmed = _literalText;
-        size_t start = trimmed.find_first_not_of(" \t\n\r");
-        size_t end = trimmed.find_last_not_of(" \t\n\r");
-        if (start == std::string::npos) {
-            // All whitespace — skip
-            _literalText.clear();
-            return;
-        }
-        trimmed = trimmed.substr(start, end - start + 1);
 
-        if (trimmed.empty()) {
-            _literalText.clear();
-            return;
+        // Only trim leading whitespace at paragraph start, or when we're
+        // not right after a formatting toggle. After a toggle (e.g. \b0),
+        // leading whitespace is intentional content.
+        if (_skipLeadingWsTrim) {
+            _skipLeadingWsTrim = false;
+        } else {
+            size_t start = trimmed.find_first_not_of(" \t\n\r");
+            if (start != std::string::npos) {
+                trimmed = trimmed.substr(start);
+            } else {
+                _literalText.clear();
+                return;
+            }
         }
 
         if (_doc.paragraphs.empty()) {

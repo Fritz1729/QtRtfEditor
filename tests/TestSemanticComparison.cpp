@@ -2,6 +2,7 @@
 #include <future>
 #include <chrono>
 #include "RtfCompare.h"
+#include "RtfParser.h"
 
 using namespace Rte;
 
@@ -112,6 +113,11 @@ private slots:
     void EmptyDocs();
     void HeaderOnly();
     void UnknownTags();
+
+    // Whitespace preservation and underline control words
+    void WhitespaceAfterToggleOff();
+    void UlNone();
+    void SemanticUlSynonyms();
 
     void cleanupTestCase();
 
@@ -562,6 +568,59 @@ void TestSemanticComparison::UnknownTags() {
     std::string rtfB = R"({\rtf1\ansi\deff0 Text\par})";
     std::string reason;
     QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::UnknownTag);
+}
+
+void TestSemanticComparison::WhitespaceAfterToggleOff() {
+    // Whitespace after a toggle-OFF (e.g. \b0) must be preserved
+    // as content, not trimmed away. After \b0, one trailing space
+    // is consumed as the RTF delimiter (per spec), so one space
+    // remains as content.
+    std::string rtf = R"({\rtf1\ansi\deff0 Test \b bold\b0  regular\par})";
+    auto doc = ParseRtf(rtf);
+    QVERIFY(doc.paragraphs.size() >= 1);
+    QVERIFY(doc.paragraphs[0].runs.size() >= 3);
+
+    // Find the "regular" run — it should start with a space
+    bool foundRegularWithSpace = false;
+    for (const auto& run : doc.paragraphs[0].runs) {
+        if (run.text.find("regular") != std::string::npos) {
+            QVERIFY(!run.text.empty());
+            QVERIFY(run.text[0] == ' ');
+            foundRegularWithSpace = true;
+        }
+    }
+    QVERIFY(foundRegularWithSpace);
+}
+
+void TestSemanticComparison::UlNone() {
+    // \ulnone must turn off underline, not turn it on
+    std::string rtf = R"({\rtf1\ansi\deff0 Text {\ul underlined\ulnone} normal\par})";
+    auto doc = ParseRtf(rtf);
+    QVERIFY(doc.paragraphs.size() >= 1);
+    QVERIFY(doc.paragraphs[0].runs.size() >= 3);
+
+    bool foundUnderlined = false;
+    bool foundNormal = false;
+    for (const auto& run : doc.paragraphs[0].runs) {
+        if (run.text.find("underlined") != std::string::npos) {
+            QVERIFY(run.format.underline);
+            foundUnderlined = true;
+        }
+        if (run.text.find("normal") != std::string::npos) {
+            QVERIFY(!run.format.underline);
+            foundNormal = true;
+        }
+    }
+    QVERIFY(foundUnderlined);
+    QVERIFY(foundNormal);
+}
+
+void TestSemanticComparison::SemanticUlSynonyms() {
+    // \ul ... \ul0 and \ul ... \ulnone must be semantically identical
+    std::string rtfUl0 = R"({\rtf1\ansi\deff0{\ul Text}\ul0\par})";
+    std::string rtfUlNone = R"({\rtf1\ansi\deff0{\ul Text}\ulnone\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfUl0, rtfUlNone, reason), RtfCompareResult::Identical);
 }
 
 void TestSemanticComparison::cleanupTestCase() {
