@@ -85,7 +85,6 @@ private slots:
     void DifferentSpaceAfter();
     void DifferentLineHeight();
     void SlMultDifferent();
-    void DifferentHighlight();
     void DifferentCaps();
     void DifferentScaps();
     void DifferentUnderlineStyle();
@@ -96,7 +95,6 @@ private slots:
 
     // RE 2.0 — Semantic identity (must NOT flag as different)
     void CbSemantic();
-    void HighlightSemantic();
 
     // Edge cases
     void EmptyDocs();
@@ -338,13 +336,6 @@ void TestSemanticComparison::SlMultDifferent() {
     QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
 }
 
-void TestSemanticComparison::DifferentHighlight() {
-    std::string rtfA = R"({\rtf1\ansi\deff0\highlight3 Red-hl\par})";
-    std::string rtfB = R"({\rtf1\ansi\deff0\highlight1 Blk-hl\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-}
-
 void TestSemanticComparison::DifferentCaps() {
     std::string rtfA = R"({\rtf1\ansi\deff0\caps Caps\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Caps\par})";
@@ -408,15 +399,6 @@ void TestSemanticComparison::CbSemantic() {
     }
     QCOMPARE(r.result, RtfCompareResult::Identical);
     QVERIFY(r.reason.empty());
-}
-
-void TestSemanticComparison::HighlightSemantic() {
-    // Both use highlight index 3 (red), so they should be identical
-    std::string rtfA = R"({\rtf1\ansi\deff0\highlight3 Red-hl\par})";
-    std::string rtfB = R"({\rtf1\ansi\deff0\highlight3 Red-hl\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
 }
 
 void TestSemanticComparison::EmptyDocs() {

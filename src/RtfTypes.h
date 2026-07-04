@@ -33,7 +33,6 @@ struct RtfRunFormat {
     int fontSize = 0;
     int colorIndex = -1;
     int bgColorIndex = -1;
-    int highlight = -1;
     bool superscript = false;
     bool subscript = false;
     UnderlineStyle underlineStyle = UnderlineStyle::None;
@@ -105,25 +104,11 @@ inline Qt::Alignment RtfAlignmentToQt(int align) {
     }
 }
 
-constexpr std::array<std::array<uint8_t, 3>, 17> kHighlightPalette = {{
-    {0, 0, 0},       // 0  = black
-    {128, 128, 128}, // 1  = dark gray
-    {128, 0, 0},     // 2  = maroon
-    {0, 128, 0},     // 3  = dark green
-    {128, 128, 0},   // 4  = dark yellow
-    {0, 0, 128},     // 5  = navy
-    {128, 0, 128},   // 6  = purple
-    {0, 128, 128},   // 7  = teal
-    {192, 192, 192}, // 8  = silver
-    {255, 255, 255}, // 9  = white
-    {255, 0, 0},     // 10 = red
-    {0, 255, 0},     // 11 = green
-    {255, 255, 0},   // 12 = yellow
-    {0, 0, 255},     // 13 = blue
-    {255, 0, 255},   // 14 = magenta
-    {0, 255, 255},   // 15 = cyan
-    {128, 128, 128}, // 16 = gray 50%
-}};
+// \highlightN is intentionally not supported:
+// - RTF 1.5 spec defines names (Black, Blue, Cyan, …) but no RGB values
+// - RTF 1.9.1 spec says "index of the color table" but defines no palette
+// - The old hardcoded 17-entry table did not match the 1.5 spec names
+// - No reliable source for RGB values exists in the spec files
 
 inline UnderlineStyle toUnderlineStyle(QTextCharFormat::UnderlineStyle qtStyle) {
     switch (qtStyle) {

@@ -45,7 +45,6 @@ static void WriteConditionalFormatOff(std::ostringstream& out, const RtfRunForma
     if (fmt.strikeOut) out << "\\strike0" << space;
     if (fmt.capitalization == Capitalization::AllCaps) out << "\\caps0" << space;
     if (fmt.capitalization == Capitalization::SmallCaps) out << "\\scaps0" << space;
-    if (fmt.highlight >= 0) out << "\\highlight0" << space;
 }
 
 static void WriteFormatOff(std::ostringstream& out, const RtfRunFormat& fmt, bool trailingSpace) {
@@ -54,7 +53,6 @@ static void WriteFormatOff(std::ostringstream& out, const RtfRunFormat& fmt, boo
     if (fmt.strikeOut) out << "\\strike0" << space;
     if (fmt.capitalization == Capitalization::AllCaps) out << "\\caps0" << space;
     if (fmt.capitalization == Capitalization::SmallCaps) out << "\\scaps0" << space;
-    if (fmt.highlight >= 0) out << "\\highlight0" << space;
 }
 
 static UnderlineStyle EffectiveUnderlineStyle(const QTextCharFormat& fmt) {
@@ -67,14 +65,6 @@ static UnderlineStyle EffectiveUnderlineStyle(const QTextCharFormat& fmt) {
 int FindColorIndex(const std::vector<QColor>& colorList, const QColor& color) {
     for (int i = 0; i < static_cast<int>(colorList.size()); ++i) {
         if (colorList[i] == color) return i;
-    }
-    return -1;
-}
-
-int FindHighlightIndex(const QColor& color) {
-    for (int i = 0; i < static_cast<int>(kHighlightPalette.size()); ++i) {
-        QColor pal(kHighlightPalette[i][0], kHighlightPalette[i][1], kHighlightPalette[i][2]);
-        if (color == pal) return i;
     }
     return -1;
 }
@@ -318,7 +308,6 @@ std::string ExportRtf(const QTextDocument& document) {
                 if (cur.subscript) out << "\\sub ";
                 if (cur.capitalization == Capitalization::AllCaps) out << "\\caps ";
                 if (cur.capitalization == Capitalization::SmallCaps) out << "\\scaps ";
-                if (cur.highlight >= 0) out << "\\highlight" << cur.highlight << ' ';
             }
 
             out << RtfEscape(frag.text());

@@ -38,7 +38,7 @@ struct RtfControl {
         LineHeight, SlMult, TabStop,
     };
     enum class CharSetProp : uint8_t {
-        FontIndex, FontSize, ColorIndex, BgColorIndex, Highlight, UpOffset,
+        FontIndex, FontSize, ColorIndex, BgColorIndex, UpOffset,
         DnOffset,
     };
     enum class RtfUlStyle : uint8_t {
@@ -63,7 +63,7 @@ struct RtfControl {
     Value value;
 };
 
-constexpr std::size_t kRtfControlTableSize = 61;
+constexpr std::size_t kRtfControlTableSize = 60;
 
 extern const std::array<RtfControl, kRtfControlTableSize> rtfControlTable;
 

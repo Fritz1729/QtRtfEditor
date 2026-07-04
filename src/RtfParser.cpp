@@ -103,9 +103,6 @@ private:
             case RtfControl::CharSetProp::BgColorIndex:
                 _format.bgColorIndex = arg;
                 break;
-            case RtfControl::CharSetProp::Highlight:
-                _format.highlight = arg;
-                break;
             case RtfControl::CharSetProp::UpOffset:
                 _format.upOffset = arg;
                 break;

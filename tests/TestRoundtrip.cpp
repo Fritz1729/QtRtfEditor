@@ -10,7 +10,6 @@
 using namespace Rte;
 
 static const char* const kSkippedFiles[] = {
-    "highlighting.rtf",       // \highlightN — no persistent Qt property
     "line-spacing.rtf",       // \slmultN — Qt only supports FixedHeight, not multiplier
     "positional-supsub.rtf",  // \upN/\dnN — Qt only supports boolean super/subscript
     "underline-styles.rtf",   // \uldb — no double underline in Qt UnderlineStyle enum

@@ -36,7 +36,6 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("fs",       Action::SetCharProp,      CharSetProp::FontSize),
     DATA("cf",       Action::SetCharProp,      CharSetProp::ColorIndex),
     DATA("cb",       Action::SetCharProp,      CharSetProp::BgColorIndex),
-    DATA("highlight", Action::SetCharProp,     CharSetProp::Highlight),
     DATA("up",       Action::SetCharProp,      CharSetProp::UpOffset),
     DATA("dn",       Action::SetCharProp,      CharSetProp::DnOffset),
 

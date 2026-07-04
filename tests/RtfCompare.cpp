@@ -7,38 +7,20 @@
 
 namespace Rte {
 
-static bool IsColorInBounds(int index, size_t tableSize) {
-    return index >= 0 && index < static_cast<int>(tableSize);
-}
-
-struct ColorResolver {
-    RtfColorEntry(*resolve)(int idx, const RtfDocument& doc, bool* hasValue);
-};
-
 static RtfColorEntry ResolveColorFromTable(int idx, const RtfDocument& doc, bool* hasValue) {
-    *hasValue = IsColorInBounds(idx, doc.colors.size());
+    *hasValue = idx >= 0 && idx < static_cast<int>(doc.colors.size());
     if (*hasValue) return doc.colors[idx];
-    return {0, 0, 0};
-}
-
-static RtfColorEntry ResolveHighlight(int idx, const RtfDocument& doc, bool* hasValue) {
-    (void)doc;
-    *hasValue = idx >= 1 && idx < static_cast<int>(kHighlightPalette.size());
-    if (*hasValue) {
-        return {kHighlightPalette[idx - 1][0],
-                kHighlightPalette[idx - 1][1],
-                kHighlightPalette[idx - 1][2]};
-    }
     return {0, 0, 0};
 }
 
 static bool CompareResolvedColors(int paraIdx, int runIdx, int idxA, int idxB,
     const RtfDocument& docA, const RtfDocument& docB,
-    ColorResolver resolverA, ColorResolver resolverB,
+    RtfColorEntry(*resolveA)(int, const RtfDocument&, bool*),
+    RtfColorEntry(*resolveB)(int, const RtfDocument&, bool*),
     std::string& reason, const char* fieldName) {
     bool hasA, hasB;
-    RtfColorEntry resolvedA = resolverA.resolve(idxA, docA, &hasA);
-    RtfColorEntry resolvedB = resolverB.resolve(idxB, docB, &hasB);
+    RtfColorEntry resolvedA = resolveA(idxA, docA, &hasA);
+    RtfColorEntry resolvedB = resolveB(idxB, docB, &hasB);
 
     if (hasA && hasB && resolvedA.red == resolvedB.red &&
         resolvedA.green == resolvedB.green && resolvedA.blue == resolvedB.blue) {
@@ -58,12 +40,10 @@ static bool CompareResolvedColors(int paraIdx, int runIdx, int idxA, int idxB,
 
     std::string boundMsg;
     if (!hasA || !hasB) {
-        size_t tableA = (resolverA.resolve == ResolveColorFromTable) ? docA.colors.size() : kHighlightPalette.size();
-        size_t tableB = (resolverB.resolve == ResolveColorFromTable) ? docB.colors.size() : kHighlightPalette.size();
-        boundMsg = " [out-of-bounds: A=" + std::to_string(idxA) +
-            "/" + std::to_string(tableA) +
-            ", B=" + std::to_string(idxB) +
-            "/" + std::to_string(tableB) + "]";
+        boundMsg = " [out-of-bounds: A=" + std::to_string(idxA) + "/" +
+            std::to_string(docA.colors.size()) +
+            ", B=" + std::to_string(idxB) + "/" +
+            std::to_string(docB.colors.size()) + "]";
     }
 
     reason = "Paragraph " + std::to_string(paraIdx) +
@@ -205,9 +185,9 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
                              runA.format.fontSize, runB.format.fontSize, reason)) return RtfCompareResult::StructuralDiff;
             if (runA.format.colorIndex != runB.format.colorIndex) {
                 if (CompareResolvedColors(i, j, runA.format.colorIndex, runB.format.colorIndex,
-                                          a, b,
-                                          {ResolveColorFromTable}, {ResolveColorFromTable},
-                                          reason, "colorIndex")) {
+                                           a, b,
+                                           ResolveColorFromTable, ResolveColorFromTable,
+                                           reason, "colorIndex")) {
                     return RtfCompareResult::StructuralDiff;
                 }
             }
@@ -219,17 +199,9 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
                                  runA.format.strikeOut, runB.format.strikeOut, reason)) return RtfCompareResult::StructuralDiff;
             if (runA.format.bgColorIndex != runB.format.bgColorIndex) {
                 if (CompareResolvedColors(i, j, runA.format.bgColorIndex, runB.format.bgColorIndex,
-                                          a, b,
-                                          {ResolveColorFromTable}, {ResolveColorFromTable},
-                                          reason, "bgColorIndex")) {
-                    return RtfCompareResult::StructuralDiff;
-                }
-            }
-            if (runA.format.highlight != runB.format.highlight) {
-                if (CompareResolvedColors(i, j, runA.format.highlight, runB.format.highlight,
-                                          a, b,
-                                          {ResolveHighlight}, {ResolveHighlight},
-                                          reason, "highlight")) {
+                                           a, b,
+                                           ResolveColorFromTable, ResolveColorFromTable,
+                                           reason, "bgColorIndex")) {
                     return RtfCompareResult::StructuralDiff;
                 }
             }

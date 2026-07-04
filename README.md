@@ -18,36 +18,33 @@ Delphi applications can re-import the data correctly.
   enabling application-specific extensions.
 - **Dual licensing**: LGPL-3.0-or-later or commercial license.
 
-## Supported & Unsupported Features
+## Features
 
-### Supported
+### RichEdit 2.0 is supported.
 
-RichEdit 2.0 with the exceptions of highlight (`\highlightN`), double underline (`\uldb`),
-line-spacing multiplier (`\slmultN`), and positional superscript/subscript (`\upN`/`\dnN`).
+#### Topics
 
-**Character formatting:** bold (`\b`), italic (`\i`), underline (solid `\ul`, dotted `\uld`, dashed `\uldash`, thick `\ulth`),
-strikethrough (`\strike`), font family (`\fN`), font size (`\fsN`), text color (`\cfN`), background color (`\cbN`),
-superscript (`\super`) / subscript (`\sub`), capitalization (`\caps` / `\scaps`).
+- **Character formatting** — bold, italic, underline (solid, dotted, dashed, thick), strikethrough, font family, font size, text color, background color, superscript/subscript, capitalization
+- **Paragraph formatting** — alignment, left indent, first-line indent, right indent, spacing before/after, line height
+- **Tab stops** — simple tab separator, tab stops with left/center/right alignment
+- **Unicode** — escape sequences, hex escapes, non-breaking space, typographic characters
+- **Document tables** — color table, font table
 
-**Paragraph formatting:** alignment (`\ql` / `\qc` / `\qr` / `\qj`), left indent (`\liN`), first-line indent (`\fiN`),
-right indent (`\riN`), spacing before (`\sbN`) / after (`\saN`), line height (`\slN`).
+#### Not supported
 
-**Tables:** color table (`\colortbl`), font table (`\fonttbl`).
-
-**Unicode:** escape (`\uN`), hex (`\'hh`), non-breaking space (`\~`), typographic characters (`\bullet`, `\emdash`, `\endash`, `\lquote`, `\rquote`, `\ldblquote`, `\rdblquote`).
-
-**Tabs:** simple tab separator (`\t`) and tab stops with alignment (`\txN`, `\tqc`, `\tqd`, `\tqr`).
+- **Character formatting** — highlight (`\highlightN`), double underline (`\uldb`), line-spacing multiplier (`\slmultN`), positional superscript/subscript (`\upN`/`\dnN`)
+- **Document metadata** (`\info`, `\title`, `\author`, `\subject`, `\keywords`, `\versionN`) — handled by the embedding app
+- **OLE objects** (`\object`, `\objdata`, `\objalias`, `\objclass`) — Windows COM embedding
+- **Metafiles** (EMF, WMF) — Windows-specific rasterizable formats
+- **Section & page setup** (`\sectd`, `\sect`, `\sbk*`, `\pgwsxn`, `\pghsxn`, `\marg*`, `\cols*`, `\deftabN`, `\vertdoc`, `\horzdoc`)
+- **Asian and East Asian fonts** (`\fscript`, `\fdecor`, `\stshfdbchN`, `\stshfhichN`, `\stshfbiN`, `\fcharset134/136/129`) — requires external shaping library
+- **Bidirectional text** (`\rtlch`, `\ltrch`, `\rtl`, `\ltrpar`, `\fbidis`) — requires platform shaping library
+- **Complex script shaping** (Indic, Thai, Arabic) — requires HarfBuzz/UCDraw
 
 ### No Support Planned
 
-#### Specific to Windows
+#### Word-specific extensions
 
-- **OLE objects** (`\object`, `\objdata`, `\objalias`, `\objclass`) — Windows COM embedding
-- **Metafiles** (EMF, WMF) — Windows-specific rasterizable formats
-
-#### Document Management
-
-- **Document metadata** (`\info`, `\title`, `\author`, `\subject`, `\keywords`, `\versionN`) — handled by the embedding app
 - **Track changes** (`\revtbl`, `\revN`, `\insrsidN`, `\delrsidN`, `\tridxN`) — version tracking
 - **Styles** (`\stylesheet`, `\sN`, `\snext`, `\sbasedonN`) — Word-specific style system
 - **Fields** (`\field`, `\*\fldinst`, `\*\fldrslt`, `\date`, `\time`) — Word field codes
@@ -57,18 +54,8 @@ right indent (`\riN`), spacing before (`\sbN`) / after (`\saN`), line height (`\
 - **Paragraph Group Properties** (`\*\pgptbl`, `\pgp`, `\ipgpN`) — Word 2002+ storage optimization
 - **Style restrictions** (`\*\latentstyles`, `\lsd*`) — Word UI style visibility and locking
 - **Password protection** (`\passwordhash`, `\password`) — document-level security
-
-#### Support of Special Languages
-
-- **Asian and East Asian fonts** (`\fscript`, `\fdecor`, `\stshfdbchN`, `\stshfhichN`, `\stshfbiN`, `\fcharset134/136/129`) — font binding and complex script support requires an external shaping library
-- **Bidirectional text** (`\rtlch`, `\ltrch`, `\rtl`, `\ltrpar`, `\fbidis`) — BiDi layout requires a platform shaping library
-- **Complex script shaping** (Indic, Thai, Arabic) — requires HarfBuzz/UCDraw
-
-#### Page Layout & Document Structure
-
-- **Section & page setup** (`\sectd`, `\sect`, `\sbk*`, `\pgwsxn`, `\pghsxn`, `\marg*`, `\cols*`, `\deftabN`, `\vertdoc`, `\horzdoc`)
-- **Comments / annotations** (`\*\annot`, `\*\ftnacc`, `\*\annotrslt`)
-- **Compatibility & document properties** (`\hyph*`, `\lnongrid`, `\donotembedsysfontN`, `\donotembeddingdataN`, `\relyonvmlN`, `\validatexmlN`, `\showxmlerrorsN`, `\trackmovesN`, `\trackformattingN`, `\muser`)
+- **Comments / annotations** (`\*\annot`, `\*\ftnacc`, `\*\annotrslt`) — Word 2002+
+- **Compatibility flags** (`\hyph*`, `\lnongrid`, `\donotembedsysfontN`, `\donotembeddingdataN`, `\relyonvmlN`, `\validatexmlN`, `\showxmlerrorsN`, `\trackmovesN`, `\trackformattingN`, `\muser`) — Word-specific behavior flags
 
 ## Quick Start
 
