@@ -29,6 +29,7 @@ Delphi applications can re-import the data correctly.
 - **Tab stops** — simple tab separator, tab stops with left/center/right alignment
 - **Unicode** — escape sequences, hex escapes, non-breaking space, typographic characters
 - **Document tables** — color table, font table
+- **Embedded images** — BMP, PNG, JPEG via `\pict`
 
 #### Not supported
 

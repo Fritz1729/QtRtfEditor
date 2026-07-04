@@ -5,10 +5,14 @@
 #include <QTextBlock>
 #include <QTextCharFormat>
 #include <QTextFragment>
+#include <QTextImageFormat>
 #include <QFont>
 #include <QTextBlockFormat>
 #include <QTextOption>
 #include <QString>
+#include <QByteArray>
+#include <QImage>
+#include <QBuffer>
 #include <QtGlobal>
 
 #include <algorithm>
@@ -99,6 +103,84 @@ std::string AlignmentToRtf(Qt::Alignment alignment) {
     if (alignment & Qt::AlignHCenter) return "\\qc";
     if (alignment & Qt::AlignLeft) return "\\ql";
     return "\\ql";
+}
+
+static std::string EmitImageAsPict(const QTextDocument& doc, const QString& name,
+                                      qreal width, qreal height) {
+    // Extract counter from name (e.g., "rtfimage://1.png" -> "1")
+    int counter = 0;
+    {
+        int lastSlash = name.lastIndexOf('/');
+        if (lastSlash >= 0) {
+            QString mid = name.mid(lastSlash + 1);
+            mid = mid.split('.').first();
+            counter = mid.toInt();
+        }
+    }
+
+    // Look up stored format (jpg, png, bmp)
+    QString fmtPropName = QString("rtfImageFormat://img%1").arg(counter);
+    QVariant fmtVariant = doc.property(qPrintable(fmtPropName));
+    QString fmt = "png";
+    if (fmtVariant.canConvert<QString>()) {
+        fmt = fmtVariant.toString();
+    }
+
+    // Map format string to blip tag
+    QString blipTag;
+    if (fmt == "jpg") blipTag = "jpegblip";
+    else if (fmt == "bmp") blipTag = "dibitmap";
+    else blipTag = "pngblip";
+
+    // Path 1: Check if we have a stored hex string (byte-identical roundtrip)
+    QString propName = QString("rtfPictHex://img%1").arg(counter);
+    QVariant hexVariant = doc.property(qPrintable(propName));
+    if (hexVariant.canConvert<QString>()) {
+        QString hexStr = hexVariant.toString();
+        std::ostringstream out;
+        out << "{\\pict\\" << blipTag.toStdString() << " ";
+        int picwgoal = static_cast<int>(width * 2.0);
+        int pichgoal = static_cast<int>(height * 2.0);
+        if (picwgoal > 0) out << "\\picwgoal" << picwgoal;
+        if (pichgoal > 0) out << "\\pichgoal" << pichgoal;
+        out << ' ';
+        out << hexStr.toStdString();
+        out << '}';
+        return out.str();
+    }
+
+    // Path 2: Re-encode from binary data (e.g., pasted/dropped images)
+    QImage image;
+    {
+        QByteArray raw = doc.resource(QTextDocument::ImageResource, QUrl(name)).toByteArray();
+        image.loadFromData(raw);
+    }
+    if (image.isNull()) return "";
+
+    QByteArray encodedData;
+    QString encFormat = "PNG";
+    if (fmt == "jpg") {
+        encFormat = "JPEG";
+    } else if (fmt == "bmp") {
+        encFormat = "BMP";
+    }
+    {
+        QBuffer buffer(&encodedData);
+        buffer.open(QIODevice::WriteOnly);
+        image.save(&buffer, qPrintable(encFormat));
+    }
+
+    std::ostringstream out;
+    out << "{\\pict\\" << blipTag.toStdString() << " ";
+
+    int picwgoal = static_cast<int>(width * 2.0);
+    int pichgoal = static_cast<int>(height * 2.0);
+    if (picwgoal > 0) out << "\\picwgoal" << picwgoal;
+    if (pichgoal > 0) out << "\\pichgoal" << pichgoal;
+
+    out << encodedData.toHex().data();
+    out << "}";
+    return out.str();
 }
 
 } // namespace
@@ -242,85 +324,117 @@ std::string ExportRtf(const QTextDocument& document) {
 
         out << "\n";
 
-        RtfRunFormat prev;
-        bool firstRun = true;
-
-        QTextBlock::iterator it = block.begin();
-        while (it != block.end()) {
-            QTextFragment frag = it.fragment();
-            if (!frag.isValid() || frag.length() == 0) { it++; continue; }
-
-            QTextCharFormat charFmt = frag.charFormat();
-
-            RtfRunFormat cur;
-            qreal ptSize = charFmt.fontPointSize();
-            if (ptSize <= 0) ptSize = defaultFont.pointSizeF();
-            cur.fontSize = static_cast<int>(ptSize * 2);
-
-            QString fam;
-            {
-                QStringList fFams = charFmt.fontFamilies().toStringList();
-                fam = fFams.isEmpty() ? QString() : fFams.first();
+        // Check for images in this block
+        bool hasImage = false;
+        for (QTextBlock::iterator itImg = block.begin(); itImg != block.end(); ++itImg) {
+            QTextFragment frag = itImg.fragment();
+            if (frag.isValid() && frag.charFormat().isImageFormat()) {
+                hasImage = true;
+                break;
             }
-            if (fam.isEmpty()) fam = defaultFont.family();
-            auto fIt = fontMap.find(fam.toStdString());
-            cur.fontIndex = (fIt != fontMap.end()) ? fIt->second : defaultFontIdx;
-
-            auto lookupColor = [&](const QColor& col, std::vector<QColor>& list) -> int {
-                if (col.isValid() && col.alpha() == 255) {
-                    int idx = FindColorIndex(list, col);
-                    if (idx >= 0) return idx + 1;
-                }
-                return 0;
-            };
-            cur.colorIndex = lookupColor(charFmt.foreground().color(), colorList);
-            {
-                QBrush bgBrush = charFmt.background();
-                if (bgBrush.style() != Qt::NoBrush)
-                    cur.bgColorIndex = lookupColor(bgBrush.color(), bgColorList);
-            }
-
-            cur.bold = charFmt.fontWeight() >= 700;
-            cur.italic = charFmt.fontItalic();
-            cur.strikeOut = charFmt.fontStrikeOut();
-            cur.superscript = charFmt.verticalAlignment() == QTextCharFormat::AlignSuperScript;
-            cur.subscript = charFmt.verticalAlignment() == QTextCharFormat::AlignSubScript;
-            cur.underlineStyle = EffectiveUnderlineStyle(charFmt);
-            cur.capitalization = toCapitalization(charFmt.fontCapitalization());
-
-            if (firstRun || cur != prev) {
-                if (!firstRun) {
-                    WriteConditionalFormatOff(out, prev, true);
-                }
-
-                if (cur.fontSize > 0 && (!firstRun || cur.fontSize != prev.fontSize))
-                    out << "\\fs" << cur.fontSize << ' ';
-                if (cur.fontIndex != prev.fontIndex)
-                    out << "\\f" << cur.fontIndex << ' ';
-                if (cur.colorIndex > 0) out << "\\cf" << cur.colorIndex << ' ';
-                if (cur.bgColorIndex > 0) out << "\\cb" << cur.bgColorIndex << ' ';
-                if (cur.bold) out << "\\b ";
-                if (cur.italic) out << "\\i ";
-                if (cur.strikeOut) out << "\\strike ";
-                if (cur.underlineStyle != UnderlineStyle::None)
-                    out << UnderlineStyleTag(cur.underlineStyle) << ' ';
-                if (cur.superscript) out << "\\super ";
-                if (cur.subscript) out << "\\sub ";
-                if (cur.capitalization == Capitalization::AllCaps) out << "\\caps ";
-                if (cur.capitalization == Capitalization::SmallCaps) out << "\\scaps ";
-            }
-
-            out << RtfEscape(frag.text());
-            prev = cur;
-            firstRun = false;
-            it++;
         }
 
-        if (!firstRun) {
-            WriteFormatOff(out, prev, false);
+        if (hasImage) {
+            // Emit images (blocks with images don't emit text)
+            QTextBlock::iterator itImg = block.begin();
+            while (itImg != block.end()) {
+                QTextFragment frag = itImg.fragment();
+                if (frag.isValid() && frag.charFormat().isImageFormat()) {
+                    QTextImageFormat imgFmt = frag.charFormat().toImageFormat();
+                    QString name = imgFmt.name();
+                    qreal w = imgFmt.width();
+                    qreal h = imgFmt.height();
+                    if (w > 0 && h > 0) {
+                        std::string pict = EmitImageAsPict(document, name, w, h);
+                        if (!pict.empty()) {
+                            out << pict << "\n";
+                        }
+                    }
+                }
+                itImg++;
+            }
             out << "\\b0\\i0\\super0\\sub0\\cf0\\par\n";
         } else {
-            out << "\\b0\\i0\\super0\\sub0\\cf0\\par\n";
+            RtfRunFormat prev;
+            bool firstRun = true;
+
+            QTextBlock::iterator it = block.begin();
+            while (it != block.end()) {
+                QTextFragment frag = it.fragment();
+                if (!frag.isValid() || frag.length() == 0) { it++; continue; }
+
+                QTextCharFormat charFmt = frag.charFormat();
+
+                RtfRunFormat cur;
+                qreal ptSize = charFmt.fontPointSize();
+                if (ptSize <= 0) ptSize = defaultFont.pointSizeF();
+                cur.fontSize = static_cast<int>(ptSize * 2);
+
+                QString fam;
+                {
+                    QStringList fFams = charFmt.fontFamilies().toStringList();
+                    fam = fFams.isEmpty() ? QString() : fFams.first();
+                }
+                if (fam.isEmpty()) fam = defaultFont.family();
+                auto fIt = fontMap.find(fam.toStdString());
+                cur.fontIndex = (fIt != fontMap.end()) ? fIt->second : defaultFontIdx;
+
+                auto lookupColor = [&](const QColor& col, std::vector<QColor>& list) -> int {
+                    if (col.isValid() && col.alpha() == 255) {
+                        int idx = FindColorIndex(list, col);
+                        if (idx >= 0) return idx + 1;
+                    }
+                    return 0;
+                };
+                cur.colorIndex = lookupColor(charFmt.foreground().color(), colorList);
+                {
+                    QBrush bgBrush = charFmt.background();
+                    if (bgBrush.style() != Qt::NoBrush)
+                        cur.bgColorIndex = lookupColor(bgBrush.color(), bgColorList);
+                }
+
+                cur.bold = charFmt.fontWeight() >= 700;
+                cur.italic = charFmt.fontItalic();
+                cur.strikeOut = charFmt.fontStrikeOut();
+                cur.superscript = charFmt.verticalAlignment() == QTextCharFormat::AlignSuperScript;
+                cur.subscript = charFmt.verticalAlignment() == QTextCharFormat::AlignSubScript;
+                cur.underlineStyle = EffectiveUnderlineStyle(charFmt);
+                cur.capitalization = toCapitalization(charFmt.fontCapitalization());
+
+                if (firstRun || cur != prev) {
+                    if (!firstRun) {
+                        WriteConditionalFormatOff(out, prev, true);
+                    }
+
+                    if (cur.fontSize > 0 && (!firstRun || cur.fontSize != prev.fontSize))
+                        out << "\\fs" << cur.fontSize << ' ';
+                    if (cur.fontIndex != prev.fontIndex)
+                        out << "\\f" << cur.fontIndex << ' ';
+                    if (cur.colorIndex > 0) out << "\\cf" << cur.colorIndex << ' ';
+                    if (cur.bgColorIndex > 0) out << "\\cb" << cur.bgColorIndex << ' ';
+                    if (cur.bold) out << "\\b ";
+                    if (cur.italic) out << "\\i ";
+                    if (cur.strikeOut) out << "\\strike ";
+                    if (cur.underlineStyle != UnderlineStyle::None)
+                        out << UnderlineStyleTag(cur.underlineStyle) << ' ';
+                    if (cur.superscript) out << "\\super ";
+                    if (cur.subscript) out << "\\sub ";
+                    if (cur.capitalization == Capitalization::AllCaps) out << "\\caps ";
+                    if (cur.capitalization == Capitalization::SmallCaps) out << "\\scaps ";
+                }
+
+                out << RtfEscape(frag.text());
+                prev = cur;
+                firstRun = false;
+                it++;
+            }
+
+            if (!firstRun) {
+                WriteFormatOff(out, prev, false);
+                out << "\\b0\\i0\\super0\\sub0\\cf0\\par\n";
+            } else {
+                out << "\\b0\\i0\\super0\\sub0\\cf0\\par\n";
+            }
         }
     }
 

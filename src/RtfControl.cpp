@@ -98,6 +98,22 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("fmodern",  Action::TableControl,     0),
     DATA("fnil",     Action::TableControl,     0),
     DATA("fcharset", Action::TableControl,     0),
+
+    // Image controls (\pict)
+    DATA("jpegblip", Action::TableControl,     0),
+    DATA("pngblip",  Action::TableControl,     0),
+    DATA("dibitmap", Action::TableControl,     0),
+    DATA("picw",     Action::TableControl,     0),
+    DATA("pich",     Action::TableControl,     0),
+    DATA("picscalex",Action::TableControl,     0),
+    DATA("picscaley",Action::TableControl,     0),
+    DATA("picwgoal", Action::TableControl,     0),
+    DATA("pichgoal", Action::TableControl,     0),
+    DATA("piccropl", Action::TableControl,     0),
+    DATA("piccropr", Action::TableControl,     0),
+    DATA("piccropt", Action::TableControl,     0),
+    DATA("piccropb", Action::TableControl,     0),
+    DATA("pict",     Action::TableControl,     0),
 };
 
 static_assert(std::size(rtfControlTableEntries) == kRtfControlTableSize,

@@ -96,6 +96,14 @@ private slots:
     // RE 2.0 — Semantic identity (must NOT flag as different)
     void CbSemantic();
 
+    // Images — must detect differences
+    void DifferentImageCount();
+    void DifferentImageFormat();
+    void DifferentImageData();
+
+    // Images — semantic identity (different dimensions, same data)
+    void SemanticImageData();
+
     // Edge cases
     void EmptyDocs();
     void HeaderOnly();
@@ -399,6 +407,107 @@ void TestSemanticComparison::CbSemantic() {
     }
     QCOMPARE(r.result, RtfCompareResult::Identical);
     QVERIFY(r.reason.empty());
+}
+
+void TestSemanticComparison::DifferentImageCount() {
+    // Create minimal 1x1 red PNG
+    QByteArray png1, png2;
+    {
+        QImage img(1, 1, QImage::Format_RGB32);
+        img.fill(qRgb(255, 0, 0));
+        QBuffer b1(&png1); b1.open(QIODevice::WriteOnly); img.save(&b1, "PNG");
+        QBuffer b2(&png2); b2.open(QIODevice::WriteOnly); img.save(&b2, "PNG");
+    }
+
+    std::string rtfA = R"({\rtf1\ansi\deff0)";
+    rtfA += "{\\pict\\pngblip ";
+    rtfA += QString::fromLatin1(png1.toHex().data()).toStdString();
+    rtfA += R"(}\par})";
+
+    std::string rtfB = R"({\rtf1\ansi\deff0)";
+    rtfB += "{\\pict\\pngblip ";
+    rtfB += QString::fromLatin1(png1.toHex().data()).toStdString();
+    rtfB += R"(}\par})";
+    rtfB += "{\\pict\\pngblip ";
+    rtfB += QString::fromLatin1(png2.toHex().data()).toStdString();
+    rtfB += R"(}\par})";
+
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+}
+
+void TestSemanticComparison::DifferentImageFormat() {
+    QByteArray pngData, bmpData;
+    {
+        QImage img(1, 1, QImage::Format_RGB32);
+        img.fill(qRgb(255, 0, 0));
+        QBuffer b1(&pngData); b1.open(QIODevice::WriteOnly); img.save(&b1, "PNG");
+        QBuffer b2(&bmpData); b2.open(QIODevice::WriteOnly); img.save(&b2, "BMP");
+    }
+
+    std::string rtfA = R"({\rtf1\ansi\deff0)";
+    rtfA += "{\\pict\\pngblip ";
+    rtfA += QString::fromLatin1(pngData.toHex().data()).toStdString();
+    rtfA += R"(}\par})";
+
+    std::string rtfB = R"({\rtf1\ansi\deff0)";
+    rtfB += "{\\pict\\dibitmap ";
+    rtfB += QString::fromLatin1(bmpData.toHex().data()).toStdString();
+    rtfB += R"(}\par})";
+
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+}
+
+void TestSemanticComparison::DifferentImageData() {
+    QByteArray png1, png2;
+    {
+        QImage img1(1, 1, QImage::Format_RGB32);
+        img1.fill(qRgb(255, 0, 0));
+        QBuffer b1(&png1); b1.open(QIODevice::WriteOnly); img1.save(&b1, "PNG");
+
+        QImage img2(1, 1, QImage::Format_RGB32);
+        img2.fill(qRgb(0, 255, 0));
+        QBuffer b2(&png2); b2.open(QIODevice::WriteOnly); img2.save(&b2, "PNG");
+    }
+
+    std::string rtfA = R"({\rtf1\ansi\deff0)";
+    rtfA += "{\\pict\\pngblip ";
+    rtfA += QString::fromLatin1(png1.toHex().data()).toStdString();
+    rtfA += R"(}\par})";
+
+    std::string rtfB = R"({\rtf1\ansi\deff0)";
+    rtfB += "{\\pict\\pngblip ";
+    rtfB += QString::fromLatin1(png2.toHex().data()).toStdString();
+    rtfB += R"(}\par})";
+
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+}
+
+void TestSemanticComparison::SemanticImageData() {
+    QByteArray pngData;
+    {
+        QImage img(1, 1, QImage::Format_RGB32);
+        img.fill(qRgb(255, 0, 0));
+        QBuffer b(&pngData); b.open(QIODevice::WriteOnly); img.save(&b, "PNG");
+    }
+
+    std::string hex = QString::fromLatin1(pngData.toHex().data()).toStdString();
+
+    std::string rtfA = R"({\rtf1\ansi\deff0)";
+    rtfA += "{\\pict\\pngblip\\picwgoal100\\pichgoal100 ";
+    rtfA += hex;
+    rtfA += R"(}\par})";
+
+    std::string rtfB = R"({\rtf1\ansi\deff0)";
+    rtfB += "{\\pict\\pngblip\\picwgoal200\\pichgoal200 ";
+    rtfB += hex;
+    rtfB += R"(}\par})";
+
+    std::string reason;
+    // Same image data → Identical (dimensions are not compared semantically)
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
 }
 
 void TestSemanticComparison::EmptyDocs() {

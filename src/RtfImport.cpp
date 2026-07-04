@@ -9,6 +9,8 @@
 #include <QTextOption>
 #include <QFont>
 #include <QColor>
+#include <QImageReader>
+#include <QBuffer>
 
 namespace Rte {
 
@@ -134,9 +136,78 @@ void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
             }
 
             cursor.insertText(QString::fromUtf8(run.text.data(),
-                                                 static_cast<int>(run.text.size())),
-                              charFmt);
+                                                  static_cast<int>(run.text.size())),
+                               charFmt);
         }
+    }
+
+    // Insert images
+    static int imgCounter = 0;
+    imgCounter = 0;
+    for (const auto& img : doc.images) {
+        cursor.insertBlock();
+
+        // Determine image size in pixels
+        qreal widthPx = 0, heightPx = 0;
+        {
+            QByteArray imageData = img.data;
+            QBuffer buffer(&imageData);
+            buffer.open(QIODevice::ReadOnly);
+            QImageReader reader(&buffer);
+            QSize size = reader.size();
+            if (size.isValid() && size.width() > 0 && size.height() > 0) {
+                widthPx = size.width() * 96.0 / 72.0;
+                heightPx = size.height() * 96.0 / 72.0;
+            }
+        }
+
+        if (widthPx <= 0 || heightPx <= 0) {
+            widthPx = 100;
+            heightPx = 100;
+        }
+
+        // Apply scaling
+        widthPx *= img.picscalex / 100.0;
+        heightPx *= img.picscaley / 100.0;
+
+        // Register image as resource
+        imgCounter++;
+        const char* ext = "";
+        switch (img.format) {
+            case Rte::RtfImageFormat::Jpeg: ext = "jpg"; break;
+            case Rte::RtfImageFormat::Png:  ext = "png"; break;
+            case Rte::RtfImageFormat::Bmp:  ext = "bmp"; break;
+            default:                        ext = "png"; break;
+        }
+        QString name = QString("rtfimage://%1.%2").arg(imgCounter).arg(ext);
+        document->addResource(QTextDocument::ImageResource, QUrl(name), QVariant::fromValue(img.data));
+
+        // Store original RTF hex string and format for byte-identical roundtrip
+        if (!img.rtfPictHex.empty()) {
+            QString propName = QString("rtfPictHex://img%1").arg(imgCounter);
+            document->setProperty(qPrintable(propName),
+                                  QVariant::fromValue(QString::fromLatin1(img.rtfPictHex.c_str())));
+            QString fmtPropName = QString("rtfImageFormat://img%1").arg(imgCounter);
+            const char* fmt = "";
+            switch (img.format) {
+                case Rte::RtfImageFormat::Jpeg: fmt = "jpg"; break;
+                case Rte::RtfImageFormat::Png:  fmt = "png"; break;
+                case Rte::RtfImageFormat::Bmp:  fmt = "bmp"; break;
+                default:                        fmt = "png"; break;
+            }
+            document->setProperty(qPrintable(fmtPropName),
+                                  QVariant::fromValue(QString(fmt)));
+        }
+
+        // Insert image
+        // NOTE: BMP rendering does not work yet in Qt demo.
+        // The export/roundtrip path is unaffected because it uses document
+        // properties instead of QTextImageFormat::name().
+        QTextImageFormat imgFmt;
+        imgFmt.setName(name);
+        imgFmt.setWidth(widthPx);
+        imgFmt.setHeight(heightPx);
+        cursor.insertImage(imgFmt);
     }
 }
 

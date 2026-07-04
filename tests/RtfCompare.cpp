@@ -90,6 +90,18 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
         return RtfCompareResult::UnknownTag;
     }
 
+    // Compare images
+    if (a.images.size() != b.images.size()) {
+        reason = "Image count: " + std::to_string(a.images.size()) +
+                 " vs " + std::to_string(b.images.size());
+        return RtfCompareResult::StructuralDiff;
+    }
+    for (size_t i = 0; i < a.images.size(); ++i) {
+        const auto& imgA = a.images[i];
+        const auto& imgB = b.images[i];
+        if (CompareImage(i, imgA, imgB, reason)) return RtfCompareResult::StructuralDiff;
+    }
+
     // Compare paragraph count
     if (a.paragraphs.size() != b.paragraphs.size()) {
         reason = "Paragraph count: " + std::to_string(a.paragraphs.size()) +
@@ -220,10 +232,37 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
 }
 
 RtfCompareResult CompareRtf(const std::string& rtfA, const std::string& rtfB,
-                              std::string& reason) {
+                               std::string& reason) {
     RtfDocument docA = ParseRtf(rtfA);
     RtfDocument docB = ParseRtf(rtfB);
     return CompareRtf(docA, docB, reason);
+}
+
+static const char* ImageFormatName(RtfImageFormat fmt) {
+    switch (fmt) {
+        case RtfImageFormat::Jpeg:  return "jpeg";
+        case RtfImageFormat::Png:   return "png";
+        case RtfImageFormat::Bmp:   return "bmp";
+        default:                    return "unknown";
+    }
+}
+
+bool CompareImage(size_t idx, const RtfImage& a, const RtfImage& b,
+                   std::string& reason) {
+    if (a.format != b.format) {
+        reason = "Image " + std::to_string(idx) +
+                 " format: " + ImageFormatName(a.format) + " vs " + ImageFormatName(b.format);
+        return true;
+    }
+    // Compare hex-encoded RTF data (semantic comparison — ignores dimension/scale changes)
+    // This enables byte-identical roundtrip for the image binary content.
+    if (a.rtfPictHex != b.rtfPictHex) {
+        reason = "Image " + std::to_string(idx) + " hex data mismatch";
+        return true;
+    }
+    // Dimensions and scale are intentionally NOT compared — they may change during
+    // document editing (resize, paste/drop re-encode) but the image content is identical.
+    return false;
 }
 
 } // namespace Rte

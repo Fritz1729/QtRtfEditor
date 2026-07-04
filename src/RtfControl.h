@@ -63,7 +63,7 @@ struct RtfControl {
     Value value;
 };
 
-constexpr std::size_t kRtfControlTableSize = 60;
+constexpr std::size_t kRtfControlTableSize = 74;
 
 extern const std::array<RtfControl, kRtfControlTableSize> rtfControlTable;
 

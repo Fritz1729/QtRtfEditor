@@ -27,6 +27,7 @@ public:
         _formatStack.clear();
         _inColortbl = false;
         _inFonttbl = false;
+        _inPict = false;
         _paraStateStack.clear();
 
         parse();
@@ -265,9 +266,24 @@ private:
     std::vector<RtfRunFormat> _formatStack;
     bool _inColortbl = false;
     bool _inFonttbl = false;
+    bool _inPict = false;
     std::vector<ParagraphFormatting> _paraStateStack;
     std::vector<int> _pendingTabAlignmentStack;
     int _pendingTabAlignment = 1;
+
+    // Pict state
+    QByteArray _pictData;
+    std::string _pictFormat;  // "jpg", "png", "bmp"
+    int _pictPicw = 0;
+    int _pictPich = 0;
+    int _pictPicwgoal = 0;
+    int _pictPichgoal = 0;
+    int _pictPicscalex = 100;
+    int _pictPicscaley = 100;
+    int _pictPiccropl = 0;
+    int _pictPiccropr = 0;
+    int _pictPiccropt = 0;
+    int _pictPiccropb = 0;
 
     void parse() {
         while (_pos < _len) {
@@ -322,6 +338,19 @@ private:
             _inFonttbl = false;
             restoreState();
             // parseFonttbl consumes the closing '}'
+            return;
+        }
+
+        if (_pos < _len && matches("\\pict")) {
+            // Consume \\pict control word
+            _pos += 4;
+            skipWhitespace();
+
+            _inPict = true;
+            parsePict();
+            _inPict = false;
+            restoreState();
+            // parsePict consumes the closing '}'
             return;
         }
 
@@ -528,6 +557,116 @@ private:
         }
         // Consume the closing '}' of the fonttbl group
         if (_pos < _len && _rtf[_pos] == '}') _pos++;
+    }
+
+    void parsePict() {
+        // {\pict\pngblip\picw500\pich500\picscalex500\picwgoal250 <hex-data>}
+        // Collect hex-encoded image data between control words
+        _pictData.clear();
+        _pictFormat.clear();
+        _pictPicw = 0;
+        _pictPich = 0;
+        _pictPicwgoal = 0;
+        _pictPichgoal = 0;
+        _pictPicscalex = 100;
+        _pictPicscaley = 100;
+        _pictPiccropl = 0;
+        _pictPiccropr = 0;
+        _pictPiccropt = 0;
+        _pictPiccropb = 0;
+
+        while (_pos < _len && _rtf[_pos] != '}') {
+            if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+            if (_rtf[_pos] == '\\') {
+                parsePictControl();
+                // Skip whitespace after control words
+                while (_pos < _len && _rtf[_pos] != '}' && isWhitespace(_rtf[_pos])) {
+                    _pos++;
+                }
+            } else {
+                // Hex data — but skip any non-hex characters (whitespace, etc.)
+                char c = _rtf[_pos];
+                // Only collect uppercase/lowercase hex digits
+                if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f')) {
+                    _pictData += c;
+                }
+                _pos++;
+            }
+        }
+
+        if (_pos < _len && _rtf[_pos] == '}') {
+            _pos++;
+        }
+
+        // Finalize image
+        if (!_pictFormat.empty() && !_pictData.isEmpty()) {
+            QByteArray rawBytes = QByteArray::fromHex(_pictData.toUpper());
+            RtfImage img;
+            img.data = rawBytes;
+            if (_pictFormat == "jpg") img.format = RtfImageFormat::Jpeg;
+            else if (_pictFormat == "png") img.format = RtfImageFormat::Png;
+            else if (_pictFormat == "bmp") img.format = RtfImageFormat::Bmp;
+            img.picw = _pictPicw;
+            img.pich = _pictPich;
+            img.picwgoal = _pictPicwgoal;
+            img.pichgoal = _pictPichgoal;
+            img.picscalex = _pictPicscalex;
+            img.picscaley = _pictPicscaley;
+            img.piccropl = _pictPiccropl;
+            img.piccropr = _pictPiccropr;
+            img.piccropt = _pictPiccropt;
+            img.piccropb = _pictPiccropb;
+            img.rtfPictHex = _pictData.toStdString();
+            _doc.images.push_back(std::move(img));
+        }
+    }
+
+    void parsePictControl() {
+        _pos++; // skip '\'
+
+        if (_pos >= _len) return;
+
+        char c = _rtf[_pos];
+        if (isWordChar(c)) {
+            std::string word;
+            int arg = 0;
+            bool hasArg = false;
+
+            while (_pos < _len && (isWordChar(_rtf[_pos]) || isDigit(_rtf[_pos]))) {
+                if (_rtf[_pos] >= '0' && _rtf[_pos] <= '9') {
+                    arg = arg * 10 + (_rtf[_pos] - '0');
+                    hasArg = true;
+                } else {
+                    word += static_cast<char>(
+                        static_cast<unsigned char>(_rtf[_pos]) | 0x20);
+                }
+                _pos++;
+            }
+
+            if (word.empty()) return;
+
+            // Known pict control words
+            if (word == "jpegblip") { _pictFormat = "jpg"; }
+            else if (word == "pngblip") { _pictFormat = "png"; }
+            else if (word == "dibitmap") { _pictFormat = "bmp"; }
+            else if (word == "picw" && hasArg) { _pictPicw = arg; }
+            else if (word == "pich" && hasArg) { _pictPich = arg; }
+            else if (word == "picwgoal" && hasArg) { _pictPicwgoal = arg; }
+            else if (word == "pichgoal" && hasArg) { _pictPichgoal = arg; }
+            else if (word == "picscalex" && hasArg) { _pictPicscalex = arg; }
+            else if (word == "picscaley" && hasArg) { _pictPicscaley = arg; }
+            else if (word == "piccropl" && hasArg) { _pictPiccropl = arg; }
+            else if (word == "piccropr" && hasArg) { _pictPiccropr = arg; }
+            else if (word == "piccropt" && hasArg) { _pictPiccropt = arg; }
+            else if (word == "piccropb" && hasArg) { _pictPiccropb = arg; }
+            // Unknown pict control words are silently ignored
+            return;
+        }
+
+        // Skip other control symbols (digits, etc.)
+        if (isDigit(c)) {
+            _pos++;
+        }
     }
 
     void processControlWord(const std::string& word, int arg) {
