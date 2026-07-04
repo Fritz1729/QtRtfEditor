@@ -78,7 +78,7 @@ Do NOT implement these — they have no Qt equivalent and no reason to emulate:
 - Omit file-path comment lines and information-less section headers.
 
 ## Working Practices
-- **Never commit without explicit user approval.** Wait for "commit" or "push".
-- Keep commit messages short. Mention AI assistance (e.g. "AI-assisted").
+- **Never commit or push without explicit user approval.**
+- Before committing, show `git diff --stat`, summarize changes, present the commit message, and ask for review. Never push without approval.
 - Never change the user's design decisions without consultation.
 - Report when design decisions hinder your work.

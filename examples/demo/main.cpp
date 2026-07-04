@@ -1,192 +1,248 @@
+#include "DemoWindow.h"
+#include "ToolbarBuilder.h"
+#include "MenuBuilder.h"
+#include "RecentFileHandler.h"
 #include <QStatusBar>
 #include <RichTextEdit.h>
 #include <QApplication>
 #include <QMainWindow>
 #include <QMenuBar>
-#include <QAction>
+#include <QToolBar>
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QFont>
+#include <QSettings>
 
-class DemoWindow : public QMainWindow {
-    Q_OBJECT
+QMenu* DemoWindow::RecentFilesMenu() const {
+    return _pMenuBuilder->RecentFilesMenu();
+}
 
-public:
-    explicit DemoWindow(QWidget* parent = nullptr)
-        : QMainWindow(parent)
-    {
-        setWindowTitle("QtRtfEditor Demo");
-        setCentralWidget(&_editor);
-        statusBar()->showMessage("Ready");
+DemoWindow::DemoWindow(QWidget* parent)
+    : QMainWindow(parent)
+{
+    setWindowTitle("QtRtfEditor Demo");
+    setCentralWidget(&_editor);
+    statusBar()->showMessage("Ready");
 
-        setupMenu();
+    QToolBar* toolbar = addToolBar("Formatting");
+    _pToolbarBuilder = new ToolbarBuilder(toolbar, this);
+    _pToolbarBuilder->Build();
 
-        std::string sampleRtf = R"({\rtf1\ansi\deff0
-{\colortbl ;\red255\green0\blue0;\red0\green128\blue0;}
-{\fonttbl{\f0\froman\fcharset0 Times New Roman;}
-         {\f1\fswiss\fcharset0 Arial;}}
-\f0\fs24\ql
-\b Medienverwaltung\b0 example\r\n
-\r\n
-\f1\fs20 This \i editor\i0 supports \ul RTF\ul0 and \cf1 protected\cf0 references.\r\n
-})";
-        try {
-            _editor.Load(sampleRtf, Rte::FormatMode::Rtf);
-            statusBar()->showMessage("Sample RTF loaded");
-        } catch (const std::exception& e) {
-            statusBar()->showMessage(QString("Error: %1").arg(e.what()));
-        }
+    _pMenuBuilder = new MenuBuilder(menuBar(), this);
+    _pMenuBuilder->Build();
+
+    _pRecentFileHandler = new RecentFileHandler(this);
+}
+
+void DemoWindow::MergeFormatOnSelection(const QTextCharFormat& format) {
+    QTextCursor cursor = _editor.textCursor();
+    if (cursor.hasSelection()) {
+        cursor.mergeCharFormat(format);
+    } else {
+        cursor.setCharFormat(format);
+    }
+    _editor.setTextCursor(cursor);
+}
+
+void DemoWindow::ApplyAlignment(Qt::Alignment alignment) {
+    QTextCursor cursor = _editor.textCursor();
+    QTextBlockFormat fmt = cursor.blockFormat();
+
+    switch (alignment) {
+        case Qt::AlignLeft:
+            fmt.setAlignment(Qt::AlignLeft);
+            break;
+        case Qt::AlignHCenter:
+            fmt.setAlignment(Qt::AlignHCenter);
+            break;
+        case Qt::AlignRight:
+            fmt.setAlignment(Qt::AlignRight);
+            break;
+        case Qt::AlignJustify:
+            fmt.setAlignment(Qt::AlignJustify);
+            break;
+        default:
+            break;
     }
 
-private:
-    void setupMenu() {
-        QMenuBar* bar = menuBar();
+    cursor.setBlockFormat(fmt);
+    _editor.setTextCursor(cursor);
+}
 
-        QMenu* file = bar->addMenu("&File");
+void DemoWindow::ApplyIndent(int delta) {
+    QTextCursor cursor = _editor.textCursor();
+    QTextBlockFormat fmt = cursor.blockFormat();
+    qreal indent = fmt.textIndent() + delta;
+    if (indent < 0) indent = 0;
+    fmt.setTextIndent(indent);
+    cursor.setBlockFormat(fmt);
+    _editor.setTextCursor(cursor);
+}
 
-        QAction* pLoad = file->addAction("&Load RTF...");
-        connect(pLoad, &QAction::triggered, this, &DemoWindow::LoadFile);
+void DemoWindow::InsertSpecialChar(QChar c) {
+    QTextCursor cursor = _editor.textCursor();
+    cursor.insertText(c);
+    _editor.setTextCursor(cursor);
+}
 
-        QAction* pSave = file->addAction("Save &RTF...");
-        connect(pSave, &QAction::triggered, this, &DemoWindow::SaveFile);
+void DemoWindow::ToggleWordWrap(bool checked) {
+    if (checked) {
+        _editor.setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+    } else {
+        _editor.setWordWrapMode(QTextOption::NoWrap);
+    }
+}
 
-        file->addSeparator();
+void DemoWindow::ToggleBold(bool checked) {
+    QTextCharFormat fmt;
+    fmt.setFontWeight(checked ? QFont::Bold : QFont::Normal);
+    MergeFormatOnSelection(fmt);
+}
 
-        QAction* quit = file->addAction("E&xit");
-        connect(quit, &QAction::triggered, this, &QApplication::quit);
+void DemoWindow::ToggleItalic(bool checked) {
+    QTextCharFormat fmt;
+    fmt.setFontItalic(checked);
+    MergeFormatOnSelection(fmt);
+}
 
-        QMenu* format = bar->addMenu("&Format");
+void DemoWindow::ToggleUnderline(bool checked) {
+    QTextCharFormat fmt;
+    fmt.setFontUnderline(checked);
+    MergeFormatOnSelection(fmt);
+}
 
-        QAction* bold = format->addAction("&Bold");
-        bold->setShortcut(Qt::CTRL | Qt::Key_B);
-        connect(bold, &QAction::triggered, this, [this] {
-            QTextCharFormat fmt;
-            fmt.setFontWeight(fmt.fontWeight() == QFont::Bold
-                              ? QFont::Normal : QFont::Bold);
-            mergeFormatOnSelection(fmt);
-        });
+void DemoWindow::ToggleStrikethrough(bool checked) {
+    QTextCharFormat fmt;
+    fmt.setFontStrikeOut(checked);
+    MergeFormatOnSelection(fmt);
+}
 
-        QMenu* protection = bar->addMenu("&Protection");
+void DemoWindow::ToggleSuperscript(bool checked) {
+    applyFormatOnSelection([checked](QTextCharFormat& fmt) {
+        if (checked) {
+            fmt.setVerticalAlignment(QTextCharFormat::VerticalAlignment::AlignSuperScript);
+        } else if (fmt.verticalAlignment() == QTextCharFormat::VerticalAlignment::AlignSuperScript) {
+            fmt.setVerticalAlignment(QTextCharFormat::VerticalAlignment::AlignNormal);
+        }
+    });
+}
 
-        QAction* setProt = protection->addAction("Set &protection...");
-        connect(setProt, &QAction::triggered, this, &DemoWindow::SetProtection);
+void DemoWindow::ToggleSubscript(bool checked) {
+    applyFormatOnSelection([checked](QTextCharFormat& fmt) {
+        if (checked) {
+            fmt.setVerticalAlignment(QTextCharFormat::VerticalAlignment::AlignSubScript);
+        } else if (fmt.verticalAlignment() == QTextCharFormat::VerticalAlignment::AlignSubScript) {
+            fmt.setVerticalAlignment(QTextCharFormat::VerticalAlignment::AlignNormal);
+        }
+    });
+}
 
-        QAction* clearProt = protection->addAction("Clear &protection");
-        connect(clearProt, &QAction::triggered, this, [this] {
-            _editor.ClearProtection();
-            statusBar()->showMessage("All protection ranges cleared");
-        });
+void DemoWindow::LoadFile() {
+    QString path = QFileDialog::getOpenFileName(
+        this, "Load RTF", "", "RTF Files (*.rtf);;All Files (*)");
+    if (path.isEmpty()) return;
 
-        QMenu* help = bar->addMenu("&Help");
-
-        QAction* about = help->addAction("&About QtRtfEditor");
-        connect(about, &QAction::triggered, this, [this] {
-            QMessageBox::about(this, "About QtRtfEditor",
-                "QtRtfEditor Demo\n"
-                "Reusable RTF-capable QTextEdit subclass\n"
-                "\n"
-                "License: Dual (LGPL-3.0+ / commercial)");
-        });
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::critical(this, "Error",
+            QString("Cannot open file:\n%1").arg(path));
+        return;
     }
 
-    void LoadFile() {
-        QString path = QFileDialog::getOpenFileName(
-            this, "Load RTF", "", "RTF Files (*.rtf);;All Files (*)");
-        if (path.isEmpty()) return;
+    QByteArray data = file.readAll();
+    file.close();
 
-        QFile file(path);
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            QMessageBox::critical(this, "Error",
-                QString("Cannot open file:\n%1").arg(path));
-            return;
-        }
-
-        QByteArray data = file.readAll();
-        file.close();
-
-        try {
-            _editor.Load(data.toStdString(), Rte::FormatMode::Rtf);
-            statusBar()->showMessage(QString("Loaded: %1").arg(path));
-        } catch (const std::exception& e) {
-            QMessageBox::critical(this, "Error", e.what());
-        }
+    try {
+        _editor.Load(data.toStdString(), Rte::FormatMode::Rtf);
+        statusBar()->showMessage(QString("Loaded: %1").arg(path));
+    } catch (const std::exception& e) {
+        QMessageBox::critical(this, "Error", e.what());
     }
 
-    void SaveFile() {
-        QString path = QFileDialog::getSaveFileName(
-            this, "Save RTF", "", "RTF Files (*.rtf);;All Files (*)");
-        if (path.isEmpty()) return;
+    _pRecentFileHandler->AddRecentFile(path);
+}
 
-        if (!path.endsWith(".rtf", Qt::CaseInsensitive)) {
-            path += ".rtf";
-        }
+void DemoWindow::SaveFile() {
+    QString path = QFileDialog::getSaveFileName(
+        this, "Save RTF", "", "RTF Files (*.rtf);;All Files (*)");
+    if (path.isEmpty()) return;
 
-        std::string rtf = _editor.Save(Rte::FormatMode::Rtf);
-
-        QFile file(path);
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            QMessageBox::critical(this, "Error",
-                QString("Cannot write file:\n%1").arg(path));
-            return;
-        }
-
-        file.write(rtf.c_str(), static_cast<qint64>(rtf.size()));
-        file.close();
-
-        statusBar()->showMessage(QString("Saved: %1").arg(path));
+    if (!path.endsWith(".rtf", Qt::CaseInsensitive)) {
+        path += ".rtf";
     }
 
-    void SetProtection() {
-        QTextCursor cursor = _editor.textCursor();
-        if (!cursor.hasSelection()) {
-            statusBar()->showMessage("Please select text to protect first");
-            return;
-        }
+    std::string rtf = _editor.Save(Rte::FormatMode::Rtf);
 
-        bool ok;
-        QString type = QInputDialog::getText(
-            this, "Set Protection",
-            "Type (e.g., 'lexicon', 'person'):",
-            QLineEdit::Normal, "lexicon", &ok);
-        if (!ok || type.isEmpty()) return;
-
-        QString target = QInputDialog::getText(
-            this, "Set Protection",
-            "Target reference (e.g., 'entry:Example'):",
-            QLineEdit::Normal, "", &ok);
-        if (!ok) return;
-
-        std::size_t start = static_cast<std::size_t>(
-            cursor.selectionStart());
-        std::size_t end = static_cast<std::size_t>(
-            cursor.selectionEnd());
-
-        _editor.SetProtection(start, end, type.toStdString(),
-                              target.toStdString());
-        statusBar()->showMessage(
-            QString("Protection set: [%1] %2").arg(type).arg(target));
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::critical(this, "Error",
+            QString("Cannot write file:\n%1").arg(path));
+        return;
     }
 
-    void mergeFormatOnSelection(const QTextCharFormat& format) {
-        QTextCursor cursor = _editor.textCursor();
-        if (cursor.hasSelection()) {
-            cursor.mergeCharFormat(format);
-            _editor.setTextCursor(cursor);
-        }
+    file.write(rtf.c_str(), static_cast<qint64>(rtf.size()));
+    file.close();
+
+    statusBar()->showMessage(QString("Saved: %1").arg(path));
+
+    _pRecentFileHandler->AddRecentFile(path);
+}
+
+void DemoWindow::ClearRecentFiles() {
+    _pRecentFileHandler->ClearRecentFiles();
+}
+
+void DemoWindow::SetProtection() {
+    QTextCursor cursor = _editor.textCursor();
+    if (!cursor.hasSelection()) {
+        statusBar()->showMessage("Please select text to protect first");
+        return;
     }
 
-    Rte::RichTextEdit _editor;
-};
+    bool ok;
+    QString type = QInputDialog::getText(
+        this, "Set Protection",
+        "Type (e.g., 'lexicon', 'person'):",
+        QLineEdit::Normal, "lexicon", &ok);
+    if (!ok || type.isEmpty()) return;
+
+    QString target = QInputDialog::getText(
+        this, "Set Protection",
+        "Target reference (e.g., 'entry:Example'):",
+        QLineEdit::Normal, "", &ok);
+    if (!ok) return;
+
+    std::size_t start = static_cast<std::size_t>(
+        cursor.selectionStart());
+    std::size_t end = static_cast<std::size_t>(
+        cursor.selectionEnd());
+
+    _editor.SetProtection(start, end, type.toStdString(),
+                          target.toStdString());
+    statusBar()->showMessage(
+        QString("Protection set: [%1] %2").arg(type).arg(target));
+}
+
+template<typename Fn>
+void DemoWindow::applyFormatOnSelection(Fn fn) {
+    QTextCursor cursor = _editor.textCursor();
+    if (cursor.hasSelection()) {
+        QTextCharFormat fmt = cursor.charFormat();
+        fn(fmt);
+        cursor.mergeCharFormat(fmt);
+        _editor.setTextCursor(cursor);
+    }
+}
 
 int main(int argc, char* argv[]) {
+    QApplication::setOrganizationName("QtRtfEditor");
+    QApplication::setApplicationName("Demo");
     QApplication app(argc, argv);
 
     DemoWindow window;
-    window.resize(800, 600);
+    window.resize(900, 650);
     window.show();
 
     return app.exec();
 }
-
-#include "main.moc"
