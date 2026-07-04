@@ -12,7 +12,7 @@ depends=('qt6-base')
 makedepends=('cmake' 'ninja' 'qt6-base')
 checkdepends=('qt6-base')
 source=("${_pkgbasename}-${pkgver}.tar.gz")
-sha256sums=('2786eaff8528621fff5cbd2a6e0ad2e778873d7a483494415def675e3be5e095')
+sha256sums=('a854734781171a0b3d46dbcd300b63e3b0fbeab7868fdf477c1c03ee3017cd34')
 
 build() {
   cmake -B build -S "${srcdir}/${_pkgbasename}-${pkgver}" \
