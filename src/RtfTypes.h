@@ -14,6 +14,8 @@ enum class UnderlineStyle : uint8_t {
     Solid,
     Dotted,
     Dashed,
+    DashDot,
+    DashDotDot,
     Double,
     Thick,
 };
@@ -35,6 +37,8 @@ struct RtfRunFormat {
     int bgColorIndex = -1;
     bool superscript = false;
     bool subscript = false;
+    bool kerning = false;
+    int expnd = 0;
     UnderlineStyle underlineStyle = UnderlineStyle::None;
     Capitalization capitalization = Capitalization::None;
     int upOffset = 0;
@@ -112,12 +116,14 @@ inline Qt::Alignment RtfAlignmentToQt(int align) {
 
 inline UnderlineStyle toUnderlineStyle(QTextCharFormat::UnderlineStyle qtStyle) {
     switch (qtStyle) {
-        case QTextCharFormat::NoUnderline:    return UnderlineStyle::None;
+        case QTextCharFormat::NoUnderline:     return UnderlineStyle::None;
         case QTextCharFormat::SingleUnderline: return UnderlineStyle::Solid;
-        case QTextCharFormat::DotLine:        return UnderlineStyle::Dotted;
-        case QTextCharFormat::DashUnderline:  return UnderlineStyle::Dashed;
-        case QTextCharFormat::WaveUnderline:  return UnderlineStyle::Thick;
-        default:                              return UnderlineStyle::None;
+        case QTextCharFormat::DotLine:         return UnderlineStyle::Dotted;
+        case QTextCharFormat::DashUnderline:   return UnderlineStyle::Dashed;
+        case QTextCharFormat::DashDotLine:     return UnderlineStyle::DashDot;
+        case QTextCharFormat::DashDotDotLine:  return UnderlineStyle::DashDotDot;
+        case QTextCharFormat::WaveUnderline:   return UnderlineStyle::Thick;
+        default:                               return UnderlineStyle::None;
     }
 }
 
@@ -125,6 +131,8 @@ inline QTextCharFormat::UnderlineStyle qtUnderlineStyleFor(UnderlineStyle style)
     switch (style) {
         case UnderlineStyle::Dotted:        return QTextCharFormat::DotLine;
         case UnderlineStyle::Dashed:        return QTextCharFormat::DashUnderline;
+        case UnderlineStyle::DashDot:       return QTextCharFormat::DashDotLine;
+        case UnderlineStyle::DashDotDot:    return QTextCharFormat::DashDotDotLine;
         case UnderlineStyle::Double:        return QTextCharFormat::SingleUnderline;
         case UnderlineStyle::Thick:         return QTextCharFormat::WaveUnderline;
         default:                            return QTextCharFormat::SingleUnderline;

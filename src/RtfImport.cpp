@@ -129,6 +129,14 @@ void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
                 charFmt.setFontCapitalization(QFont::SmallCaps);
             }
 
+            if (run.format.kerning) {
+                charFmt.setFontKerning(true);
+            }
+            if (run.format.expnd != 0) {
+                double ptSize = run.format.fontSize > 0 ? run.format.fontSize / 2.0 : defaultFont.pointSizeF();
+                charFmt.setFontLetterSpacing(run.format.expnd / 20.0 * ptSize);
+            }
+
             if (run.format.superscript) {
                 charFmt.setVerticalAlignment(QTextCharFormat::AlignSuperScript);
             } else if (run.format.subscript) {

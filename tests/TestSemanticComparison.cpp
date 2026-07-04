@@ -92,6 +92,10 @@ private slots:
     void DifferentUnderlineDbl();
     void DifferentUp();
     void DifferentDn();
+    void DifferentKerning();
+    void DifferentExpnd();
+    void DifferentUnderlineDashDot();
+    void DifferentUnderlineDashDotDot();
 
     // RE 2.0 — Semantic identity (must NOT flag as different)
     void CbSemantic();
@@ -389,6 +393,34 @@ void TestSemanticComparison::DifferentUp() {
 void TestSemanticComparison::DifferentDn() {
     std::string rtfA = R"({\rtf1\ansi\deff0\dn12 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\dn6 Text\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+}
+
+void TestSemanticComparison::DifferentKerning() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\kerning Kerned}\kerning0\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0 Kerned\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+}
+
+void TestSemanticComparison::DifferentExpnd() {
+    std::string rtfA = R"({\rtf1\ansi\deff0\expnd20 Expanded\expnd0\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0 Expanded\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+}
+
+void TestSemanticComparison::DifferentUnderlineDashDot() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\ul Underlined}\ul0\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\uldashd DashDot}\ul0\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+}
+
+void TestSemanticComparison::DifferentUnderlineDashDotDot() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\ul Underlined}\ul0\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\uldashdd DashDotDot}\ul0\par})";
     std::string reason;
     QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
 }

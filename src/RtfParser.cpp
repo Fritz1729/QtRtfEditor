@@ -84,6 +84,9 @@ private:
             case RtfControl::CharProp::Strike:
                 _format.strikeOut = on;
                 break;
+            case RtfControl::CharProp::Kerning:
+                _format.kerning = on;
+                break;
             }
             break;
         }
@@ -109,6 +112,9 @@ private:
                 break;
             case RtfControl::CharSetProp::DnOffset:
                 _format.dnOffset = arg;
+                break;
+            case RtfControl::CharSetProp::Expnd:
+                _format.expnd = arg;
                 break;
             }
             break;
@@ -180,6 +186,14 @@ private:
                 break;
             case RtfControl::RtfUlStyle::UlDashed:
                 _format.underlineStyle = UnderlineStyle::Dashed;
+                _format.underline = true;
+                break;
+            case RtfControl::RtfUlStyle::UlDashDot:
+                _format.underlineStyle = UnderlineStyle::DashDot;
+                _format.underline = true;
+                break;
+            case RtfControl::RtfUlStyle::UlDashDotDot:
+                _format.underlineStyle = UnderlineStyle::DashDotDot;
                 _format.underline = true;
                 break;
             case RtfControl::RtfUlStyle::UlDouble:

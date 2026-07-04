@@ -49,6 +49,7 @@ static void WriteConditionalFormatOff(std::ostringstream& out, const RtfRunForma
     if (fmt.strikeOut) out << "\\strike0" << space;
     if (fmt.capitalization == Capitalization::AllCaps) out << "\\caps0" << space;
     if (fmt.capitalization == Capitalization::SmallCaps) out << "\\scaps0" << space;
+    if (fmt.kerning) out << "\\kerning0" << space;
 }
 
 static void WriteFormatOff(std::ostringstream& out, const RtfRunFormat& fmt, bool trailingSpace) {
@@ -400,6 +401,13 @@ std::string ExportRtf(const QTextDocument& document) {
                 cur.subscript = charFmt.verticalAlignment() == QTextCharFormat::AlignSubScript;
                 cur.underlineStyle = EffectiveUnderlineStyle(charFmt);
                 cur.capitalization = toCapitalization(charFmt.fontCapitalization());
+                cur.kerning = charFmt.fontKerning();
+                {
+                    qreal spacing = charFmt.fontLetterSpacing();
+                    if (spacing > 0) {
+                        cur.expnd = static_cast<int>(spacing * 20.0 / ptSize + 0.5);
+                    }
+                }
 
                 if (firstRun || cur != prev) {
                     if (!firstRun) {
@@ -421,6 +429,8 @@ std::string ExportRtf(const QTextDocument& document) {
                     if (cur.subscript) out << "\\sub ";
                     if (cur.capitalization == Capitalization::AllCaps) out << "\\caps ";
                     if (cur.capitalization == Capitalization::SmallCaps) out << "\\scaps ";
+                    if (cur.kerning) out << "\\kerning ";
+                    if (cur.expnd != 0) out << "\\expnd" << cur.expnd << ' ';
                 }
 
                 out << RtfEscape(frag.text());

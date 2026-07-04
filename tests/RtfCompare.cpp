@@ -222,9 +222,13 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
             if (CompareField(i, j, "capitalization",
                              static_cast<int>(runA.format.capitalization), static_cast<int>(runB.format.capitalization), reason)) return RtfCompareResult::StructuralDiff;
             if (CompareField(i, j, "upOffset",
-                             runA.format.upOffset, runB.format.upOffset, reason)) return RtfCompareResult::StructuralDiff;
+                              runA.format.upOffset, runB.format.upOffset, reason)) return RtfCompareResult::StructuralDiff;
             if (CompareField(i, j, "dnOffset",
-                             runA.format.dnOffset, runB.format.dnOffset, reason)) return RtfCompareResult::StructuralDiff;
+                              runA.format.dnOffset, runB.format.dnOffset, reason)) return RtfCompareResult::StructuralDiff;
+            if (CompareBoolField(i, j, "kerning",
+                                  runA.format.kerning, runB.format.kerning, reason)) return RtfCompareResult::StructuralDiff;
+            if (CompareField(i, j, "expnd",
+                              runA.format.expnd, runB.format.expnd, reason)) return RtfCompareResult::StructuralDiff;
         }
     }
 

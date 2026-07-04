@@ -8,7 +8,7 @@ employ different formatting conventions. The library detects
 TRichEdit-generated RTF and exports in the same style to ensure
 Delphi applications can re-import the data correctly.
 
-## Features
+## Scope
 
 - **RTF I/O**: Load and serialize RTF data, preserving
   Delphi TRichEdit formatting conventions.
@@ -18,45 +18,80 @@ Delphi applications can re-import the data correctly.
   enabling application-specific extensions.
 - **Dual licensing**: LGPL-3.0-or-later or commercial license.
 
-## Features
+## Supported
 
-### RichEdit 2.0 is supported.
+Rich Edit 1.0–2.0 feature set (Delphi TRichEdit compatibility baseline).
 
-#### Topics
+### Character formatting
 
-- **Character formatting** — bold, italic, underline (solid, dotted, dashed, thick), strikethrough, font family, font size, text color, background color, superscript/subscript, capitalization
-- **Paragraph formatting** — alignment, left indent, first-line indent, right indent, spacing before/after, line height
-- **Tab stops** — simple tab separator, tab stops with left/center/right alignment
-- **Unicode** — escape sequences, hex escapes, non-breaking space, typographic characters
-- **Document tables** — color table, font table
-- **Embedded images** — BMP, PNG, JPEG via `\pict`
+bold, italic, underline (solid, dotted, dashed, dash-dot, dash-dot-dot, thick),
+strikethrough, font family, font size, text color, background color,
+superscript/subscript, capitalization (all caps, small caps), character expansion
+(`\expndN`, `\expndtwN`), kerning (`\kerning` / `\kerning0`)
 
-#### Not supported
+### Paragraph formatting
 
-- **Character formatting** — highlight (`\highlightN`), double underline (`\uldb`), line-spacing multiplier (`\slmultN`), positional superscript/subscript (`\upN`/`\dnN`)
-- **Document metadata** (`\info`, `\title`, `\author`, `\subject`, `\keywords`, `\versionN`) — handled by the embedding app
-- **OLE objects** (`\object`, `\objdata`, `\objalias`, `\objclass`) — Windows COM embedding
-- **Metafiles** (EMF, WMF) — Windows-specific rasterizable formats
+alignment (left, center, right), left indent, first-line indent, right indent,
+spacing before/after, line height (fixed), tab stops (left, center, right)
+
+### Unicode & symbols
+
+escape sequences (`\uNNN`), hex escapes (`\'hh`), non-breaking space (`\~`),
+typographic characters (bullet, emdash, endash, smart quotes, en/em space)
+
+### Document tables
+
+color table (RGB), font table (family name, charset)
+
+### Embedded images
+
+BMP, PNG, JPEG via `\pict`
+
+## Not Supported
+
+### Intentionally out of scope
+
+- **Highlight** (`\highlightN`) — no reliable RGB mapping per RTF spec
+- **Double underline** (`\uldb`) — Qt has no double-underline variant
+- **Line-spacing multiplier** (`\slmultN`) — Qt only supports fixed height
+- **Positional superscript/subscript** (`\upN`/`\dnN`) — Qt only supports toggle
+- **Underline color** (`\ulcN`) — Qt 6.11 has no `setFontUnderlineColor()`
+
+### Document metadata
+
+`\info` section (`\title`, `\author`, `\subject`, `\keywords`, `\versionN`, `\revtbl`)
+— handled by the embedding app
+
+### Windows-specific
+
+- **OLE objects** (`\object`, `\objdata`, `\objalias`, `\objclass`) — COM embedding
+- **Metafiles** (EMF, WMF) — Windows rasterizable formats
 - **Section & page setup** (`\sectd`, `\sect`, `\sbk*`, `\pgwsxn`, `\pghsxn`, `\marg*`, `\cols*`, `\deftabN`, `\vertdoc`, `\horzdoc`)
-- **Asian and East Asian fonts** (`\fscript`, `\fdecor`, `\stshfdbchN`, `\stshfhichN`, `\stshfbiN`, `\fcharset134/136/129`) — requires external shaping library
-- **Bidirectional text** (`\rtlch`, `\ltrch`, `\rtl`, `\ltrpar`, `\fbidis`) — requires platform shaping library
+- **Headers/footers** (`{\header ...}`, `{\footer ...}`)
+- **Footnotes/endnotes** (`{\footnote ...}`, `\ftnstart`, `\endnhere`)
+- **Bookmarks** (`{\*\bkmkstart ...}`, `{\*\bkmkend ...}`) — no `QTextBookmark` in Qt6
+
+### Complex text
+
+- **Asian/East Asian fonts** (`\fscript`, `\fdecor`, `\stshfdbchN`, `\stshfhichN`, `\stshfbiN`, `\fcharset134/136/129`) — requires external shaping library
+- **Bidirectional text** (`\rtlch`, `\ltrch`, `\rtl`, `\ltrpar`, `\fbidis`) — no platform BIDI library
 - **Complex script shaping** (Indic, Thai, Arabic) — requires HarfBuzz/UCDraw
 
-### No Support Planned
+## No Support Planned
 
-#### Word-specific extensions
+### Word-specific extensions
 
 - **Track changes** (`\revtbl`, `\revN`, `\insrsidN`, `\delrsidN`, `\tridxN`) — version tracking
-- **Styles** (`\stylesheet`, `\sN`, `\snext`, `\sbasedonN`) — Word-specific style system
+- **Styles** (`\stylesheet`, `\sN`, `\snext`, `\sbasedonN`) — Word style system
 - **Fields** (`\field`, `\*\fldinst`, `\*\fldrslt`, `\date`, `\time`) — Word field codes
-- **Index / TOC entries** (`\*{\index ...}`, `\*{\toc ...}`, `\*{\tc ...}`) — document generation, not editing
-- **Document variables** (`\*\docvar`) — low-priority document metadata
-- **User properties** (`\userprops`, `\propname`, `\staticval`) — custom document properties
-- **Paragraph Group Properties** (`\*\pgptbl`, `\pgp`, `\ipgpN`) — Word 2002+ storage optimization
-- **Style restrictions** (`\*\latentstyles`, `\lsd*`) — Word UI style visibility and locking
-- **Password protection** (`\passwordhash`, `\password`) — document-level security
-- **Comments / annotations** (`\*\annot`, `\*\ftnacc`, `\*\annotrslt`) — Word 2002+
-- **Compatibility flags** (`\hyph*`, `\lnongrid`, `\donotembedsysfontN`, `\donotembeddingdataN`, `\relyonvmlN`, `\validatexmlN`, `\showxmlerrorsN`, `\trackmovesN`, `\trackformattingN`, `\muser`) — Word-specific behavior flags
+- **Index / TOC entries** (`\*{\index ...}`, `\*{\toc ...}`, `\*{\tc ...}`)
+- **Document variables** (`\*\docvar`)
+- **User properties** (`\userprops`, `\propname`, `\staticval`)
+- **Paragraph Group Properties** (`\*\pgptbl`, `\pgp`, `\ipgpN`)
+- **Style restrictions** (`\*\latentstyles`, `\lsd*`)
+- **Password protection** (`\passwordhash`, `\password`)
+- **Comments / annotations** (`\*\annot`, `\*\ftnacc`, `\*\annotrslt`)
+- **Compatibility flags** (`\hyph*`, `\lnongrid`, `\donotembedsysfontN`, `\donotembeddingdataN`, `\relyonvmlN`, `\validatexmlN`, `\showxmlerrorsN`, `\trackmovesN`, `\trackformattingN`, `\muser`)
 
 ## Quick Start
 

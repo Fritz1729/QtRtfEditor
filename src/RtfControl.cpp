@@ -30,6 +30,8 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("super0",   Action::ToggleCharProp,   CharProp::Superscript),
     DATA("strike",   Action::ToggleCharProp,   CharProp::Strike),
     DATA("strike0",  Action::ToggleCharProp,   CharProp::Strike),
+    DATA("kerning",    Action::ToggleCharProp,   CharProp::Kerning),
+    DATA("kerning0",   Action::ToggleCharProp,   CharProp::Kerning),
 
     // Character properties with numeric argument
     DATA("f",        Action::SetCharProp,      CharSetProp::FontIndex),
@@ -38,6 +40,8 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("cb",       Action::SetCharProp,      CharSetProp::BgColorIndex),
     DATA("up",       Action::SetCharProp,      CharSetProp::UpOffset),
     DATA("dn",       Action::SetCharProp,      CharSetProp::DnOffset),
+    DATA("expnd",      Action::SetCharProp,      CharSetProp::Expnd),
+    DATA("expndtw",    Action::SetCharProp,      CharSetProp::Expnd),
 
     // Paragraph properties
     DATA("li",       Action::SetParaProp,      ParaProp::LeftIndent),
@@ -63,10 +67,12 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("tx",       Action::SetParaProp,      ParaProp::TabStop),
 
     // Underline styles
-    DATA("uld",      Action::SetUlStyle,       UlStyle::UlDotted),
-    DATA("uldash",   Action::SetUlStyle,       UlStyle::UlDashed),
-    DATA("uldb",     Action::SetUlStyle,       UlStyle::UlDouble),
-    DATA("ulth",     Action::SetUlStyle,       UlStyle::UlThick),
+    DATA("uld",        Action::SetUlStyle, UlStyle::UlDotted),
+    DATA("uldash",     Action::SetUlStyle, UlStyle::UlDashed),
+    DATA("uldashd",    Action::SetUlStyle, UlStyle::UlDashDot),
+    DATA("uldashdd",   Action::SetUlStyle, UlStyle::UlDashDotDot),
+    DATA("uldb",       Action::SetUlStyle, UlStyle::UlDouble),
+    DATA("ulth",       Action::SetUlStyle, UlStyle::UlThick),
 
     // Capitalization
     DATA("caps",     Action::SetCapitalization, Caps::CapsAll),
