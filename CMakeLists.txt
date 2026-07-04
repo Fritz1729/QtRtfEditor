@@ -41,9 +41,9 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     include(CMakePackageConfigHelpers)
 
     # Header Installation
-    install(DIRECTORY src/
+    file(GLOB PUBLIC_HEADERS "src/*.h")
+    install(FILES ${PUBLIC_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/RichTextEdit
-        FILES_MATCHING PATTERN "*.h"
     )
 
     # Config files for find_package()

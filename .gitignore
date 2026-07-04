@@ -1,5 +1,13 @@
 # Build artifacts
 build/
+Testing/
+src/QtRtfEditor-*/
+
+# 3rd-party bundled sources
+3rdparty/
+
+# Temp
+tmp/
 CMakeCache.txt
 cmake_install.cmake
 CMakeFiles/
@@ -44,3 +52,9 @@ RTF_COVERAGE_PLAN.md
 *.sdf
 *.suo
 *.user
+
+# Runtime files
+.qtrtfeditor_recent.txt
+
+# Build artifacts
+archive.tar.gz
