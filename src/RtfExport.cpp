@@ -6,6 +6,10 @@
 #include <QTextCharFormat>
 #include <QTextFragment>
 #include <QTextImageFormat>
+#include <QTextFrame>
+#include <QTextTable>
+#include <QTextTableFormat>
+#include <QTextTableCell>
 #include <QFont>
 #include <QTextBlockFormat>
 #include <QTextListFormat>
@@ -286,27 +290,17 @@ std::string ExportRtf(const QTextDocument& document) {
     }
     out << "}";
 
-    for (QTextBlock block = document.begin(); block.isValid(); block = block.next()) {
+    // Content export — iterate root frame to handle tables and paragraphs
+    auto exportBlock = [&](const QTextBlock& block, bool isTableCell) {
         QString text = block.text();
         bool hasText = !text.trimmed().isEmpty();
-
         if (!hasText) {
-            bool hasFollowingContent = false;
-            for (QTextBlock b = block.next(); b.isValid(); b = b.next()) {
-                if (!b.text().trimmed().isEmpty()) {
-                    hasFollowingContent = true;
-                    break;
-                }
-            }
-            if (hasFollowingContent) continue;
-            continue;
+            return;
         }
 
         QTextBlockFormat blockFmt = block.blockFormat();
-
-        // Emit list fields
         bool inListGroup = false;
-        if (block.textList()) {
+        if (!isTableCell && block.textList()) {
             const QTextList* list = block.textList();
             auto listIt = listMap.find(list);
             if (listIt != listMap.end()) {
@@ -373,7 +367,6 @@ std::string ExportRtf(const QTextDocument& document) {
         }
 
         if (hasImage) {
-            // Emit images (blocks with images don't emit text)
             QTextBlock::iterator itImg = block.begin();
             while (itImg != block.end()) {
                 QTextFragment frag = itImg.fragment();
@@ -484,6 +477,68 @@ std::string ExportRtf(const QTextDocument& document) {
             } else {
                 if (inListGroup) out << '}';
                 out << "\\b0\\i0\\super0\\sub0\\cf0\\par\n";
+            }
+        }
+    };
+
+    QTextFrame* rootFrame = document.rootFrame();
+    for (QTextFrame::iterator frameIt = rootFrame->begin(); frameIt != rootFrame->end(); ++frameIt) {
+        QTextFrame* currentFrame = frameIt.currentFrame();
+        QTextTable* table = qobject_cast<QTextTable*>(currentFrame);
+        if (table) {
+            // === TABLE EXPORT ===
+            QTextTableFormat tableFmt = table->format();
+            QVector<QTextLength> constraints = tableFmt.columnWidthConstraints();
+            int colCount = table->columns();
+            int rowCount = table->rows();
+
+            // Compute cumulative \cellx positions
+            std::vector<int> cellxPositions;
+            int cumulative = 0;
+            for (int c = 0; c < colCount; ++c) {
+                double width = constraints[c].value(QTextLength::FixedLength);
+                int widthTwips = static_cast<int>(width * 20.0);
+                cumulative += widthTwips;
+                cellxPositions.push_back(cumulative);
+            }
+
+            for (int r = 0; r < rowCount; ++r) {
+                out << "{\\trowd ";
+                for (int pos : cellxPositions) {
+                    out << "\\cellx" << pos;
+                }
+                out << "\n";
+
+                for (int c = 0; c < colCount; ++c) {
+                    QTextTableCell cell = table->cellAt(r, c);
+                    if (!cell.isValid()) {
+                        out << "\\intbl \\cell";
+                        continue;
+                    }
+
+                    // Iterate over blocks within the cell
+                    QTextBlock cellBlock = cell.firstCursorPosition().block();
+                    int cellEndPos = cell.lastPosition();
+                    bool first = true;
+                    while (cellBlock.isValid() && cellBlock.position() < cellEndPos) {
+                        if (!cellBlock.text().trimmed().isEmpty()) {
+                            if (first) {
+                                out << "\\intbl";
+                                first = false;
+                            }
+                            exportBlock(cellBlock, true);
+                        }
+                        cellBlock = cellBlock.next();
+                    }
+                    if (first) out << "\\intbl";
+                    out << "\\cell";
+                }
+                out << "\\row}";
+            }
+        } else {
+            QTextBlock block = frameIt.currentBlock();
+            if (block.isValid()) {
+                exportBlock(block, false);
             }
         }
     }

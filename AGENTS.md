@@ -82,4 +82,4 @@ Do NOT implement these — they have no Qt equivalent and no reason to emulate:
 - Before committing, show `git diff --stat`, summarize changes, present the commit message, and ask for review. Never push without approval.
 - Never change the user's design decisions without consultation.
 - Report when design decisions hinder your work.
-- **AI-assisted commits** — add a footer: `Co-developed-with: opencode (qwen36-35a3)`
+- **AI-assisted commits** — add a footer: `Co-developed-with: opencode (${MODEL})`

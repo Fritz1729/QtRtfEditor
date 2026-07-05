@@ -44,6 +44,10 @@ typographic characters (bullet, emdash, endash, smart quotes, en/em space)
 
 color table (RGB), font table (family name, charset)
 
+### Layout tables
+
+**Partial** — rows, cells, column widths, vertical alignment; cell shading, per-side borders, and merged cells are parsed but not rendered
+
 ### Embedded images
 
 BMP, PNG, JPEG via `\pict`
@@ -54,6 +58,8 @@ BMP, PNG, JPEG via `\pict`
 
 - **Highlight** (`\highlightN`) — no reliable RGB mapping per RTF spec
 - **Double underline** (`\uldb`) — Qt has no double-underline variant
+- **Cell shading & per-side borders** (`\clshdn`, `\clbrdrl`/`\brdrs`/`\brdrw`/`\brdrcf`) — parsed but not applied in import (no Qt API)
+- **Merged cells** (`\clmrg`) — out of scope
 - **Line-spacing multiplier** (`\slmultN`) — Qt only supports fixed height
 - **Positional superscript/subscript** (`\upN`/`\dnN`) — Qt only supports toggle
 - **Underline color** (`\ulcN`) — Qt 6.11 has no `setFontUnderlineColor()`

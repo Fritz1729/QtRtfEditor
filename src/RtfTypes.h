@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include <QFont>
@@ -88,6 +89,35 @@ struct ParagraphFormatting {
     int lineHeight = 0;
     int slMult = 1;
     std::vector<TabStop> tabStops;
+};
+
+struct TableCellBorders {
+    int leftWidth = 0;
+    int topWidth = 0;
+    int rightWidth = 0;
+    int bottomWidth = 0;
+    int leftColor = 0;
+    int topColor = 0;
+    int rightColor = 0;
+    int bottomColor = 0;
+
+    bool operator==(const TableCellBorders& other) const = default;
+};
+
+struct TableCellFormat {
+    int width = 0;
+    int vertAlign = 0;
+    int shadingColor = -1;
+    TableCellBorders borders;
+
+    bool operator==(const TableCellFormat& other) const = default;
+};
+
+struct RtfTableRowEntry {
+    std::vector<int> cellxPositions;
+    std::vector<std::pair<std::vector<RtfRun>, TableCellFormat>> cells;
+
+    bool operator==(const RtfTableRowEntry& other) const = default;
 };
 
 struct RtfParagraph : ParagraphFormatting {

@@ -10,6 +10,9 @@
 using namespace Rte;
 
 static const char* const kSkippedFiles[] = {
+    "cell-shading.rtf",            // \clshdn — Qt has no cell-level background API
+    "tables-borders.rtf",          // \clbrdrl/\brdrs — Qt has no per-side border API
+    "tables-merged.rtf",           // \clmrg — merged cells out of scope
     "line-spacing.rtf",          // \slmultN — Qt only supports FixedHeight, not multiplier
     "positional-supsub.rtf",     // \upN/\dnN — Qt only supports boolean super/subscript
     "underline-styles.rtf",      // \uldb — no double underline in Qt UnderlineStyle enum
@@ -44,9 +47,15 @@ private:
 static bool HasUnknownTags(const std::string& rtf) {
     try {
         RtfDocument doc = ParseRtf(rtf);
+        if (!doc.unknownTags.empty()) {
+            for (const auto& tag : doc.unknownTags) {
+                qDebug() << "  UNKNOWN TAG:" << QString::fromStdString(tag);
+            }
+        }
         return !doc.unknownTags.empty();
     } catch (...) {
         // Iteration limit or crash — counts as unsupported
+        qDebug() << "  UNKNOWN TAG: exception during ParseRtf";
         return true;
     }
 }

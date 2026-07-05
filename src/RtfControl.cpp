@@ -10,11 +10,14 @@ using Align = RtfControl::Align;
 using TabAlign = RtfControl::TabAlign;
 using UlStyle = RtfControl::RtfUlStyle;
 using Caps = RtfControl::RtfCaps;
+using TableCtrlWord = RtfControl::TableCtrlWord;
 
 #define DATA(keyword, action, prop) \
     { keyword, action, { .raw = static_cast<int>(prop) } }
 #define DATA_TAB(keyword, action, align) \
     { keyword, action, { .tabAlign = align } }
+#define DATA_TABLE(keyword, ctrlWord) \
+    { keyword, Action::TableControlWord, { .tableCtrlWord = ctrlWord } }
 
 constexpr RtfControl rtfControlTableEntries[] = {
     // Character toggles
@@ -68,6 +71,10 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA_TAB("tqc",   Action::SetTabAlign,      TabAlign::Center),
     DATA_TAB("tqd",   Action::SetTabAlign,      TabAlign::Decimal),
     DATA_TAB("tqr",   Action::SetTabAlign,      TabAlign::Right),
+    DATA_TAB("tabcenter", Action::SetTabAlign,  TabAlign::Center),
+    DATA_TAB("tabright",  Action::SetTabAlign,  TabAlign::Right),
+    DATA("tabgrid",   Action::TableControl,      0),
+    DATA("tableft",   Action::TableControl,      0),
 
     // Tab stop position
     DATA("tx",       Action::SetParaProp,      ParaProp::TabStop),
@@ -139,6 +146,25 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("piccropt", Action::TableControl,     0),
     DATA("piccropb", Action::TableControl,     0),
     DATA("pict",     Action::TableControl,     0),
+
+    // Table structure
+    DATA_TABLE("trowd",     TableCtrlWord::Trowd),
+    DATA_TABLE("cellx",     TableCtrlWord::Cellx),
+    DATA_TABLE("cell",      TableCtrlWord::Cell),
+    DATA_TABLE("row",       TableCtrlWord::Row),
+    DATA_TABLE("intbl",     TableCtrlWord::Intbl),
+    DATA_TABLE("clshdn",    TableCtrlWord::ClShading),
+    DATA_TABLE("clvertalt", TableCtrlWord::ClVertAlignTop),
+    DATA_TABLE("clvertalc", TableCtrlWord::ClVertAlignCenter),
+    DATA_TABLE("clvertalb", TableCtrlWord::ClVertAlignBottom),
+    DATA_TABLE("clbrdrl",   TableCtrlWord::ClBorderLeft),
+    DATA_TABLE("clbrdrt",   TableCtrlWord::ClBorderTop),
+    DATA_TABLE("clbrdrr",   TableCtrlWord::ClBorderRight),
+    DATA_TABLE("clbrdrb",   TableCtrlWord::ClBorderBottom),
+    DATA_TABLE("brdrs",     TableCtrlWord::BrdrSolid),
+    DATA_TABLE("brdrw",     TableCtrlWord::BrdrWidth),
+    DATA_TABLE("brdrcf",    TableCtrlWord::BrdrColor),
+    DATA_TABLE("clmrg",     TableCtrlWord::ClMerge),
 };
 
 static_assert(std::size(rtfControlTableEntries) == kRtfControlTableSize,

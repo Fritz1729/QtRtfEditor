@@ -33,21 +33,21 @@ public:
         _inListtable = false;
         _listIdToStyle.clear();
         _paraStateStack.clear();
+        _inTable = false;
+        _inRow = false;
+        _inTableCell = false;
+        _currentCellIndex = 0;
+        _pendingBorderSide = -1;
         _listId = 0;
         _listLevel = 0;
         _listStyle = ListStyle::None;
 
         parse();
         finalizeRun();
-        // Remove trailing empty paragraph (from trailing \par)
-        if (!_doc.paragraphs.empty()) {
-            const auto& last = _doc.paragraphs.back();
-            bool hasText = std::any_of(last.runs.begin(), last.runs.end(),
-                [](const RtfRun& r) { return !r.text.empty(); });
-            if (!hasText) {
-                _doc.paragraphs.pop_back();
-            }
-        }
+        // Flush current paragraph if it has content
+        flushCurrentParagraph();
+        // Remove trailing empty paragraphs and table rows from elements
+        removeTrailingEmptyElements();
 
         return _doc;
     }
@@ -260,47 +260,35 @@ private:
             break;
         }
         case RtfControl::Action::EmitParagraph:
-            handleParagraph();
+            if (_inTableCell) {
+                finalizeRun();
+            } else {
+                handleParagraph();
+            }
             return;
 
         case RtfControl::Action::HeaderControl:
         case RtfControl::Action::TableControl:
             break;
+        case RtfControl::Action::TableControlWord:
+            handleTableControl(ctrl, arg);
+            return;
         case RtfControl::Action::Unknown:
             break;
         }
     }
 
     void handleParagraph() {
+        if (_inTable) {
+            flushPendingTableRow();
+        }
         finalizeRun();
         _skipLeadingWsTrim = false;
-        // Apply paragraph formatting to the last non-empty paragraph
-        for (int k = static_cast<int>(_doc.paragraphs.size()) - 1; k >= 0; --k) {
-            if (!_doc.paragraphs[k].runs.empty() &&
-                std::any_of(_doc.paragraphs[k].runs.begin(), _doc.paragraphs[k].runs.end(),
-                    [](const RtfRun& r) { return !r.text.empty(); }))
-            {
-                _doc.paragraphs[k].setFormatting(_para);
-                _doc.paragraphs[k].listId = _listId;
-                _doc.paragraphs[k].listLevel = _listLevel;
-                _doc.paragraphs[k].listStyle = _listStyle;
-                _doc.paragraphs[k].listIndent = _para.leftIndent;
-                break;
-            }
-        }
-        // Remove trailing empty paragraphs
-        while (!_doc.paragraphs.empty()) {
-            const auto& last = _doc.paragraphs.back();
-            bool hasText = std::any_of(last.runs.begin(), last.runs.end(),
-                [](const RtfRun& r) { return !r.text.empty(); });
-            if (!hasText) {
-                _doc.paragraphs.pop_back();
-            } else {
-                break;
-            }
-        }
+        flushCurrentParagraph();
+        // Remove trailing empty paragraphs and table rows from elements
+        removeTrailingEmptyElements();
         // Create paragraph for content that follows
-        _doc.paragraphs.push_back({});
+        _currentParagraph = {};
         // Reset paragraph formatting
         _para = ParagraphFormatting{};
         _pendingTabAlignment = 1;
@@ -309,7 +297,228 @@ private:
         _listStyle = ListStyle::None;
     }
 
+    void handleTableControl(const RtfControl& ctrl, int arg) {
+        switch (ctrl.value.tableCtrlWord) {
+        case RtfControl::TableCtrlWord::Trowd:
+            if (!_inTable) {
+                _inTable = true;
+                flushCurrentParagraph();
+            }
+            _inRow = true;
+            _currentCellIndex = 0;
+            _currentCellRuns.clear();
+            _currentCellFormat = {};
+            resetPendingBorder();
+            _currentRow = {};
+            break;
+
+        case RtfControl::TableCtrlWord::Cellx:
+            if (arg >= 0) {
+                _currentRow.cellxPositions.push_back(arg);
+            }
+            break;
+
+        case RtfControl::TableCtrlWord::Intbl:
+            _inTableCell = true;
+            finalizeRun();
+            _currentCellRuns.clear();
+            break;
+
+        case RtfControl::TableCtrlWord::Cell:
+            if (_inTableCell) {
+                finalizeRun();
+                applyPendingBorder();
+                addCurrentCellToRow();
+                _inTableCell = false;
+                _currentCellIndex++;
+            }
+            _currentCellFormat = {};
+            resetPendingBorder();
+            break;
+
+        case RtfControl::TableCtrlWord::Row:
+            if (_inTableCell) {
+                finalizeRun();
+                applyPendingBorder();
+                addCurrentCellToRow();
+                _inTableCell = false;
+            }
+            emitTableRow();
+            _inRow = false;
+            _currentCellIndex = 0;
+            resetPendingBorder();
+            break;
+
+        case RtfControl::TableCtrlWord::ClShading:
+            if (arg >= 0) {
+                _currentCellFormat.shadingColor = arg;
+            }
+            break;
+
+        case RtfControl::TableCtrlWord::ClVertAlignTop:
+            _currentCellFormat.vertAlign = 0;
+            break;
+
+        case RtfControl::TableCtrlWord::ClVertAlignCenter:
+            _currentCellFormat.vertAlign = 1;
+            break;
+
+        case RtfControl::TableCtrlWord::ClVertAlignBottom:
+            _currentCellFormat.vertAlign = 2;
+            break;
+
+        case RtfControl::TableCtrlWord::ClBorderLeft:
+            beginBorderSide(0);
+            break;
+
+        case RtfControl::TableCtrlWord::ClBorderTop:
+            beginBorderSide(1);
+            break;
+
+        case RtfControl::TableCtrlWord::ClBorderRight:
+            beginBorderSide(2);
+            break;
+
+        case RtfControl::TableCtrlWord::ClBorderBottom:
+            beginBorderSide(3);
+            break;
+
+        case RtfControl::TableCtrlWord::BrdrSolid:
+            _pendingBorderStyle = 1;
+            break;
+
+        case RtfControl::TableCtrlWord::BrdrWidth:
+            if (arg >= 0) _pendingBorderWidth = arg;
+            break;
+
+        case RtfControl::TableCtrlWord::BrdrColor:
+            if (arg >= 0) _pendingBorderColor = arg;
+            break;
+
+        case RtfControl::TableCtrlWord::ClMerge:
+            break;
+        }
+    }
+
+    void applyPendingBorder() {
+        if (_pendingBorderSide < 0) return;
+        auto& borders = _currentCellFormat.borders;
+        switch (_pendingBorderSide) {
+            case 0:
+                borders.leftWidth = _pendingBorderWidth;
+                borders.leftColor = _pendingBorderColor;
+                break;
+            case 1:
+                borders.topWidth = _pendingBorderWidth;
+                borders.topColor = _pendingBorderColor;
+                break;
+            case 2:
+                borders.rightWidth = _pendingBorderWidth;
+                borders.rightColor = _pendingBorderColor;
+                break;
+            case 3:
+                borders.bottomWidth = _pendingBorderWidth;
+                borders.bottomColor = _pendingBorderColor;
+                break;
+        }
+        resetPendingBorder();
+    }
+
+    void resetPendingBorder() {
+        _pendingBorderSide = -1;
+        _pendingBorderStyle = 0;
+        _pendingBorderWidth = 0;
+        _pendingBorderColor = 0;
+    }
+
+    void beginBorderSide(int side) {
+        applyPendingBorder();
+        _pendingBorderSide = side;
+        _pendingBorderStyle = 0;
+        _pendingBorderWidth = 0;
+        _pendingBorderColor = 0;
+    }
+
+    void addCurrentCellToRow() {
+        while (static_cast<int>(_currentRow.cells.size()) <= _currentCellIndex) {
+            _currentRow.cells.push_back({{}, {}});
+        }
+        _currentRow.cells[_currentCellIndex] =
+            {std::move(_currentCellRuns), _currentCellFormat};
+        _currentCellRuns.clear();
+        _currentCellFormat = {};
+    }
+
+    void emitTableRow() {
+        if (hasTextContent(_currentRow)) {
+            _doc.elements.push_back(std::move(_currentRow));
+        }
+        _currentRow = {};
+    }
+
+    void flushPendingTableRow() {
+        if (!_inTable || !_inRow) {
+            _inTable = false;
+            _inRow = false;
+            _inTableCell = false;
+            _currentCellIndex = 0;
+            _currentRow = {};
+            return;
+        }
+        if (hasTextContent(_currentRow)) {
+            _doc.elements.push_back(std::move(_currentRow));
+        }
+        _inTable = false;
+        _inRow = false;
+        _inTableCell = false;
+        _currentCellIndex = 0;
+        _currentRow = {};
+    }
+
+    void flushCurrentParagraph() {
+        if (!_currentParagraph.runs.empty()) {
+            _currentParagraph.setFormatting(_para);
+            _currentParagraph.listId = _listId;
+            _currentParagraph.listLevel = _listLevel;
+            _currentParagraph.listStyle = _listStyle;
+            _currentParagraph.listIndent = _para.leftIndent;
+            _doc.elements.push_back(std::move(_currentParagraph));
+        }
+        _currentParagraph = {};
+    }
+
+    bool hasTextContent(const RtfParagraph& p) {
+        return std::any_of(p.runs.begin(), p.runs.end(),
+            [](const RtfRun& r) { return !r.text.empty(); });
+    }
+
+    bool hasTextContent(const RtfTableRowEntry& r) {
+        for (const auto& [runs, _] : r.cells) {
+            for (const auto& run : runs) {
+                if (!run.text.empty()) return true;
+            }
+        }
+        return false;
+    }
+
+    void removeTrailingEmptyElements() {
+        while (!_doc.elements.empty()) {
+            bool hasText = std::visit([this](const auto& elem) -> bool {
+                using T = std::decay_t<decltype(elem)>;
+                if constexpr (std::is_same_v<T, RtfParagraph>) return hasTextContent(elem);
+                else if constexpr (std::is_same_v<T, RtfTableRowEntry>) return hasTextContent(elem);
+                else return true;
+            }, _doc.elements.back());
+            if (!hasText) {
+                _doc.elements.pop_back();
+            } else {
+                break;
+            }
+        }
+    }
+
     RtfDocument _doc;
+    RtfParagraph _currentParagraph;
     std::string _rtf;
     size_t _pos = 0;
     size_t _len = 0;
@@ -345,6 +554,19 @@ private:
     int _pictPiccropt = 0;
     int _pictPiccropb = 0;
 
+    // Table state
+    bool _inTable = false;
+    bool _inRow = false;
+    bool _inTableCell = false;
+    int _currentCellIndex = 0;
+    RtfTableRowEntry _currentRow;
+    std::vector<RtfRun> _currentCellRuns;
+    TableCellFormat _currentCellFormat;
+    int _pendingBorderSide = -1;
+    int _pendingBorderStyle = 0;
+    int _pendingBorderWidth = 0;
+    int _pendingBorderColor = 0;
+
     void parse() {
         while (_pos < _len) {
             if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
@@ -361,6 +583,10 @@ private:
             } else {
                 _pos++;
             }
+        }
+        // Flush pending table row at end of input (outermost parse only)
+        if (_inTable && _pos >= _len) {
+            flushPendingTableRow();
         }
     }
 
@@ -470,9 +696,13 @@ private:
             }
             if (_pos < _len) _pos++; // skip '}'
         } else if (c == 't') {
-            // Tab character
-            _pos++;
-            _literalText += static_cast<char>(9);
+            // Tab character — only if not followed by more word chars (\trowd etc.)
+            if (_pos + 1 >= _len || !isWordChar(_rtf[_pos + 1])) {
+                _pos++;
+                _literalText += static_cast<char>(9);
+            } else {
+                parseControlWord();
+            }
         } else if (c == '~') {
             // Non-breaking space
             _pos++;
@@ -687,7 +917,8 @@ private:
             img.piccropt = _pictPiccropt;
             img.piccropb = _pictPiccropb;
             img.rtfPictHex = _pictData.toStdString();
-            _doc.images.push_back(std::move(img));
+            flushCurrentParagraph();
+            _doc.elements.push_back(std::move(img));
         }
     }
 
@@ -890,11 +1121,11 @@ private:
             }
         }
 
-        if (_doc.paragraphs.empty()) {
-            _doc.paragraphs.push_back({});
+        if (_inTableCell) {
+            _currentCellRuns.emplace_back(trimmed, _format);
+        } else {
+            _currentParagraph.runs.emplace_back(trimmed, _format);
         }
-
-        _doc.paragraphs.back().runs.emplace_back(trimmed, _format);
         _literalText.clear();
     }
 

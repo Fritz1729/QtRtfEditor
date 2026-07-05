@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include <QByteArray>
@@ -52,8 +53,7 @@ struct RtfDocument {
     int defaultFontSize = 0;      // half-points (\fs in header)
     std::vector<RtfColorEntry> colors;
     std::vector<RtfFontEntry> fonts;
-    std::vector<RtfParagraph> paragraphs;
-    std::vector<RtfImage> images;
+    std::vector<std::variant<RtfParagraph, RtfTableRowEntry, RtfImage>> elements;
     std::vector<std::string> unknownTags;
 };
 

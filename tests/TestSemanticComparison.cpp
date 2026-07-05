@@ -133,6 +133,20 @@ private slots:
     void UlNone();
     void SemanticUlSynonyms();
 
+    // Tables
+    void DifferentCellShading();
+    void DifferentCellShadingVsNoShading();
+    void DifferentTableRowCount();
+    void DifferentTableColCount();
+    void DifferentTableCellText();
+    void DifferentTableCellWidth();
+    void DifferentCellVertAlign();
+    void DifferentCellBorders();
+    void TableWithEmptyCell();
+    void TableWithFormatting();
+    void TableOrderingParagraphTableParagraph();
+    void TableOrderingPTPTP();
+
     void cleanupTestCase();
 
 private:
@@ -639,12 +653,14 @@ void TestSemanticComparison::WhitespaceAfterToggleOff() {
     // remains as content.
     std::string rtf = R"({\rtf1\ansi\deff0 Test \b bold\b0  regular\par})";
     auto doc = ParseRtf(rtf);
-    QVERIFY(doc.paragraphs.size() >= 1);
-    QVERIFY(doc.paragraphs[0].runs.size() >= 3);
+    QVERIFY(doc.elements.size() >= 1);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    QVERIFY(para.runs.size() >= 3);
 
     // Find the "regular" run — it should start with a space
     bool foundRegularWithSpace = false;
-    for (const auto& run : doc.paragraphs[0].runs) {
+    for (const auto& run : para.runs) {
         if (run.text.find("regular") != std::string::npos) {
             QVERIFY(!run.text.empty());
             QVERIFY(run.text[0] == ' ');
@@ -658,12 +674,14 @@ void TestSemanticComparison::UlNone() {
     // \ulnone must turn off underline, not turn it on
     std::string rtf = R"({\rtf1\ansi\deff0 Text {\ul underlined\ulnone} normal\par})";
     auto doc = ParseRtf(rtf);
-    QVERIFY(doc.paragraphs.size() >= 1);
-    QVERIFY(doc.paragraphs[0].runs.size() >= 3);
+    QVERIFY(doc.elements.size() >= 1);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    QVERIFY(para.runs.size() >= 3);
 
     bool foundUnderlined = false;
     bool foundNormal = false;
-    for (const auto& run : doc.paragraphs[0].runs) {
+    for (const auto& run : para.runs) {
         if (run.text.find("underlined") != std::string::npos) {
             QVERIFY(run.format.underline);
             foundUnderlined = true;
@@ -683,6 +701,106 @@ void TestSemanticComparison::SemanticUlSynonyms() {
     std::string rtfUlNone = R"({\rtf1\ansi\deff0{\ul Text}\ulnone\par})";
     std::string reason;
     QCOMPARE(CompareRtf(rtfUl0, rtfUlNone, reason), RtfCompareResult::Identical);
+}
+
+void TestSemanticComparison::DifferentTableRowCount() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \intbl B\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \intbl B\cell \row}{\trowd \cellx2000 \cellx4000 \intbl C\cell \intbl D\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentTableColCount() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \intbl B\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentTableCellText() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \intbl B\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl X\cell \intbl Y\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentTableCellWidth() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \intbl B\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx3000 \cellx6000 \intbl A\cell \intbl B\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentCellVertAlign() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clvertalt \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clvertalb \intbl A\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentCellBorders() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clbrdrl\brdrs\brdrw10 \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clbrdrl\brdrs\brdrw20 \intbl A\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::TableWithEmptyCell() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QVERIFY(reason.empty());
+}
+
+void TestSemanticComparison::TableWithFormatting() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl {\b Bold}\b0 \cell \intbl Normal\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl Normal\cell \intbl Normal\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentCellShading() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clshdn1 \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clshdn2 \intbl A\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentCellShadingVsNoShading() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clshdn1 \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \intbl A\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::TableOrderingParagraphTableParagraph() {
+    std::string rtf = R"({\rtf1\ansi\deff0 Para A\par{\trowd \cellx2000 \intbl T\cell \row}Para B\par})";
+    auto doc = ParseRtf(rtf);
+    QCOMPARE(doc.elements.size(), 3u);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    QVERIFY(std::holds_alternative<RtfTableRowEntry>(doc.elements[1]));
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[2]));
+}
+
+void TestSemanticComparison::TableOrderingPTPTP() {
+    std::string rtf = R"({\rtf1\ansi\deff0 P1\par{\trowd \cellx2000 \intbl T1\cell \row}P2\par{\trowd \cellx3000 \intbl T2\cell \row}P3\par})";
+    auto doc = ParseRtf(rtf);
+    QCOMPARE(doc.elements.size(), 5u);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    QVERIFY(std::holds_alternative<RtfTableRowEntry>(doc.elements[1]));
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[2]));
+    QVERIFY(std::holds_alternative<RtfTableRowEntry>(doc.elements[3]));
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[4]));
 }
 
 void TestSemanticComparison::cleanupTestCase() {
