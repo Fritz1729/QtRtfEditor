@@ -128,7 +128,13 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
         if (CompareField(i, SIZE_MAX, "lineHeight",
                          paraA.lineHeight, paraB.lineHeight, reason)) return RtfCompareResult::StructuralDiff;
         if (CompareField(i, SIZE_MAX, "slMult",
-                          paraA.slMult, paraB.slMult, reason)) return RtfCompareResult::StructuralDiff;
+                           paraA.slMult, paraB.slMult, reason)) return RtfCompareResult::StructuralDiff;
+        if (CompareField(i, SIZE_MAX, "listId",
+                           paraA.listId, paraB.listId, reason)) return RtfCompareResult::StructuralDiff;
+        if (CompareField(i, SIZE_MAX, "listLevel",
+                           paraA.listLevel, paraB.listLevel, reason)) return RtfCompareResult::StructuralDiff;
+        if (CompareField(i, SIZE_MAX, "listStyle",
+                           static_cast<int>(paraA.listStyle), static_cast<int>(paraB.listStyle), reason)) return RtfCompareResult::StructuralDiff;
         if (paraA.tabStops.size() != paraB.tabStops.size()) {
             reason = "Paragraph " + std::to_string(i) +
                      " tabStops count: " + std::to_string(paraA.tabStops.size()) +
@@ -228,7 +234,17 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
             if (CompareBoolField(i, j, "kerning",
                                   runA.format.kerning, runB.format.kerning, reason)) return RtfCompareResult::StructuralDiff;
             if (CompareField(i, j, "expnd",
-                              runA.format.expnd, runB.format.expnd, reason)) return RtfCompareResult::StructuralDiff;
+                               runA.format.expnd, runB.format.expnd, reason)) return RtfCompareResult::StructuralDiff;
+            if (runA.format.ulColorIndex != 0 || runB.format.ulColorIndex != 0) {
+                if (CompareResolvedColors(i, j, runA.format.ulColorIndex, runB.format.ulColorIndex,
+                                            a, b,
+                                            ResolveColorFromTable, ResolveColorFromTable,
+                                            reason, "ulColorIndex")) {
+                    return RtfCompareResult::StructuralDiff;
+                }
+            }
+            if (CompareField(i, j, "langId",
+                               runA.format.langId, runB.format.langId, reason)) return RtfCompareResult::StructuralDiff;
         }
     }
 

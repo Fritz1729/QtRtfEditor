@@ -78,6 +78,20 @@ private slots:
     void TabAlignDecimalVsRight();
     void TabAlignDecimalVsLeft();
 
+    // Justification
+    void DifferentJustification();
+
+    // Lists
+    void DifferentListStyle();
+    void DifferentListIndent();
+    void DifferentListLevel();
+
+    // Underline color
+    void DifferentUlColor();
+
+    // Language ID
+    void DifferentLangId();
+
     // RE 2.0 — True positives (must detect differences)
     void DifferentStrike();
     void DifferentCb();
@@ -294,6 +308,54 @@ void TestSemanticComparison::TabAlignDecimalVsRight() {
 void TestSemanticComparison::TabAlignDecimalVsLeft() {
     std::string rtfA = R"({\rtf1\ansi\deff0\tqd\tx1000 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\tx1000 Text\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentJustification() {
+    std::string rtfA = R"({\rtf1\ansi\deff0\ql Left\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0\qj Justified\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentListStyle() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylenum\liststyletype3}}{\listid1\listlevel0 Item one\par}{\listid1\listlevel0 Item two\par}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylebulletsimple}}{\listid1\listlevel0 Item one\par}{\listid1\listlevel0 Item two\par}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentListIndent() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylenum\liststyletype3}}{\listid1\listlevel0\li200 Item one\par}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylenum\liststyletype3}}{\listid1\listlevel0\li400 Item one\par}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentListLevel() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylenum\liststyletype3}}{\listid1\listlevel0 Item\par}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylenum\liststyletype3}}{\listid1\listlevel1 Item\par}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentUlColor() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\colortbl ;\red255\green0\blue0;}{\ul\ulc1 Colored}\ul0\ulc0\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\colortbl ;\red0\green255\blue0;}{\ul\ulc1 Colored}\ul0\ulc0\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentLangId() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\lang1033 English}\lang0\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\lang1031 German}\lang0\par})";
     std::string reason;
     QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
     QVERIFY(!reason.empty());

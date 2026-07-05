@@ -15,6 +15,8 @@ static const char* const kSkippedFiles[] = {
     "underline-styles.rtf",      // \uldb — no double underline in Qt UnderlineStyle enum
     "ul-dashdot.rtf",            // \uldashd — DashDotLine has no Qt roundtrip (toUnderlineStyle loss)
     "ul-dashdotdot.rtf",         // \uldashdd — DashDotDotLine has no Qt roundtrip
+    "underline-color.rtf",       // \ulcN — Qt has no setFontUnderlineColor()
+    "language-id.rtf",           // \langN — Qt 6.11 has no setFontLanguageId()
     nullptr
 };
 

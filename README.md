@@ -31,8 +31,9 @@ superscript/subscript, capitalization (all caps, small caps), character expansio
 
 ### Paragraph formatting
 
-alignment (left, center, right), left indent, first-line indent, right indent,
-spacing before/after, line height (fixed), tab stops (left, center, right)
+alignment (left, center, right, justified), left indent, first-line indent, right indent,
+spacing before/after, line height (fixed), tab stops (left, center, right),
+lists (bullet, number, letter, roman)
 
 ### Unicode & symbols
 
@@ -56,6 +57,7 @@ BMP, PNG, JPEG via `\pict`
 - **Line-spacing multiplier** (`\slmultN`) — Qt only supports fixed height
 - **Positional superscript/subscript** (`\upN`/`\dnN`) — Qt only supports toggle
 - **Underline color** (`\ulcN`) — Qt 6.11 has no `setFontUnderlineColor()`
+- **Language ID** (`\langN`, `\chlangN`, `\langfeN`) — Qt 6.11 has no `setFontLanguageId()`
 
 ### Document metadata
 
