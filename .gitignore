@@ -2,6 +2,7 @@
 build/
 Testing/
 src/QtRtfEditor-*/
+src/src/
 
 # 3rd-party bundled sources
 3rdparty/
