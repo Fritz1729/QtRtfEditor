@@ -11,7 +11,6 @@ using namespace Rte;
 
 static const char* const kSkippedFiles[] = {
     "cell-shading.rtf",            // \clshdn — Qt has no cell-level background API
-    "tables-borders.rtf",          // \clbrdrl/\brdrs — Qt has no per-side border API
     "tables-merged.rtf",           // \clmrg — merged cells out of scope
     "line-spacing.rtf",          // \slmultN — Qt only supports FixedHeight, not multiplier
     "positional-supsub.rtf",     // \upN/\dnN — Qt only supports boolean super/subscript

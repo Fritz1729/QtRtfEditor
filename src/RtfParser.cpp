@@ -310,6 +310,7 @@ private:
             _currentCellFormat = {};
             resetPendingBorder();
             _currentRow = {};
+            _currentRow.tableAlignment = 0;
             break;
 
         case RtfControl::TableCtrlWord::Cellx:
@@ -343,6 +344,7 @@ private:
                 addCurrentCellToRow();
                 _inTableCell = false;
             }
+            applyPendingBorder();
             emitTableRow();
             _inRow = false;
             _currentCellIndex = 0;
@@ -397,28 +399,110 @@ private:
 
         case RtfControl::TableCtrlWord::ClMerge:
             break;
+
+        case RtfControl::TableCtrlWord::BrdrNone:
+            _pendingBorderStyle = 0;
+            break;
+
+        case RtfControl::TableCtrlWord::BrdrDashed:
+            _pendingBorderStyle = 2;
+            break;
+
+        case RtfControl::TableCtrlWord::ClPadLeft:
+            if (arg >= 0) _currentCellFormat.leftPadding = arg;
+            break;
+
+        case RtfControl::TableCtrlWord::ClPadRight:
+            if (arg >= 0) _currentCellFormat.rightPadding = arg;
+            break;
+
+        case RtfControl::TableCtrlWord::ClPadTop:
+            if (arg >= 0) _currentCellFormat.topPadding = arg;
+            break;
+
+        case RtfControl::TableCtrlWord::ClPadBottom:
+            if (arg >= 0) _currentCellFormat.bottomPadding = arg;
+            break;
+
+        case RtfControl::TableCtrlWord::TrPadLeft:
+            if (arg >= 0) _currentRow.rowLeftPadding = arg;
+            break;
+
+        case RtfControl::TableCtrlWord::TrPadRight:
+            if (arg >= 0) _currentRow.rowRightPadding = arg;
+            break;
+
+        case RtfControl::TableCtrlWord::TrPadTop:
+            if (arg >= 0) _currentRow.rowTopPadding = arg;
+            break;
+
+        case RtfControl::TableCtrlWord::TrPadBottom:
+            if (arg >= 0) _currentRow.rowBottomPadding = arg;
+            break;
+
+        case RtfControl::TableCtrlWord::TrAlignLeft:
+            _currentRow.tableAlignment = 0;
+            break;
+
+        case RtfControl::TableCtrlWord::TrAlignCenter:
+            _currentRow.tableAlignment = 1;
+            break;
+
+        case RtfControl::TableCtrlWord::TrAlignRight:
+            _currentRow.tableAlignment = 2;
+            break;
+
+        case RtfControl::TableCtrlWord::TrLeft:
+            if (arg >= 0) _currentRow.tableLeftPosition = arg;
+            break;
+
+        case RtfControl::TableCtrlWord::TrWidth:
+            if (arg >= 0) _currentRow.tableWidth = arg;
+            break;
+
+        case RtfControl::TableCtrlWord::TrBorderLeft:
+            beginRowBorderSide(0);
+            break;
+
+        case RtfControl::TableCtrlWord::TrBorderTop:
+            beginRowBorderSide(1);
+            break;
+
+        case RtfControl::TableCtrlWord::TrBorderRight:
+            beginRowBorderSide(2);
+            break;
+
+        case RtfControl::TableCtrlWord::TrBorderBottom:
+            beginRowBorderSide(3);
+            break;
         }
     }
 
     void applyPendingBorder() {
         if (_pendingBorderSide < 0) return;
-        auto& borders = _currentCellFormat.borders;
+        auto& borders = _pendingBorderIsRow ? _currentRow.rowBorders : _currentCellFormat.borders;
+        int style = _pendingBorderStyle;
+        if (style == 0 && _pendingBorderWidth > 0) style = 1;
         switch (_pendingBorderSide) {
             case 0:
                 borders.leftWidth = _pendingBorderWidth;
                 borders.leftColor = _pendingBorderColor;
+                borders.leftStyle = static_cast<BorderStyle>(style);
                 break;
             case 1:
                 borders.topWidth = _pendingBorderWidth;
                 borders.topColor = _pendingBorderColor;
+                borders.topStyle = static_cast<BorderStyle>(style);
                 break;
             case 2:
                 borders.rightWidth = _pendingBorderWidth;
                 borders.rightColor = _pendingBorderColor;
+                borders.rightStyle = static_cast<BorderStyle>(style);
                 break;
             case 3:
                 borders.bottomWidth = _pendingBorderWidth;
                 borders.bottomColor = _pendingBorderColor;
+                borders.bottomStyle = static_cast<BorderStyle>(style);
                 break;
         }
         resetPendingBorder();
@@ -429,6 +513,7 @@ private:
         _pendingBorderStyle = 0;
         _pendingBorderWidth = 0;
         _pendingBorderColor = 0;
+        _pendingBorderIsRow = false;
     }
 
     void beginBorderSide(int side) {
@@ -437,6 +522,16 @@ private:
         _pendingBorderStyle = 0;
         _pendingBorderWidth = 0;
         _pendingBorderColor = 0;
+        _pendingBorderIsRow = false;
+    }
+
+    void beginRowBorderSide(int side) {
+        applyPendingBorder();
+        _pendingBorderSide = side;
+        _pendingBorderStyle = 0;
+        _pendingBorderWidth = 0;
+        _pendingBorderColor = 0;
+        _pendingBorderIsRow = true;
     }
 
     void addCurrentCellToRow() {
@@ -566,6 +661,7 @@ private:
     int _pendingBorderStyle = 0;
     int _pendingBorderWidth = 0;
     int _pendingBorderColor = 0;
+    bool _pendingBorderIsRow = false;
 
     void parse() {
         while (_pos < _len) {

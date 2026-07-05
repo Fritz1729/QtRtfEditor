@@ -147,6 +147,19 @@ private slots:
     void TableOrderingParagraphTableParagraph();
     void TableOrderingPTPTP();
 
+    // Table padding
+    void DifferentCellPadding();
+    void DifferentRowPadding();
+    void SemanticPaddingCellVsRow();
+
+    // Table alignment
+    void DifferentTableAlignment();
+
+    // Row borders vs cell borders
+    void RowBorderVsCellBorderSame();
+    void RowBorderVsCellBorderDifferent();
+    void DifferentBorderStyle();
+
     void cleanupTestCase();
 
 private:
@@ -801,6 +814,65 @@ void TestSemanticComparison::TableOrderingPTPTP() {
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[2]));
     QVERIFY(std::holds_alternative<RtfTableRowEntry>(doc.elements[3]));
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[4]));
+}
+
+void TestSemanticComparison::DifferentCellPadding() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clpadl100 \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clpadl200 \intbl A\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentRowPadding() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \trpaddl100 \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \trpaddl200 \intbl A\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::SemanticPaddingCellVsRow() {
+    // Same effective padding: cell-level vs row-level
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \trpaddl100 \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clpadl100 \intbl A\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QVERIFY(reason.empty());
+}
+
+void TestSemanticComparison::DifferentTableAlignment() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \trql \cellx2000 \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \trqc \cellx2000 \intbl A\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::RowBorderVsCellBorderSame() {
+    // Row border and cell border produce same effective border
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \trbrdrl\brdrs\brdrw10 \cellx2000 \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clbrdrl\brdrs\brdrw10 \intbl A\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QVERIFY(reason.empty());
+}
+
+void TestSemanticComparison::RowBorderVsCellBorderDifferent() {
+    // Row border vs different cell border
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \trbrdrl\brdrs\brdrw10 \cellx2000 \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clbrdrl\brdrs\brdrw20 \intbl A\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentBorderStyle() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clbrdrl\brdrs\brdrw10 \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clbrdrl\brdrd\brdrw10 \intbl A\cell \row}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
 }
 
 void TestSemanticComparison::cleanupTestCase() {

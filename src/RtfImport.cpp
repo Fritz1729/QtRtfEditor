@@ -1,7 +1,9 @@
 #include "RtfImport.h"
 
 #include "RtfParser.h"
+#include "RtfTypes.h"
 
+#include <algorithm>
 #include <QTextDocument>
 #include <QTextCursor>
 #include <QTextCharFormat>
@@ -216,7 +218,7 @@ static void BuildImage(QTextCursor& cursor, const RtfImage& img,
 }
 
 static void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEntry*>& tableRows,
-                            const RtfDocument& doc, const QFont& defaultFont) {
+                             const RtfDocument& doc, const QFont& defaultFont) {
     if (tableRows.empty()) return;
 
     // Use first row's cellxPositions for column widths
@@ -229,8 +231,15 @@ static void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEnt
 
     QTextTableFormat tableFmt;
     tableFmt.setBorderStyle(QTextFrameFormat::BorderStyle_None);
-    tableFmt.setCellPadding(2);
     tableFmt.setCellSpacing(0);
+
+    // Table alignment from first row
+    {
+        int align = tableRows[0]->tableAlignment;
+        if (align == 1) tableFmt.setAlignment(Qt::AlignHCenter);
+        else if (align == 2) tableFmt.setAlignment(Qt::AlignRight);
+        else tableFmt.setAlignment(Qt::AlignLeft);
+    }
 
     // Set column widths from \cellx positions
     QVector<QTextLength> constraints;
@@ -243,6 +252,50 @@ static void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEnt
     tableFmt.setColumnWidthConstraints(constraints);
 
     QTextTable* qtTable = cursor.insertTable(rowCount, colCount, tableFmt);
+
+    auto resolveBorderColor = [&](int colorIdx) -> QColor {
+        if (colorIdx > 0 && colorIdx < static_cast<int>(doc.colors.size())) {
+            const auto& col = doc.colors[colorIdx];
+            return QColor(col.red, col.green, col.blue);
+        }
+        return QColor();
+    };
+
+    auto applyBorderToCellFormat = [&](QTextTableCellFormat& cellFmt, int side,
+                                         int width, BorderStyle style, int colorIdx) {
+        if (width <= 0) return;
+        double borderPt = width / 2.0;
+        QTextFrameFormat::BorderStyle qtStyle = QTextFrameFormat::BorderStyle_None;
+        switch (style) {
+            case BorderStyle::Dashed: qtStyle = QTextFrameFormat::BorderStyle_Dashed; break;
+            case BorderStyle::Solid: qtStyle = QTextFrameFormat::BorderStyle_Solid; break;
+            default: return;
+        }
+        QColor color = resolveBorderColor(colorIdx);
+
+        switch (side) {
+            case 0:
+                cellFmt.setLeftBorder(borderPt);
+                cellFmt.setLeftBorderStyle(qtStyle);
+                if (color.isValid()) cellFmt.setLeftBorderBrush(color);
+                break;
+            case 1:
+                cellFmt.setTopBorder(borderPt);
+                cellFmt.setTopBorderStyle(qtStyle);
+                if (color.isValid()) cellFmt.setTopBorderBrush(color);
+                break;
+            case 2:
+                cellFmt.setRightBorder(borderPt);
+                cellFmt.setRightBorderStyle(qtStyle);
+                if (color.isValid()) cellFmt.setRightBorderBrush(color);
+                break;
+            case 3:
+                cellFmt.setBottomBorder(borderPt);
+                cellFmt.setBottomBorderStyle(qtStyle);
+                if (color.isValid()) cellFmt.setBottomBorderBrush(color);
+                break;
+        }
+    };
 
     for (int r = 0; r < rowCount; ++r) {
         const auto& rowEntry = tableRows[r];
@@ -258,7 +311,54 @@ static void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEnt
                     case 2: cellFmt.setVerticalAlignment(QTextCharFormat::AlignBottom); break;
                     default: cellFmt.setVerticalAlignment(QTextCharFormat::AlignTop); break;
                 }
+
+                // Apply padding — cell padding takes precedence, fall back to row padding
+                auto effectivePadding = [](int cellPad, int rowPad) -> double {
+                    return (cellPad > 0 || rowPad > 0) ? std::max(cellPad, rowPad) / 2.0 : 0.0;
+                };
+                if (cellData.leftPadding > 0 || rowEntry->rowLeftPadding > 0)
+                    cellFmt.setLeftPadding(effectivePadding(cellData.leftPadding, rowEntry->rowLeftPadding));
+                if (cellData.rightPadding > 0 || rowEntry->rowRightPadding > 0)
+                    cellFmt.setRightPadding(effectivePadding(cellData.rightPadding, rowEntry->rowRightPadding));
+                if (cellData.topPadding > 0 || rowEntry->rowTopPadding > 0)
+                    cellFmt.setTopPadding(effectivePadding(cellData.topPadding, rowEntry->rowTopPadding));
+                if (cellData.bottomPadding > 0 || rowEntry->rowBottomPadding > 0)
+                    cellFmt.setBottomPadding(effectivePadding(cellData.bottomPadding, rowEntry->rowBottomPadding));
+
+                // Apply cell borders
+                const auto& borders = cellData.borders;
+                // For each side, use cell border; if not set, inherit from row borders
+                for (int side = 0; side < 4; ++side) {
+                    int w, ci;
+                    BorderStyle s;
+                    switch (side) {
+                        case 0: w = borders.leftWidth; ci = borders.leftColor; s = borders.leftStyle; break;
+                        case 1: w = borders.topWidth; ci = borders.topColor; s = borders.topStyle; break;
+                        case 2: w = borders.rightWidth; ci = borders.rightColor; s = borders.rightStyle; break;
+                        default: w = borders.bottomWidth; ci = borders.bottomColor; s = borders.bottomStyle; break;
+                    }
+                    if (w <= 0 && s == BorderStyle::None) {
+                        // No cell border — try row border
+                        const auto& rb = rowEntry->rowBorders;
+                        switch (side) {
+                            case 0: applyBorderToCellFormat(cellFmt, side, rb.leftWidth, rb.leftStyle, rb.leftColor); break;
+                            case 1: applyBorderToCellFormat(cellFmt, side, rb.topWidth, rb.topStyle, rb.topColor); break;
+                            case 2: applyBorderToCellFormat(cellFmt, side, rb.rightWidth, rb.rightStyle, rb.rightColor); break;
+                            default: applyBorderToCellFormat(cellFmt, side, rb.bottomWidth, rb.bottomStyle, rb.bottomColor); break;
+                        }
+                    } else {
+                        applyBorderToCellFormat(cellFmt, side, w, s, ci);
+                    }
+                }
+
                 InsertRuns(cellCursor, runs, doc, defaultFont);
+            } else {
+                // Empty cell — apply row borders
+                const auto& rb = rowEntry->rowBorders;
+                applyBorderToCellFormat(cellFmt, 0, rb.leftWidth, rb.leftStyle, rb.leftColor);
+                applyBorderToCellFormat(cellFmt, 1, rb.topWidth, rb.topStyle, rb.topColor);
+                applyBorderToCellFormat(cellFmt, 2, rb.rightWidth, rb.rightStyle, rb.rightColor);
+                applyBorderToCellFormat(cellFmt, 3, rb.bottomWidth, rb.bottomStyle, rb.bottomColor);
             }
             cell.setFormat(cellFmt);
         }

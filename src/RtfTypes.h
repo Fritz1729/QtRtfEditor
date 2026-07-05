@@ -91,6 +91,12 @@ struct ParagraphFormatting {
     std::vector<TabStop> tabStops;
 };
 
+enum class BorderStyle : uint8_t {
+    None = 0,
+    Solid = 1,
+    Dashed = 2,
+};
+
 struct TableCellBorders {
     int leftWidth = 0;
     int topWidth = 0;
@@ -100,6 +106,10 @@ struct TableCellBorders {
     int topColor = 0;
     int rightColor = 0;
     int bottomColor = 0;
+    BorderStyle leftStyle = BorderStyle::None;
+    BorderStyle topStyle = BorderStyle::None;
+    BorderStyle rightStyle = BorderStyle::None;
+    BorderStyle bottomStyle = BorderStyle::None;
 
     bool operator==(const TableCellBorders& other) const = default;
 };
@@ -109,6 +119,10 @@ struct TableCellFormat {
     int vertAlign = 0;
     int shadingColor = -1;
     TableCellBorders borders;
+    int topPadding = 0;
+    int leftPadding = 0;
+    int rightPadding = 0;
+    int bottomPadding = 0;
 
     bool operator==(const TableCellFormat& other) const = default;
 };
@@ -116,6 +130,14 @@ struct TableCellFormat {
 struct RtfTableRowEntry {
     std::vector<int> cellxPositions;
     std::vector<std::pair<std::vector<RtfRun>, TableCellFormat>> cells;
+    TableCellBorders rowBorders;
+    int rowLeftPadding = 0;
+    int rowRightPadding = 0;
+    int rowTopPadding = 0;
+    int rowBottomPadding = 0;
+    int tableAlignment = 0;
+    int tableLeftPosition = 0;
+    int tableWidth = 0;
 
     bool operator==(const RtfTableRowEntry& other) const = default;
 };

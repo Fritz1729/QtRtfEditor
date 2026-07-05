@@ -46,7 +46,11 @@ color table (RGB), font table (family name, charset)
 
 ### Layout tables
 
-**Partial** — rows, cells, column widths, vertical alignment; cell shading, per-side borders, and merged cells are parsed but not rendered
+Rows, cells, column widths, vertical alignment, per-side borders (solid/dashed, width, color), cell padding, row padding, table alignment (left/center/right), row-level borders
+
+### Layout tables (partial)
+
+Cell shading (`\clshdn`) and merged cells (`\clmrg`) are parsed but not rendered — no Qt equivalent
 
 ### Embedded images
 
@@ -58,7 +62,7 @@ BMP, PNG, JPEG via `\pict`
 
 - **Highlight** (`\highlightN`) — no reliable RGB mapping per RTF spec
 - **Double underline** (`\uldb`) — Qt has no double-underline variant
-- **Cell shading & per-side borders** (`\clshdn`, `\clbrdrl`/`\brdrs`/`\brdrw`/`\brdrcf`) — parsed but not applied in import (no Qt API)
+- **Cell shading** (`\clshdn`) — Qt has no cell-level background API
 - **Merged cells** (`\clmrg`) — out of scope
 - **Line-spacing multiplier** (`\slmultN`) — Qt only supports fixed height
 - **Positional superscript/subscript** (`\upN`/`\dnN`) — Qt only supports toggle

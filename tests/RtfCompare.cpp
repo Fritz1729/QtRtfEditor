@@ -78,8 +78,32 @@ static bool CompareBoolField(size_t paraIdx, size_t runIdx, const char* name,
     return false;
 }
 
+static TableCellBorders NormalizeCellBorders(const TableCellBorders& cellBorders, const TableCellBorders& rowBorders) {
+    TableCellBorders normalized = cellBorders;
+    auto fillFromRow = [&](int& cellVal, int& cellColor, BorderStyle& cellStyle, int rowVal, int rowColor, BorderStyle rowStyle) {
+        if (cellVal <= 0 && cellStyle == BorderStyle::None) {
+            cellVal = rowVal;
+            cellColor = rowColor;
+            cellStyle = rowStyle;
+        }
+    };
+    fillFromRow(normalized.leftWidth, normalized.leftColor, normalized.leftStyle,
+                rowBorders.leftWidth, rowBorders.leftColor, rowBorders.leftStyle);
+    fillFromRow(normalized.topWidth, normalized.topColor, normalized.topStyle,
+                rowBorders.topWidth, rowBorders.topColor, rowBorders.topStyle);
+    fillFromRow(normalized.rightWidth, normalized.rightColor, normalized.rightStyle,
+                rowBorders.rightWidth, rowBorders.rightColor, rowBorders.rightStyle);
+    fillFromRow(normalized.bottomWidth, normalized.bottomColor, normalized.bottomStyle,
+                rowBorders.bottomWidth, rowBorders.bottomColor, rowBorders.bottomStyle);
+    return normalized;
+}
+
+static int EffectiveCellPadding(int cellPad, int rowPad) {
+    return (cellPad > 0 || rowPad > 0) ? std::max(cellPad, rowPad) : 0;
+}
+
 RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
-                               std::string& reason) {
+                                std::string& reason) {
     // Check for unknown tags
     if (!a.unknownTags.empty()) {
         reason = "Unknown tag in input: " + a.unknownTags.back();
@@ -176,6 +200,20 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
                 return RtfCompareResult::StructuralDiff;
             }
 
+            // Compare table alignment
+            {
+                int alignA = rowCountA > 0 ?
+                    std::get<RtfTableRowEntry>(a.elements[tablesA[tableIdxA].startIdx]).tableAlignment : 0;
+                int alignB = rowCountB > 0 ?
+                    std::get<RtfTableRowEntry>(b.elements[tablesB[tableIdxB].startIdx]).tableAlignment : 0;
+                if (alignA != alignB) {
+                    reason = "Table " + std::to_string(tableIdxA) +
+                             " alignment: " + std::to_string(alignA) +
+                             " vs " + std::to_string(alignB);
+                    return RtfCompareResult::StructuralDiff;
+                }
+            }
+
             // Compare rows
             for (size_t ri = 0; ri < rowCountA; ++ri) {
                 const auto& rowA = std::get<RtfTableRowEntry>(a.elements[tablesA[tableIdxA].startIdx + ri]);
@@ -225,12 +263,50 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
                                  " vs " + std::to_string(fmtB.vertAlign);
                         return RtfCompareResult::StructuralDiff;
                     }
-                    if (fmtA.borders != fmtB.borders) {
-                        reason = "Table " + std::to_string(tableIdxA) +
-                                 " row " + std::to_string(ri) +
-                                 " cell " + std::to_string(ci) + " borders differ";
-                        return RtfCompareResult::StructuralDiff;
+
+                    // Normalize borders: merge row borders into cell borders for comparison
+                    {
+                        TableCellBorders normA = NormalizeCellBorders(fmtA.borders, rowA.rowBorders);
+                        TableCellBorders normB = NormalizeCellBorders(fmtB.borders, rowB.rowBorders);
+                        if (normA != normB) {
+                            reason = "Table " + std::to_string(tableIdxA) +
+                                     " row " + std::to_string(ri) +
+                                     " cell " + std::to_string(ci) + " borders differ";
+                            return RtfCompareResult::StructuralDiff;
+                        }
                     }
+
+                    // Compare effective padding
+                    {
+                        auto effPad = [&]() {
+                            struct Pad { int top, left, right, bottom; };
+                            return Pad{
+                                EffectiveCellPadding(fmtA.topPadding, rowA.rowTopPadding),
+                                EffectiveCellPadding(fmtA.leftPadding, rowA.rowLeftPadding),
+                                EffectiveCellPadding(fmtA.rightPadding, rowA.rowRightPadding),
+                                EffectiveCellPadding(fmtA.bottomPadding, rowA.rowBottomPadding)
+                            };
+                        };
+                        auto padA = effPad();
+                        auto effPadB = [&]() {
+                            struct Pad { int top, left, right, bottom; };
+                            return Pad{
+                                EffectiveCellPadding(fmtB.topPadding, rowB.rowTopPadding),
+                                EffectiveCellPadding(fmtB.leftPadding, rowB.rowLeftPadding),
+                                EffectiveCellPadding(fmtB.rightPadding, rowB.rowRightPadding),
+                                EffectiveCellPadding(fmtB.bottomPadding, rowB.rowBottomPadding)
+                            };
+                        };
+                        auto padB = effPadB();
+                        if (padA.top != padB.top || padA.left != padB.left ||
+                            padA.right != padB.right || padA.bottom != padB.bottom) {
+                            reason = "Table " + std::to_string(tableIdxA) +
+                                     " row " + std::to_string(ri) +
+                                     " cell " + std::to_string(ci) + " padding differs";
+                            return RtfCompareResult::StructuralDiff;
+                        }
+                    }
+
                     if (fmtA.shadingColor != fmtB.shadingColor) {
                         reason = "Table " + std::to_string(tableIdxA) +
                                  " row " + std::to_string(ri) +

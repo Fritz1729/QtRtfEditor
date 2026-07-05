@@ -502,18 +502,178 @@ std::string ExportRtf(const QTextDocument& document) {
                 cellxPositions.push_back(cumulative);
             }
 
+            // Collect border colors from all cells
+            {
+                for (int r = 0; r < rowCount; ++r) {
+                    for (int c = 0; c < colCount; ++c) {
+                        QTextTableCell cell = table->cellAt(r, c);
+                        if (!cell.isValid()) continue;
+                        QTextTableCellFormat cf(cell.format().toTableCellFormat());
+                        auto tryCollect = [&](const QBrush& brush) {
+                            if (brush.style() != Qt::NoBrush && brush.color().isValid()) {
+                                QColor col = brush.color();
+                                if (col.alpha() == 255 && FindColorIndex(colorList, col) < 0)
+                                    colorList.push_back(col);
+                            }
+                        };
+                        tryCollect(cf.leftBorderBrush());
+                        tryCollect(cf.topBorderBrush());
+                        tryCollect(cf.rightBorderBrush());
+                        tryCollect(cf.bottomBorderBrush());
+                    }
+                }
+            }
+
+            struct CellBorderInfo {
+                double width = 0;
+                QTextFrameFormat::BorderStyle style = QTextFrameFormat::BorderStyle_None;
+                int colorIdx = 0;
+                bool operator==(const CellBorderInfo& other) const {
+                    return width == other.width && style == other.style && colorIdx == other.colorIdx;
+                }
+                bool operator!=(const CellBorderInfo& other) const {
+                    return !(*this == other);
+                }
+            };
+
+            auto readCellBorder = [&](const QTextTableCellFormat& cf, int side) -> CellBorderInfo {
+                CellBorderInfo bi{};
+                switch (side) {
+                    case 0:
+                        bi.width = cf.leftBorder();
+                        bi.style = cf.leftBorderStyle();
+                        if (cf.leftBorderBrush().style() != Qt::NoBrush)
+                            bi.colorIdx = FindColorIndex(colorList, cf.leftBorderBrush().color()) + 1;
+                        break;
+                    case 1:
+                        bi.width = cf.topBorder();
+                        bi.style = cf.topBorderStyle();
+                        if (cf.topBorderBrush().style() != Qt::NoBrush)
+                            bi.colorIdx = FindColorIndex(colorList, cf.topBorderBrush().color()) + 1;
+                        break;
+                    case 2:
+                        bi.width = cf.rightBorder();
+                        bi.style = cf.rightBorderStyle();
+                        if (cf.rightBorderBrush().style() != Qt::NoBrush)
+                            bi.colorIdx = FindColorIndex(colorList, cf.rightBorderBrush().color()) + 1;
+                        break;
+                    default:
+                        bi.width = cf.bottomBorder();
+                        bi.style = cf.bottomBorderStyle();
+                        if (cf.bottomBorderBrush().style() != Qt::NoBrush)
+                            bi.colorIdx = FindColorIndex(colorList, cf.bottomBorderBrush().color()) + 1;
+                        break;
+                }
+                return bi;
+            };
+
+            auto emitBorderSpec = [&](std::ostringstream& ostr, double width, QTextFrameFormat::BorderStyle style, int colorIdx) {
+                if (width <= 0.0) return;
+                int halfPts = static_cast<int>(width * 2.0 + 0.5);
+                switch (style) {
+                    case QTextFrameFormat::BorderStyle_Solid:  ostr << "\\brdrs"; break;
+                    case QTextFrameFormat::BorderStyle_Dashed:  ostr << "\\brdrd"; break;
+                    default: return;
+                }
+                ostr << "\\brdrw" << halfPts;
+                if (colorIdx > 0) ostr << "\\brdrcf" << colorIdx;
+            };
+
+            auto emitCellBorderSide = [&](std::ostringstream& ostr, const char* sideTag, double width, QTextFrameFormat::BorderStyle style, int colorIdx) {
+                if (width <= 0.0) return;
+                ostr << sideTag;
+                emitBorderSpec(ostr, width, style, colorIdx);
+            };
+
+            auto emitRowBorderSide = [&](std::ostringstream& ostr, const char* sideTag, double width, QTextFrameFormat::BorderStyle style, int colorIdx) {
+                if (width <= 0.0) return;
+                ostr << sideTag;
+                emitBorderSpec(ostr, width, style, colorIdx);
+            };
+
             for (int r = 0; r < rowCount; ++r) {
                 out << "{\\trowd ";
                 for (int pos : cellxPositions) {
                     out << "\\cellx" << pos;
                 }
+
+                // Table alignment (only on first row)
+                if (r == 0) {
+                    Qt::Alignment tAlign = tableFmt.alignment();
+                    if (tAlign & Qt::AlignHCenter) out << "\\trqc";
+                    else if (tAlign & Qt::AlignRight) out << "\\trqr";
+                    else out << "\\trql";
+                }
+
                 out << "\n";
+
+                // Pre-read all cell border info for this row to detect uniform sides
+                std::vector<std::array<CellBorderInfo, 4>> rowCellBorders(colCount);
+
+                for (int c = 0; c < colCount; ++c) {
+                    QTextTableCell cell = table->cellAt(r, c);
+                    if (cell.isValid()) {
+                        QTextTableCellFormat cf(cell.format().toTableCellFormat());
+                        for (int side = 0; side < 4; ++side) {
+                            rowCellBorders[c][side] = readCellBorder(cf, side);
+                        }
+                    }
+                }
+
+                // Determine which sides have uniform borders across all cells
+                bool uniformSide[4] = {true, true, true, true};
+                CellBorderInfo uniformBorder[4]{};
+                for (int side = 0; side < 4; ++side) {
+                    uniformBorder[side] = rowCellBorders[0][side];
+                    for (int c = 1; c < colCount; ++c) {
+                        if (rowCellBorders[c][side] != uniformBorder[side]) {
+                            uniformSide[side] = false;
+                            break;
+                        }
+                    }
+                    // Not uniform if no border (we don't emit \trbrdrl\brdrn)
+                    if (uniformBorder[side].width <= 0.0) uniformSide[side] = false;
+                }
+
+                // Emit row-level borders for uniform sides
+                if (uniformSide[0]) emitRowBorderSide(out, "\\trbrdrl", uniformBorder[0].width, uniformBorder[0].style, uniformBorder[0].colorIdx);
+                if (uniformSide[1]) emitRowBorderSide(out, "\\trbrdrt", uniformBorder[1].width, uniformBorder[1].style, uniformBorder[1].colorIdx);
+                if (uniformSide[2]) emitRowBorderSide(out, "\\trbrdrr", uniformBorder[2].width, uniformBorder[2].style, uniformBorder[2].colorIdx);
+                if (uniformSide[3]) emitRowBorderSide(out, "\\trbrdrb", uniformBorder[3].width, uniformBorder[3].style, uniformBorder[3].colorIdx);
 
                 for (int c = 0; c < colCount; ++c) {
                     QTextTableCell cell = table->cellAt(r, c);
                     if (!cell.isValid()) {
                         out << "\\intbl \\cell";
                         continue;
+                    }
+
+                    QTextTableCellFormat cf(cell.format().toTableCellFormat());
+
+                    // Emit cell padding
+                    auto emitIfPositive = [&](double val, const char* tag) {
+                        if (val > 0) {
+                            int halfPts = static_cast<int>(val * 2.0 + 0.5);
+                            out << "\\" << tag << halfPts;
+                        }
+                    };
+                    emitIfPositive(cf.leftPadding(), "clpadl");
+                    emitIfPositive(cf.rightPadding(), "clpadr");
+                    emitIfPositive(cf.topPadding(), "clpadt");
+                    emitIfPositive(cf.bottomPadding(), "clpadb");
+
+                    // Emit cell borders (skip sides that are emitted as row borders)
+                    for (int side = 0; side < 4; ++side) {
+                        if (uniformSide[side]) continue;
+                        const char* sideTag = "";
+                        switch (side) {
+                            case 0: sideTag = "\\clbrdrl"; break;
+                            case 1: sideTag = "\\clbrdrt"; break;
+                            case 2: sideTag = "\\clbrdrr"; break;
+                            default: sideTag = "\\clbrdrb"; break;
+                        }
+                        auto& bi = rowCellBorders[c][side];
+                        emitCellBorderSide(out, sideTag, bi.width, bi.style, bi.colorIdx);
                     }
 
                     // Iterate over blocks within the cell

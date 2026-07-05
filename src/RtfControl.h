@@ -53,6 +53,12 @@ struct RtfControl {
         ClShading, ClVertAlignTop, ClVertAlignCenter, ClVertAlignBottom,
         ClBorderLeft, ClBorderTop, ClBorderRight, ClBorderBottom,
         BrdrSolid, BrdrWidth, BrdrColor, ClMerge,
+        BrdrNone, BrdrDashed,
+        ClPadLeft, ClPadRight, ClPadTop, ClPadBottom,
+        TrPadLeft, TrPadRight, TrPadTop, TrPadBottom,
+        TrAlignLeft, TrAlignCenter, TrAlignRight,
+        TrLeft, TrWidth,
+        TrBorderLeft, TrBorderTop, TrBorderRight, TrBorderBottom,
     };
 
     Action action;
@@ -72,7 +78,7 @@ struct RtfControl {
     Value value;
 };
 
-constexpr std::size_t kRtfControlTableSize = 118;
+constexpr std::size_t kRtfControlTableSize = 137;
 
 extern const std::array<RtfControl, kRtfControlTableSize> rtfControlTable;
 
