@@ -3,8 +3,8 @@
 #include "RtfExport.h"
 #include "RtfImport.h"
 
-#include <QMessageBox>
-#include <algorithm>
+#include <QTextBlock>
+#include <QTextCursor>
 
 namespace Rte {
 
@@ -26,7 +26,6 @@ void RichTextEdit::Load(const std::string& blob, FormatMode mode) {
             LoadHtml(blob);
             break;
     }
-    UpdateProtection();
 }
 
 std::string RichTextEdit::Save(FormatMode mode) const {
@@ -39,118 +38,102 @@ std::string RichTextEdit::Save(FormatMode mode) const {
     return {};
 }
 
-void RichTextEdit::SetProtection(std::size_t start, std::size_t end,
-                                 std::string type, std::string target)
-{
-    SetProtection({ start, end, std::move(type), std::move(target) });
-}
+void RichTextEdit::SetProtection(std::size_t start, std::size_t end) {
+    if (start >= end) return;
 
-void RichTextEdit::SetProtection(const ProtectedRangeInfo& info) {
-    // Overwrite any existing range at the same start
-    auto it = std::find_if(_protection.begin(), _protection.end(),
-        [&info](const ProtectedRangeInfo& p) {
-            return p.start == info.start;
-        });
+    // Set user property on the range (best effort — used for RTF export)
+    QTextCursor cursor(document());
+    cursor.setPosition(static_cast<int>(start));
+    cursor.setPosition(static_cast<int>(end), QTextCursor::KeepAnchor);
+    QTextCharFormat fmt;
+    fmt.setProperty(UserPropProtect, true);
+    cursor.mergeCharFormat(fmt);
 
-    if (it != _protection.end()) {
-        _protection.erase(it);
-    }
-
-    _protection.push_back(info);
-
-    // Sort by start position
-    std::sort(_protection.begin(), _protection.end(),
-        [](const ProtectedRangeInfo& a, const ProtectedRangeInfo& b) {
-            return a.start < b.start;
-        });
+    _protectedRanges.emplace_back(start, end);
 }
 
 void RichTextEdit::ClearProtection() {
-    _protection.clear();
+    QTextCursor cursor(document());
+    cursor.select(QTextCursor::Document);
+
+    QTextCharFormat fmt;
+    fmt.setProperty(UserPropProtect, false);
+    cursor.mergeCharFormat(fmt);
+
+    _protectedRanges.clear();
 }
 
-void RichTextEdit::CheckProtection(const QTextCursor& cursor,
-                                    bool& allowed) const
-{
-    allowed = true;
-
-    if (_protectionPolicy == ProtectionPolicy::None) {
-        return;
+bool RichTextEdit::IsProtected(std::size_t position) const {
+    for (const auto& [start, end] : _protectedRanges) {
+        if (position >= start && position < end) {
+            return true;
+        }
     }
+    return false;
+}
 
-    if (!cursor.hasSelection()) {
-        return;
-    }
+void RichTextEdit::SyncProtectedRanges() {
+    _protectedRanges.clear();
 
-    std::size_t start = static_cast<std::size_t>(cursor.selectionStart());
-    std::size_t end = static_cast<std::size_t>(cursor.selectionEnd());
+    int docLen = document()->characterCount();
+    if (docLen == 0) return;
 
-    for (const auto& p : _protection) {
-        if (start < p.end && end > p.start) {
-            if (_protectionPolicy == ProtectionPolicy::Block) {
-                allowed = false;
-                return;
-            }
+    std::size_t runStart = 0;
+    bool inProtected = false;
 
-            if (_protectionViolationHandler) {
-                allowed = _protectionViolationHandler(p, cursor);
+    auto checkPos = [docLen, this](std::size_t pos) -> bool {
+        if (pos >= static_cast<std::size_t>(docLen)) return false;
+        QTextCursor cursor(document());
+        cursor.setPosition(static_cast<int>(pos));
+        return cursor.charFormat().property(UserPropProtect).toBool();
+    };
+
+    for (int i = 0; i <= docLen; ++i) {
+        bool protected_ = (i < docLen) && checkPos(static_cast<std::size_t>(i));
+        if (protected_ != inProtected) {
+            if (inProtected) {
+                _protectedRanges.emplace_back(runStart, static_cast<std::size_t>(i));
             } else {
-                QMessageBox msgBox;
-                msgBox.setIcon(QMessageBox::Warning);
-                msgBox.setWindowTitle("Protected Text");
-                msgBox.setText(QString("The selected area contains a "
-                                       "protected reference (%1).")
-                                   .arg(QString::fromStdString(p.type)));
-                msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No
-                                          | QMessageBox::Cancel);
-                int result = msgBox.exec();
-                allowed = (result == QMessageBox::Yes);
+                runStart = static_cast<std::size_t>(i);
             }
-            if (!allowed) {
-                return;
-            }
+            inProtected = protected_;
         }
     }
 }
 
-bool RichTextEdit::IsProtected(std::size_t position) const {
-    return PositionInProtection(position);
-}
-
-std::vector<ProtectedRangeInfo> RichTextEdit::AllProtection() const {
-    return _protection;
-}
-
-void RichTextEdit::SetProtectionPolicy(ProtectionPolicy policy) {
-    _protectionPolicy = policy;
-}
-
-ProtectionPolicy RichTextEdit::GetProtectionPolicy() const {
-    return _protectionPolicy;
-}
-
-void RichTextEdit::SetProtectionViolationHandler(
-    ProtectionViolationHandler handler)
-{
-    _protectionViolationHandler = std::move(handler);
-}
-
-const ProtectionViolationHandler&
-RichTextEdit::GetProtectionViolationHandler() const
-{
-    return _protectionViolationHandler;
-}
-
 void RichTextEdit::keyPressEvent(QKeyEvent* event) {
-    bool allowed = true;
     QTextCursor cursor = textCursor();
+    int pos = cursor.position();
 
-    if (event->key() == Qt::Key_Backspace ||
-        event->key() == Qt::Key_Delete)
-    {
+    if (event->key() == Qt::Key_Backspace) {
         if (cursor.hasSelection()) {
-            CheckProtection(cursor, allowed);
-            if (!allowed) {
+            int selStart = cursor.selectionStart();
+            int selEnd = cursor.selectionEnd();
+            for (int i = selStart; i < selEnd; ++i) {
+                if (IsProtected(static_cast<std::size_t>(i))) {
+                    event->ignore();
+                    return;
+                }
+            }
+        } else if (pos > 0 && IsProtected(static_cast<std::size_t>(pos - 1))) {
+            event->ignore();
+            return;
+        }
+    } else if (event->key() == Qt::Key_Delete) {
+        if (cursor.hasSelection()) {
+            int selStart = cursor.selectionStart();
+            int selEnd = cursor.selectionEnd();
+            for (int i = selStart; i < selEnd; ++i) {
+                if (IsProtected(static_cast<std::size_t>(i))) {
+                    event->ignore();
+                    return;
+                }
+            }
+        } else {
+            int docLen = document()->characterCount();
+            if (IsProtected(static_cast<std::size_t>(pos)) ||
+                (pos < docLen - 1 && IsProtected(static_cast<std::size_t>(pos + 1))))
+            {
                 event->ignore();
                 return;
             }
@@ -158,31 +141,68 @@ void RichTextEdit::keyPressEvent(QKeyEvent* event) {
     }
 
     QTextEdit::keyPressEvent(event);
+    SyncProtectedRanges();
+    ClampCursor();
+}
+
+void RichTextEdit::mousePressEvent(QMouseEvent* event) {
+    QTextEdit::mousePressEvent(event);
+
+    int pos = textCursor().position();
+    if (IsProtected(static_cast<std::size_t>(pos))) {
+        int start = pos;
+        while (start > 0 && IsProtected(static_cast<std::size_t>(start - 1))) {
+            start--;
+        }
+        int end = pos;
+        int docLen = document()->characterCount();
+        while (end < docLen && IsProtected(static_cast<std::size_t>(end))) {
+            end++;
+        }
+
+        QTextCursor run(document());
+        run.setPosition(start);
+        run.setPosition(end, QTextCursor::KeepAnchor);
+
+        emit protectedRegionClicked(start, end, run.selectedText());
+    }
+
+    ClampCursor();
 }
 
 void RichTextEdit::insertFromMimeData(const QMimeData* source) {
-    bool allowed = true;
-    QTextCursor cursor = textCursor();
+    ClampCursor();
+    QTextEdit::insertFromMimeData(source);
+    SyncProtectedRanges();
+    ClampCursor();
+}
 
-    CheckProtection(cursor, allowed);
-    if (!allowed) {
+void RichTextEdit::ClampCursor() {
+    QTextCursor cursor = textCursor();
+    int pos = cursor.position();
+
+    if (!IsProtected(static_cast<std::size_t>(pos))) {
         return;
     }
 
-    QTextEdit::insertFromMimeData(source);
-}
-
-void RichTextEdit::CheckProtection(const QTextCursor& cursor, bool& allowed) {
-    const_cast<const RichTextEdit*>(this)->CheckProtection(cursor, allowed);
+    // Skip forward past the protected run
+    int docLen = document()->characterCount();
+    while (pos < docLen && IsProtected(static_cast<std::size_t>(pos))) {
+        pos++;
+    }
+    cursor.setPosition(pos);
+    setTextCursor(cursor);
 }
 
 void RichTextEdit::LoadRtf(const std::string& blob) {
     ImportRtf(document(), blob);
+    SyncProtectedRanges();
 }
 
 void RichTextEdit::LoadHtml(const std::string& blob) {
     setHtml(QString::fromUtf8(blob.data(),
-                              static_cast<int>(blob.size())));
+                                static_cast<int>(blob.size())));
+    _protectedRanges.clear();
 }
 
 std::string RichTextEdit::SerializeRtf() const {
@@ -191,27 +211,6 @@ std::string RichTextEdit::SerializeRtf() const {
 
 std::string RichTextEdit::SerializeHtml() const {
     return ExportHtml(*document());
-}
-
-bool RichTextEdit::PositionInProtection(std::size_t position) const {
-    for (const auto& p : _protection) {
-        if (position >= p.start && position < p.end) {
-            return true;
-        }
-    }
-    return false;
-}
-
-void RichTextEdit::UpdateProtection() {
-    std::size_t docLen = static_cast<std::size_t>(
-        document()->toPlainText().size());
-
-    _protection.erase(
-        std::remove_if(_protection.begin(), _protection.end(),
-            [docLen](const ProtectedRangeInfo& p) {
-                return p.start >= docLen;
-            }),
-        _protection.end());
 }
 
 } // namespace Rte

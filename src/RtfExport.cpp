@@ -56,6 +56,7 @@ static void WriteConditionalFormatOff(std::ostringstream& out, const RtfRunForma
     if (fmt.capitalization == Capitalization::AllCaps) out << "\\caps0" << space;
     if (fmt.capitalization == Capitalization::SmallCaps) out << "\\scaps0" << space;
     if (fmt.kerning) out << "\\kerning0" << space;
+    if (fmt.protected_) out << "\\protect0" << space;
 }
 
 static void WriteFormatOff(std::ostringstream& out, const RtfRunFormat& fmt, bool trailingSpace) {
@@ -385,7 +386,7 @@ std::string ExportRtf(const QTextDocument& document) {
                 itImg++;
             }
             if (inListGroup) out << '}';
-            out << "\\b0\\i0\\super0\\sub0\\cf0\\par\n";
+            out << "\\b0\\i0\\super0\\sub0\\cf0\\protect0\\par\n";
         } else {
             RtfRunFormat prev;
             bool firstRun = true;
@@ -433,6 +434,7 @@ std::string ExportRtf(const QTextDocument& document) {
                 cur.underlineStyle = EffectiveUnderlineStyle(charFmt);
                 cur.capitalization = toCapitalization(charFmt.fontCapitalization());
                 cur.kerning = charFmt.fontKerning();
+                cur.protected_ = charFmt.property(UserPropProtect).toBool();
                 {
                     qreal spacing = charFmt.fontLetterSpacing();
                     if (spacing > 0) {
@@ -462,6 +464,7 @@ std::string ExportRtf(const QTextDocument& document) {
                     if (cur.capitalization == Capitalization::SmallCaps) out << "\\scaps ";
                     if (cur.kerning) out << "\\kerning ";
                     if (cur.expnd != 0) out << "\\expnd" << cur.expnd << ' ';
+                    if (cur.protected_) out << "\\protect ";
                 }
 
                 out << RtfEscape(frag.text());
@@ -473,10 +476,10 @@ std::string ExportRtf(const QTextDocument& document) {
             if (!firstRun) {
                 WriteFormatOff(out, prev, false);
                 if (inListGroup) out << '}';
-                out << "\\b0\\i0\\super0\\sub0\\cf0\\par\n";
+                out << "\\b0\\i0\\super0\\sub0\\cf0\\protect0\\par\n";
             } else {
                 if (inListGroup) out << '}';
-                out << "\\b0\\i0\\super0\\sub0\\cf0\\par\n";
+                out << "\\b0\\i0\\super0\\sub0\\cf0\\protect0\\par\n";
             }
         }
     };

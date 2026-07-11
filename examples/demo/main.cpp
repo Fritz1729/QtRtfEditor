@@ -200,28 +200,13 @@ void DemoWindow::SetProtection() {
         return;
     }
 
-    bool ok;
-    QString type = QInputDialog::getText(
-        this, "Set Protection",
-        "Type (e.g., 'lexicon', 'person'):",
-        QLineEdit::Normal, "lexicon", &ok);
-    if (!ok || type.isEmpty()) return;
-
-    QString target = QInputDialog::getText(
-        this, "Set Protection",
-        "Target reference (e.g., 'entry:Example'):",
-        QLineEdit::Normal, "", &ok);
-    if (!ok) return;
-
     std::size_t start = static_cast<std::size_t>(
         cursor.selectionStart());
     std::size_t end = static_cast<std::size_t>(
         cursor.selectionEnd());
 
-    _editor.SetProtection(start, end, type.toStdString(),
-                          target.toStdString());
-    statusBar()->showMessage(
-        QString("Protection set: [%1] %2").arg(type).arg(target));
+    _editor.SetProtection(start, end);
+    statusBar()->showMessage("Protection set on selected text");
 }
 
 template<typename Fn>

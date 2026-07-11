@@ -93,6 +93,9 @@ private:
             case RtfControl::CharProp::Kerning:
                 _format.kerning = on;
                 break;
+            case RtfControl::CharProp::Protect:
+                _format.protected_ = on;
+                break;
             }
             break;
         }

@@ -472,7 +472,9 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
                         }
                     }
                     if (CompareField(paraIdx, j, "langId",
-                                       runA.format.langId, runB.format.langId, reason)) return RtfCompareResult::StructuralDiff;
+                                        runA.format.langId, runB.format.langId, reason)) return RtfCompareResult::StructuralDiff;
+                    if (CompareBoolField(paraIdx, j, "protected",
+                                          runA.format.protected_, runB.format.protected_, reason)) return RtfCompareResult::StructuralDiff;
                 }
 
                 paraIdx++;

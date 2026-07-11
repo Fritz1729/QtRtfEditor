@@ -32,6 +32,7 @@ struct RtfControl {
 
     enum class CharProp : uint8_t {
         Bold, Italic, Underline, Subscript, Superscript, Strike, Kerning,
+        Protect,
     };
     enum class Align : uint8_t { Left, Center, Right, Justified };
     enum class ParaProp : uint8_t {
@@ -78,7 +79,7 @@ struct RtfControl {
     Value value;
 };
 
-constexpr std::size_t kRtfControlTableSize = 137;
+constexpr std::size_t kRtfControlTableSize = 139;
 
 extern const std::array<RtfControl, kRtfControlTableSize> rtfControlTable;
 

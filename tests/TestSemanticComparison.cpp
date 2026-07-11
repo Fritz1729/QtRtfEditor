@@ -123,6 +123,9 @@ private slots:
     // Images — semantic identity (different dimensions, same data)
     void SemanticImageData();
 
+    // Protect
+    void DifferentProtect();
+
     // Edge cases
     void EmptyDocs();
     void HeaderOnly();
@@ -635,6 +638,14 @@ void TestSemanticComparison::SemanticImageData() {
     std::string reason;
     // Same image data → Identical (dimensions are not compared semantically)
     QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+}
+
+void TestSemanticComparison::DifferentProtect() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\protect Protected}\protect0\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0 Protected\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
 }
 
 void TestSemanticComparison::EmptyDocs() {

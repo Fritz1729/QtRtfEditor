@@ -87,8 +87,12 @@ static void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
 
         if (run.format.superscript) {
             charFmt.setVerticalAlignment(QTextCharFormat::AlignSuperScript);
-        } else if (run.format.subscript) {
+        } else         if (run.format.subscript) {
             charFmt.setVerticalAlignment(QTextCharFormat::AlignSubScript);
+        }
+
+        if (run.format.protected_) {
+            charFmt.setProperty(UserPropProtect, true);
         }
 
         cursor.insertText(QString::fromUtf8(run.text.data(),

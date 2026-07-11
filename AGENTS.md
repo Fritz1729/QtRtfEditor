@@ -11,8 +11,7 @@ Out-of-source into `build/`. Demo: `build/examples/demo/demo`.
 
 ## Structure
 - **`src/`** — `QtRtfEditor` shared library (static on macOS, shared on Linux/Windows):
-  - `RichTextEdit.{h,cpp}` — `Rte::RichTextEdit`, `QTextEdit` subclass, RTF/HTML I/O, protected text ranges.
-  - `ProtectedRange.{h,cpp}` — `ProtectedRange` class and `ProtectedRangeInfo` struct.
+  - `RichTextEdit.{h,cpp}` — `Rte::RichTextEdit`, `QTextEdit` subclass, RTF/HTML I/O, `\protect` cursor-skip.
   - `RtfExport.{h,cpp}` — Manual RTF generator (Delphi/TRichEdit-compatible).
   - `RtfImport.{h,cpp}` — RTF parser.
   - `RtfParser.{h,cpp}` — Token-level RTF tokenizer.
@@ -20,9 +19,9 @@ Out-of-source into `build/`. Demo: `build/examples/demo/demo`.
   - `RtfTypes.h` — Shared types and enums.
 - **`include/RichTextEdit/RichTextEdit.h`** — Install header (re-exports `Rte::RichTextEdit`).
 - **`tests/`** — Three executables:
-  - `test_protected_ranges` — 13 tests for the protection API.
-  - `test_rtf_structural` — 12 atomic tests for `CompareRtf()` (shared `RtfCompare.{h,cpp}`).
-  - `test_roundtrip` — data-driven test over `tests/TestData/*.rtf` (18 files).
+  - `test_protected_ranges` — Protection API.
+  - `test_rtf_structural` — Atomic tests for `CompareRtf()` (shared `RtfCompare.{h,cpp}`).
+  - `test_roundtrip` — Data-driven test over `tests/TestData/*.rtf`.
 - **`cmake/`** — CMake package config files for `find_package()` support.
 - **`examples/demo/`** — Minimal GUI demo.
 

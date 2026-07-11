@@ -36,6 +36,8 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("strike0",  Action::ToggleCharProp,   CharProp::Strike),
     DATA("kerning",    Action::ToggleCharProp,   CharProp::Kerning),
     DATA("kerning0",   Action::ToggleCharProp,   CharProp::Kerning),
+    DATA("protect",    Action::ToggleCharProp,   CharProp::Protect),
+    DATA("protect0",   Action::ToggleCharProp,   CharProp::Protect),
 
     // Character properties with numeric argument
     DATA("f",        Action::SetCharProp,      CharSetProp::FontIndex),

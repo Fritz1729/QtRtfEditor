@@ -3,8 +3,6 @@
 add_library(QtRtfEditor STATIC
     RichTextEdit.h
     RichTextEdit.cpp
-    ProtectedRange.h
-    ProtectedRange.cpp
     RtfExport.h
     RtfExport.cpp
     RtfTypes.h

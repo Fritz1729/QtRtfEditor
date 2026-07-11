@@ -12,8 +12,8 @@ Delphi applications can re-import the data correctly.
 
 - **RTF I/O**: Load and serialize RTF data, preserving
   Delphi TRichEdit formatting conventions.
-- **Protected text ranges**: Configurable protection of
-  text blocks against deletion (None, Warn, Block).
+- **Protected text ranges**: `\protect` character format — cursor
+  skips over protected text, preventing any edit within it.
 - **Subclassing**: All critical methods are virtual,
   enabling application-specific extensions.
 - **Dual licensing**: LGPL-3.0-or-later or commercial license.
@@ -151,32 +151,28 @@ target_link_libraries(MyTarget PRIVATE QtRtfEditor::QtRtfEditor)
 #include <RichTextEdit/RichTextEdit.h>
 
 Rte::RichTextEdit editor;
-editor.SetProtectionPolicy(Rte::ProtectionPolicy::Warn);
 
 // Load RTF
 std::string rtf = R"({\rtf1\ansi{\b Bold}{\b0 normal})";
 editor.Load(rtf, Rte::FormatMode::Rtf);
 
-// Set protection
-editor.SetProtection(0, 4, "lexicon", "entry:Example");
+// Set protection — cursor skips this range
+editor.SetProtection(0, 4);
 
 // Save RTF
 std::string saved = editor.Save(Rte::FormatMode::Rtf);
 ```
 
-## Subclassing
+## Signals
 
 ```cpp
-class MvEditor : public Rte::RichTextEdit
-{
-protected:
-    void CheckProtection(const QTextCursor& cursor, bool& allowed) override
-    {
-        // MV-specific logic: translate protection types,
-        // show custom dialogs
-        Rte::RichTextEdit::CheckProtection(cursor, allowed);
-    }
-};
+Rte::RichTextEdit editor;
+
+// React to clicks on protected text
+QObject::connect(&editor, &Rte::RichTextEdit::protectedRegionClicked,
+    [](std::size_t start, std::size_t end, const QString& text) {
+        // User clicked protected text — handle navigation, tooltip, etc.
+    });
 ```
 
 ## License

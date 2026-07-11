@@ -11,6 +11,8 @@
 
 namespace Rte {
 
+static constexpr int UserPropProtect = 1000;
+
 enum class UnderlineStyle : uint8_t {
     None,
     Solid,
@@ -44,6 +46,7 @@ struct RtfRunFormat {
     bool italic = false;
     bool underline = false;
     bool strikeOut = false;
+    bool protected_ = false;
     int fontIndex = 0;
     int fontSize = 0;
     int colorIndex = -1;
