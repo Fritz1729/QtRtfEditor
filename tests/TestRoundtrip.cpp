@@ -1,8 +1,10 @@
+#include <cstdio>
 #include <RichTextEdit.h>
 #include <QtTest>
 #include <QDir>
 #include <QFile>
-#include <QCoreApplication>
+#include <QApplication>
+#include <QVector>
 #include <stdexcept>
 #include "RtfCompare.h"
 #include "RtfParser.h"
@@ -36,11 +38,17 @@ private slots:
     void TestRtfSuite();
     void cleanupTestCase();
 
+public:
+    void setCustomDir(const QString& dir) { _customDir = dir; }
+
 private:
+    void _runFromCustomDir(const QString& dirPath);
+
     int _pass = 0;
     int _fail = 0;
     int _skip = 0;
     int _exception = 0;
+    QString _customDir;
 };
 
 static bool HasUnknownTags(const std::string& rtf) {
@@ -75,27 +83,35 @@ static void ReportCase(const QString& filename, const char* result) {
 }
 
 void TestRoundtrip::TestRtfSuite() {
-    QString testDataDir = QCoreApplication::applicationDirPath() + "/testdata";
+    QString testDataDir;
+    if (!_customDir.isEmpty()) {
+        testDataDir = _customDir;
+    } else {
+        testDataDir = QCoreApplication::applicationDirPath() + "/testdata";
+    }
+    _runFromCustomDir(testDataDir);
+}
 
-    QDir dir(testDataDir);
+void TestRoundtrip::_runFromCustomDir(const QString& dirPath) {
+    QDir dir(dirPath);
     QStringList files = dir.entryList(QStringList() << "*.rtf", QDir::Files);
 
-        _pass = 0;
-        _fail = 0;
-        _skip = 0;
-        _exception = 0;
+    _pass = 0;
+    _fail = 0;
+    _skip = 0;
+    _exception = 0;
 
-        for (int i = 0; i < files.size(); ++i) {
-            const QString& filename = files[i];
-            qDebug().noquote() << "[" << i + 1 << "/" << files.size() << "]" << filename;
+    for (int i = 0; i < files.size(); ++i) {
+        const QString& filename = files[i];
+        qDebug().noquote() << "[" << i + 1 << "/" << files.size() << "]" << filename;
 
-            if (IsSkipped(filename)) {
-                ReportCase(filename, "SKIP (no Qt roundtrip)");
-                _skip++;
-                continue;
-            }
+        if (IsSkipped(filename)) {
+            ReportCase(filename, "SKIP (no Qt roundtrip)");
+            _skip++;
+            continue;
+        }
 
-            QString filepath = testDataDir + "/" + filename;
+        QString filepath = dirPath + "/" + filename;
 
         std::string original;
         try {
@@ -159,5 +175,54 @@ void TestRoundtrip::cleanupTestCase() {
     qDebug().noquote() << "======================================";
 }
 
-QTEST_MAIN(TestRoundtrip)
+static int customMain(int argc, char **argv) {
+    QStringList filtered;
+    QString testDataDir;
+    for (int i = 0; i < argc; ++i) {
+        QByteArray arg = argv[i];
+        if (arg == "--testdata-dir" && i + 1 < argc) {
+            testDataDir = QString::fromLocal8Bit(argv[++i]);
+        } else if (arg.startsWith("--testdata-dir=")) {
+            testDataDir = QString::fromLocal8Bit(arg.mid(strlen("--testdata-dir=")));
+        } else if (arg == "-t" && i + 1 < argc) {
+            testDataDir = QString::fromLocal8Bit(argv[++i]);
+        } else {
+            filtered << QString::fromLocal8Bit(argv[i]);
+        }
+    }
+
+    if (!testDataDir.isEmpty()) {
+        QDir dir(testDataDir);
+        if (!dir.exists() || !dir.isReadable()) {
+            fprintf(stderr, "--testdata-dir: %s does not exist or is not readable\n", testDataDir.toStdString().c_str());
+            return 1;
+        }
+    }
+
+    int filteredArgc = filtered.size();
+    QVector<QByteArray> filteredBytes;
+    filteredBytes.reserve(filtered.size());
+    for (const QString& s : filtered) {
+        filteredBytes.append(s.toLocal8Bit());
+    }
+    QVector<char*> filteredArgv;
+    filteredArgv.reserve(filtered.size());
+    for (QByteArray& b : filteredBytes) {
+        filteredArgv.append(b.data());
+    }
+    filteredArgv.append(nullptr);
+
+    int adjustedArgc = filteredArgc;
+    QApplication app(adjustedArgc, filteredArgv.data());
+    app.setApplicationName("test_roundtrip");
+
+    TestRoundtrip test;
+    test.setCustomDir(testDataDir);
+    return QTest::qExec(&test, adjustedArgc, filteredArgv.data());
+}
+
+int main(int argc, char **argv) {
+    return customMain(argc, argv);
+}
+
 #include "TestRoundtrip.moc"
