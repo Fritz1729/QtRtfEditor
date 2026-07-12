@@ -89,8 +89,6 @@ CMAKE
 add_library(QtRtfEditor STATIC
     RichTextEdit.h
     RichTextEdit.cpp
-    ProtectedRange.h
-    ProtectedRange.cpp
     RtfExport.h
     RtfExport.cpp
     RtfTypes.h
@@ -99,6 +97,8 @@ add_library(QtRtfEditor STATIC
     RtfParser.cpp
     RtfImport.h
     RtfImport.cpp
+    RtfCharset.h
+    RtfCharset.cpp
 )
 
 add_library(QtRtfEditor::QtRtfEditor ALIAS QtRtfEditor)
