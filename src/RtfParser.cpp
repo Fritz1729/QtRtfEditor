@@ -840,6 +840,20 @@ private:
             // Escaped literal }
             _pos++;
             _literalText += '}';
+        } else if (c == '\\') {
+            // Escaped literal backslash: \\
+            // RTF spec: \\{ produces literal \{, \\} produces literal \}
+            // We handle these as single units to avoid { starting a group.
+            _literalText += '\\';
+            if (_pos + 1 < _len && _rtf[_pos + 1] == '{') {
+                _literalText += '{';
+                _pos += 2; // skip both \ and {
+            } else if (_pos + 1 < _len && _rtf[_pos + 1] == '}') {
+                _literalText += '}';
+                _pos += 2; // skip both \ and }
+            } else {
+                _pos++; // skip second backslash only
+            }
         } else if (c == 't') {
             // Tab character — only if not followed by more word chars (\trowd etc.)
             if (_pos + 1 >= _len || !isWordChar(_rtf[_pos + 1])) {

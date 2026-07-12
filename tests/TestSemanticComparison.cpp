@@ -139,6 +139,9 @@ private slots:
     void EmptyDocs();
     void HeaderOnly();
     void UnknownTags();
+    void EscapedBackslash();
+    void EscapedBackslashWithBraces();
+    void EscapedBackslashRoundtrip();
 
     // Whitespace preservation and underline control words
     void WhitespaceAfterToggleOff();
@@ -677,6 +680,52 @@ void TestSemanticComparison::UnknownTags() {
     std::string rtfB = R"({\rtf1\ansi\deff0 Text\par})";
     std::string reason;
     QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::UnknownTag);
+}
+
+void TestSemanticComparison::EscapedBackslash() {
+    // \\ produces a literal backslash character
+    std::string rtfA = R"({\rtf1\ansi\deff0 Path: C:\\Users\\test\par})";
+    std::string reason;
+    auto doc = ParseRtf(rtfA);
+    QVERIFY(doc.elements.size() >= 1);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    bool found = false;
+    for (const auto& run : para.runs) {
+        if (run.text.find("C:\\Users\\test") != std::string::npos) {
+            found = true;
+            break;
+        }
+    }
+    QVERIFY(found);
+}
+
+void TestSemanticComparison::EscapedBackslashWithBraces() {
+    // \\{ and \\} produce literal \{ and \} (not backslash + group delimiter)
+    std::string rtfA = R"({\rtf1\ansi\deff0 Set: K[x]\\{0\\}\par})";
+    std::string reason;
+    auto doc = ParseRtf(rtfA);
+    QVERIFY(doc.elements.size() >= 1);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    bool found = false;
+    for (const auto& run : para.runs) {
+        if (run.text.find("K[x]\\{0\\}") != std::string::npos) {
+            found = true;
+            break;
+        }
+    }
+    QVERIFY(found);
+}
+
+void TestSemanticComparison::EscapedBackslashRoundtrip() {
+    // RTF with \\ should roundtrip: parse → save → parse should yield identical structure
+    std::string rtfA = R"({\rtf1\ansi\deff0 Path: C:\\Users\\test\par})";
+    auto doc = ParseRtf(rtfA);
+    QVERIFY(doc.elements.size() >= 1);
+    auto doc2 = ParseRtf(rtfA);
+    std::string reason;
+    QCOMPARE(CompareRtf(doc, doc2, reason), RtfCompareResult::Identical);
 }
 
 void TestSemanticComparison::WhitespaceAfterToggleOff() {
