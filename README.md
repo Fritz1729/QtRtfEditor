@@ -47,7 +47,8 @@ The export does not emit `\ansicpgN` — all text is Unicode-encoded.
 
 ### Document tables
 
-color table (RGB), font table (family name, charset)
+color table (RGB), font table (family name, charset;
+`\fprq` font pitch is recognized but not preserved)
 
 ### Layout tables
 
