@@ -10,19 +10,19 @@ Out-of-source into `build/`. Demo: `build/examples/demo/demo`.
 **Windows/MSVC:** multi-config generator — always pass `--config Release` to `cmake --build` and `-C Release` to `ctest`, or tests won't find binaries.
 
 ## Structure
-- **`src/`** — `QtRtfEditor` shared library (static on macOS, shared on Linux/Windows):
+- **`src/`** — `QtRtfEditor` static library:
   - `RichTextEdit.{h,cpp}` — `Rte::RichTextEdit`, `QTextEdit` subclass, RTF/HTML I/O, `\protect` cursor-skip.
   - `RtfExport.{h,cpp}` — Manual RTF generator (Delphi/TRichEdit-compatible).
   - `RtfImport.{h,cpp}` — RTF parser.
   - `RtfParser.{h,cpp}` — Token-level RTF tokenizer.
   - `RtfControl.{h,cpp}` — Control word handling.
+  - `RtfCharset.{h,cpp}` — Character set mapping (symbol, CP1252, hex byte to codepoint).
   - `RtfTypes.h` — Shared types and enums.
-- **`include/RichTextEdit/RichTextEdit.h`** — Install header (re-exports `Rte::RichTextEdit`).
 - **`tests/`** — Three executables:
   - `test_protected_ranges` — Protection API.
   - `test_rtf_structural` — Atomic tests for `CompareRtf()` (shared `RtfCompare.{h,cpp}`).
   - `test_roundtrip` — Data-driven test over `tests/TestData/*.rtf`.
-- **`cmake/`** — CMake package config files for `find_package()` support.
+- **`src/cmake/`** — CMake package config template for `find_package()` support.
 - **`examples/demo/`** — Minimal GUI demo.
 
 ## Testing quirks
@@ -76,9 +76,12 @@ Do NOT implement these — they have no Qt equivalent and no reason to emulate:
 - Omit Doxygen where self-evident (`clearProtection()`, `protectionPolicy()`, `keyPressEvent()`).
 - Omit file-path comment lines and information-less section headers.
 
+## Commit messages
+- One-liner unless the change clearly needs explanation.
+- **AI-assisted commits** — add a footer: `Co-developed-with: opencode (${MODEL})`
+
 ## Working Practices
 - **Never commit or push without explicit user approval.**
 - Before committing, show `git diff --stat`, summarize changes, present the commit message, and ask for review. Never push without approval.
 - Never change the user's design decisions without consultation.
 - Report when design decisions hinder your work.
-- **AI-assisted commits** — add a footer: `Co-developed-with: opencode (${MODEL})`
