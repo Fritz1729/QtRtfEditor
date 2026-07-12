@@ -103,17 +103,15 @@ static bool CompareFormatSemantic(const RtfRunFormat& fmtA, const RtfRunFormat& 
     if (reportBool("underline", fmtA.underline, fmtB.underline)) return false;
 
     // Font — resolve by family
-    if (fmtA.fontIndex != fmtB.fontIndex) {
-        std::string familyA, familyB;
-        bool hasFontA = fmtA.fontIndex >= 0 && fmtA.fontIndex < static_cast<int>(docA.fonts.size());
-        bool hasFontB = fmtB.fontIndex >= 0 && fmtB.fontIndex < static_cast<int>(docB.fonts.size());
-        if (hasFontA) familyA = docA.fonts[fmtA.fontIndex].family;
-        if (hasFontB) familyB = docB.fonts[fmtB.fontIndex].family;
-        if (!(hasFontA && hasFontB && familyA == familyB)) {
-            reason = loc + " fontIndex: " + std::to_string(fmtA.fontIndex) +
-                " (" + familyA + ") vs " + std::to_string(fmtB.fontIndex) + " (" + familyB + ")";
-            return false;
-        }
+    std::string familyA, familyB;
+    bool hasFontA = fmtA.fontIndex >= 0 && fmtA.fontIndex < static_cast<int>(docA.fonts.size());
+    bool hasFontB = fmtB.fontIndex >= 0 && fmtB.fontIndex < static_cast<int>(docB.fonts.size());
+    if (hasFontA) familyA = docA.fonts[fmtA.fontIndex].family;
+    if (hasFontB) familyB = docB.fonts[fmtB.fontIndex].family;
+    if ((hasFontA || hasFontB) && familyA != familyB) {
+        reason = loc + " fontIndex: " + std::to_string(fmtA.fontIndex) +
+            " (" + familyA + ") vs " + std::to_string(fmtB.fontIndex) + " (" + familyB + ")";
+        return false;
     }
 
     int effA = fmtA.fontSize > 0 ? fmtA.fontSize : effFsA;
