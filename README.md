@@ -149,7 +149,7 @@ ctest --output-on-failure
 include(FetchContent)
 FetchContent_Declare(QtRtfEditor
     GIT_REPOSITORY https://github.com/Fritz1729/QtRtfEditor.git
-    GIT_TAG        v0.1.0
+     GIT_TAG        v0.1.1
 )
 FetchContent_MakeAvailable(QtRtfEditor)
 
