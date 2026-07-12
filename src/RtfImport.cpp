@@ -167,6 +167,14 @@ static void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
         currentList = nullptr;
         cursor.insertBlock(blockFmt);
     }
+
+    // Store per-paragraph group-persistent values as block properties
+    {
+        QTextBlockFormat curFmt = cursor.blockFormat();
+        curFmt.setProperty(UserPropParaDefaultFontIndex, para.defaultFontIndex);
+        curFmt.setProperty(UserPropParaDefaultTabStopTwips, para.defaultTabStopTwips);
+        cursor.setBlockFormat(curFmt);
+    }
     prevListId = para.listId;
     prevListLevel = para.listLevel;
 
@@ -438,6 +446,8 @@ void ImportRtf(QTextDocument* document, const std::string& rtf, int codePage) {
         document->setProperty(UserPropMetaViewKind, doc.viewKind);
     if (doc.ucByteCount != 1)
         document->setProperty(UserPropMetaUcByteCount, doc.ucByteCount);
+    if (doc.defaultTabStopTwips != 180)  // 180 = RTF spec default
+        document->setProperty(UserPropMetaDefaultTabStopTwips, doc.defaultTabStopTwips);
 }
 
 } // namespace Rte

@@ -36,6 +36,10 @@ class TestRoundtrip : public QObject {
 
 private slots:
     void TestRtfSuite();
+    void RoundtripDeff();
+    void RoundtripDeftab();
+    void RoundtripDeffNested();
+    void RoundtripDeftabNested();
     void cleanupTestCase();
 
 public:
@@ -43,6 +47,7 @@ public:
 
 private:
     void _runFromCustomDir(const QString& dirPath);
+    void _doRoundtrip(const QString& name, const std::string& rtf);
 
     int _pass = 0;
     int _fail = 0;
@@ -164,6 +169,68 @@ void TestRoundtrip::_runFromCustomDir(const QString& dirPath) {
     }
 
     QVERIFY(_fail == 0);
+}
+
+void TestRoundtrip::_doRoundtrip(const QString& name, const std::string& rtf) {
+    if (HasUnknownTags(rtf)) {
+        ReportCase(name, "FAIL (unsupported features)");
+        _fail++;
+        return;
+    }
+
+    try {
+        Rte::RichTextEdit editor;
+        editor.Load(rtf, Rte::FormatMode::Rtf);
+        std::string saved = editor.Save(Rte::FormatMode::Rtf);
+
+        if (HasUnknownTags(saved)) {
+            ReportCase(name, "FAIL (output has unsupported features)");
+            _fail++;
+            return;
+        }
+
+        std::string reason;
+        RtfCompareResult result = CompareRtf(rtf, saved, reason);
+        bool passed = (result == RtfCompareResult::Identical);
+
+        ReportCase(name, passed ? "PASS" : "FAIL");
+
+        if (!passed) {
+            qDebug() << "File:" << name << ":" << QString::fromStdString(reason);
+        }
+
+        if (passed) _pass++;
+        else _fail++;
+    } catch (const std::exception& e) {
+        ReportCase(name, "EXCEPTION");
+        qWarning() << "Test:" << name << "crashed:" << e.what();
+        _exception++;
+    }
+}
+
+void TestRoundtrip::RoundtripDeff() {
+    std::string input = R"({\rtf1\ansi\deff0\pard\plain Text\par})";
+    _doRoundtrip("RoundtripDeff", input);
+}
+
+void TestRoundtrip::RoundtripDeftab() {
+    std::string input = R"({\rtf1\ansi\deff0\deftab720\pard\plain Text\par})";
+    _doRoundtrip("RoundtripDeftab", input);
+}
+
+void TestRoundtrip::RoundtripDeffNested() {
+    // RTF 1.5/1.9.1 spec: \deffN is group-persistent (pushed/popped with groups).
+    // Export wraps changed values in scoped groups to preserve semantics:
+    //   {\rtf1\deff0 {\deff2\...Deep\par} {\deff1\...Mid\par} \...Outer\par}
+    std::string input = R"({\rtf1\ansi\deff0 {\deff1 {\deff2\pard\plain\f2 Deep\par}\pard\plain\f1 Mid\par}\pard\plain\f0 Outer\par})";
+    _doRoundtrip("RoundtripDeffNested", input);
+}
+
+void TestRoundtrip::RoundtripDeftabNested() {
+    // RTF 1.5/1.9.1 spec: \deftabN is group-persistent (pushed/popped with groups).
+    // Export wraps changed values in scoped groups to preserve semantics.
+    std::string input = R"({\rtf1\ansi\deff0\deftab180 {\deftab360\pard\plain\deftab360 Mid\par}\pard\plain\deftab180 Outer\par})";
+    _doRoundtrip("RoundtripDeftabNested", input);
 }
 
 void TestRoundtrip::cleanupTestCase() {

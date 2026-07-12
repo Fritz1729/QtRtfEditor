@@ -78,6 +78,18 @@ private slots:
     void TabAlignDecimalVsRight();
     void TabAlignDecimalVsLeft();
 
+    // Group-persistent: \deff — different default font index
+    void DifferentDeff();
+    void IdenticalDeff();
+    void DeffGroupPersistent();
+    void DeffNestedGroupReverted();
+
+    // Group-persistent: \deftab — different default tab stop
+    void DifferentDeftab();
+    void IdenticalDeftab();
+    void DeftabGroupPersistent();
+    void DeftabNestedGroupReverted();
+
     // Justification
     void DifferentJustification();
 
@@ -979,6 +991,76 @@ void TestSemanticComparison::SemanticPlainVsManualReset() {
 void TestSemanticComparison::SemanticPardVsManualReset() {
     std::string rtfA = R"({\rtf1\ansi\deff0\li500\qc Centered\pard\ql Left\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\li500\qc Centered\pard\ql Left\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QVERIFY(reason.empty());
+}
+
+void TestSemanticComparison::DifferentDeff() {
+    std::string rtfA = R"({\rtf1\ansi\deff0 Text\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff1 Text\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::IdenticalDeff() {
+    std::string rtfA = R"({\rtf1\ansi\deff0 Text\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0 Text\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QVERIFY(reason.empty());
+}
+
+void TestSemanticComparison::DeffGroupPersistent() {
+    // \deff in subgroup changes the paragraph's defaultFontIndex
+    // Both have \deff1 in subgroup, so both paragraphs should have defaultFontIndex=1
+    std::string rtfA = R"({\rtf1\ansi\deff0\pard\plain\f0 Outside\par {\deff1\pard\plain\f1 Inside\par}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0\pard\plain\f0 Outside\par {\deff1\pard\plain\f0 Inside\par}})";
+    std::string reason;
+    // defaultFontIndex is the same (1) for both — the \f1 vs \f0 affects run font, not paragraph default
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QVERIFY(reason.empty());
+}
+
+void TestSemanticComparison::DeffNestedGroupReverted() {
+    // Nested group reverts to outer \deff
+    std::string rtfA = R"({\rtf1\ansi\deff0 {\deff1 {\deff2\pard\plain\f2 Deep\par}\pard\plain\f1 Mid\par}\pard\plain\f0 Outer\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0 {\deff1 {\deff2\pard\plain\f2 Deep\par}\pard\plain\f1 Mid\par}\pard\plain\f0 Outer\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QVERIFY(reason.empty());
+}
+
+void TestSemanticComparison::DifferentDeftab() {
+    std::string rtfA = R"({\rtf1\ansi\deff0\deftab180 Text\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0\deftab360 Text\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::IdenticalDeftab() {
+    std::string rtfA = R"({\rtf1\ansi\deff0\deftab720 Text\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0\deftab720 Text\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QVERIFY(reason.empty());
+}
+
+void TestSemanticComparison::DeftabGroupPersistent() {
+    // \deftab in subgroup affects paragraphs inside the subgroup
+    std::string rtfA = R"({\rtf1\ansi\deff0\deftab180\pard\plain Outside\par {\deftab720\pard\plain Inside\par}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0\deftab180\pard\plain Outside\par {\deftab360\pard\plain Inside\par}})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DeftabNestedGroupReverted() {
+    // Nested group reverts to outer \deftab
+    std::string rtfA = R"({\rtf1\ansi\deff0\deftab180 {\deftab360 {\deftab540\pard\plain Deep\par}\pard\plain Mid\par}\pard\plain Outer\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0\deftab180 {\deftab360 {\deftab540\pard\plain Deep\par}\pard\plain Mid\par}\pard\plain Outer\par})";
     std::string reason;
     QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
     QVERIFY(reason.empty());

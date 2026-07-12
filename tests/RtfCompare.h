@@ -56,6 +56,7 @@ struct RtfDocument {
     int viewKind = 0;             // \viewkindN (0 = not present)
     int ucByteCount = 1;          // \ucN (default 1)
     int codePage = 1252;          // \ansicpgN (default 1252)
+    int defaultTabStopTwips = 180; // \deftabN (RTF spec default = 180 twips = 1/8 inch)
     std::vector<RtfColorEntry> colors;
     std::vector<RtfFontEntry> fonts;
     std::vector<std::variant<RtfParagraph, RtfTableRowEntry, RtfImage>> elements;

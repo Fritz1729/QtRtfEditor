@@ -206,6 +206,15 @@ void RichTextEdit::ClampCursor() {
 void RichTextEdit::LoadRtf(const std::string& blob) {
     ImportRtf(document(), blob, _codePage);
     SyncProtectedRanges();
+
+    // Apply default tab stop distance (stored during import as twips)
+    int tabStopTwips = document()->property(UserPropMetaDefaultTabStopTwips).toInt();
+    if (tabStopTwips > 0) {
+        // Convert twips to points (1 twip = 1/1440 inch, 1 point = 1/72 inch)
+        // Then to pixels (assume 96 DPI: 1 point = 4/3 pixels)
+        qreal twipsToPixels = 96.0 / 1440.0;
+        setTabStopDistance(tabStopTwips * twipsToPixels);
+    }
 }
 
 void RichTextEdit::LoadHtml(const std::string& blob) {

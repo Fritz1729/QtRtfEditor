@@ -62,6 +62,8 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("sa",       Action::SetParaProp,      ParaProp::SpaceAfter),
     DATA("sl",       Action::SetParaProp,      ParaProp::LineHeight),
     DATA("slmult",   Action::SetParaProp,      ParaProp::SlMult),
+    // \deftabN: group-persistent per RTF 1.5/1.9.1 spec (pushed/popped with groups).
+    DATA("deftab",   Action::GroupPersistent,  0),
 
     // Alignment
     DATA("ql",       Action::SetAlignment,     Align::Left),
@@ -114,11 +116,12 @@ constexpr RtfControl rtfControlTableEntries[] = {
     // Header controls
     DATA("rtf",      Action::HeaderControl,    0),
     DATA("ansi",     Action::HeaderControl,    0),
-    DATA("deff0",    Action::HeaderControl,    0),
     DATA("mac",      Action::HeaderControl,    0),
     DATA("pca",      Action::HeaderControl,    0),
     DATA("ucci",     Action::HeaderControl,    0),
-    DATA("deff",     Action::HeaderControl,    0),
+    // \deffN: group-persistent per RTF 1.5/1.9.1 spec (pushed/popped with groups).
+    DATA("deff",     Action::GroupPersistent,  0),
+    DATA("deff0",    Action::GroupPersistent,  0),
     DATA("qi",       Action::SetAlignment,     Align::Justified),
 
     // Header metadata (roundtrip preservation)

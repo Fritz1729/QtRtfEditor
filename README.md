@@ -83,7 +83,7 @@ BMP, PNG, JPEG via `\pict`
 
 - **OLE objects** (`\object`, `\objdata`, `\objalias`, `\objclass`) — COM embedding
 - **Metafiles** (EMF, WMF) — Windows rasterizable formats
-- **Section & page setup** (`\sectd`, `\sect`, `\sbk*`, `\pgwsxn`, `\pghsxn`, `\marg*`, `\cols*`, `\deftabN`, `\vertdoc`, `\horzdoc`)
+- **Section & page setup** (`\sectd`, `\sect`, `\sbk*`, `\pgwsxn`, `\pghsxn`, `\marg*`, `\cols*`, `\vertdoc`, `\horzdoc`)
 - **Headers/footers** (`{\header ...}`, `{\footer ...}`)
 - **Footnotes/endnotes** (`{\footnote ...}`, `\ftnstart`, `\endnhere`)
 - **Bookmarks** (`{\*\bkmkstart ...}`, `{\*\bkmkend ...}`) — no `QTextBookmark` in Qt6
@@ -109,6 +109,22 @@ BMP, PNG, JPEG via `\pict`
 - **Password protection** (`\passwordhash`, `\password`)
 - **Comments / annotations** (`\*\annot`, `\*\ftnacc`, `\*\annotrslt`)
 - **Compatibility flags** (`\hyph*`, `\lnongrid`, `\donotembedsysfontN`, `\donotembeddingdataN`, `\relyonvmlN`, `\validatexmlN`, `\showxmlerrorsN`, `\trackmovesN`, `\trackformattingN`, `\muser`)
+
+### DeffN and DeftabN scope
+
+The RTF 1.5 and 1.9.1 specifications define `\deffN` (default font index) and `\deftabN`
+(default tab width) as **group-persistent** control words — pushed/popped on group entry/exit.
+
+Our parser handles full group-persistence on import. On export, changed values are wrapped
+in scoped groups to preserve semantics:
+
+```rtf
+{\rtf1\deff0 {\deff2\pard\plain Deep\par} {\deff1\pard\plain Mid\par} \pard\plain Outer\par}
+```
+
+This ensures that re-parsing produces the same document-level defaults and per-paragraph values.
+For documents where `\deff` and `\deftab` appear only once at the document level (the common case),
+no extra grouping is emitted.
 
 ## Quick Start
 

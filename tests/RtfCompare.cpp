@@ -219,6 +219,14 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
         reason = "ucByteCount: " + std::to_string(a.ucByteCount) + " vs " + std::to_string(b.ucByteCount);
         return RtfCompareResult::StructuralDiff;
     }
+    if (a.defaultFontIndex != b.defaultFontIndex) {
+        reason = "defaultFontIndex: " + std::to_string(a.defaultFontIndex) + " vs " + std::to_string(b.defaultFontIndex);
+        return RtfCompareResult::StructuralDiff;
+    }
+    if (a.defaultTabStopTwips != b.defaultTabStopTwips) {
+        reason = "defaultTabStopTwips: " + std::to_string(a.defaultTabStopTwips) + " vs " + std::to_string(b.defaultTabStopTwips);
+        return RtfCompareResult::StructuralDiff;
+    }
 
     struct TableGroup {
         size_t startIdx;
@@ -456,7 +464,11 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
                 if (CompareField(paraIdx, SIZE_MAX, "listLevel",
                                   paraA.listLevel, paraB.listLevel, reason)) return RtfCompareResult::StructuralDiff;
                 if (CompareField(paraIdx, SIZE_MAX, "listStyle",
-                                  static_cast<int>(paraA.listStyle), static_cast<int>(paraB.listStyle), reason)) return RtfCompareResult::StructuralDiff;
+                                   static_cast<int>(paraA.listStyle), static_cast<int>(paraB.listStyle), reason)) return RtfCompareResult::StructuralDiff;
+                if (CompareField(paraIdx, SIZE_MAX, "defaultFontIndex",
+                                   paraA.defaultFontIndex, paraB.defaultFontIndex, reason)) return RtfCompareResult::StructuralDiff;
+                if (CompareField(paraIdx, SIZE_MAX, "defaultTabStopTwips",
+                                   paraA.defaultTabStopTwips, paraB.defaultTabStopTwips, reason)) return RtfCompareResult::StructuralDiff;
                 if (paraA.tabStops.size() != paraB.tabStops.size()) {
                     reason = "Paragraph " + std::to_string(paraIdx) +
                              " tabStops count: " + std::to_string(paraA.tabStops.size()) +

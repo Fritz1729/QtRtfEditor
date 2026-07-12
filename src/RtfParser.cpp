@@ -52,7 +52,6 @@ public:
         // Remove trailing empty paragraphs and table rows from elements
         removeTrailingEmptyElements();
 
-
         return _doc;
     }
 
@@ -321,6 +320,13 @@ private:
         case RtfControl::Action::TableControlWord:
             handleTableControl(ctrl, arg);
             return;
+        case RtfControl::Action::GroupPersistent:
+            if (strcmp(ctrl.keyword, "deff") == 0) {
+                if (arg >= 0) _currentDeff = arg;
+            } else if (strcmp(ctrl.keyword, "deftab") == 0) {
+                if (arg >= 0) _currentDeftab = arg;
+            }
+            break;
         case RtfControl::Action::Unknown:
             break;
         }
@@ -625,6 +631,8 @@ private:
             _currentParagraph.listLevel = _listLevel;
             _currentParagraph.listStyle = _listStyle;
             _currentParagraph.listIndent = _para.leftIndent;
+            _currentParagraph.defaultFontIndex = _currentDeff;
+            _currentParagraph.defaultTabStopTwips = _currentDeftab;
             _doc.elements.push_back(std::move(_currentParagraph));
         }
         _currentParagraph = {};
@@ -680,6 +688,12 @@ private:
     std::vector<ParagraphFormatting> _paraStateStack;
     std::vector<int> _pendingTabAlignmentStack;
     int _pendingTabAlignment = 1;
+
+    // Group-persistent control words: push on group enter, pop on group exit
+    std::vector<int> _deffStack;
+    int _currentDeff = 0;
+    std::vector<int> _deftabStack;
+    int _currentDeftab = 180;  // RTF spec default = 180 twips (1/8 inch)
     int _listId = 0;
     int _listLevel = 0;
     ListStyle _listStyle = ListStyle::None;
@@ -697,6 +711,9 @@ private:
     int _pictPiccropr = 0;
     int _pictPiccropt = 0;
     int _pictPiccropb = 0;
+
+    // Group nesting depth for document-level save
+    int _groupDepth = 0;
 
     // Table state
     bool _inTable = false;
@@ -737,11 +754,14 @@ private:
 
     void parseGroup() {
         _pos++; // skip '{'
+        _groupDepth++;
 
         // Push state
         _formatStack.push_back(_format);
         _paraStateStack.push_back(_para);
         _pendingTabAlignmentStack.push_back(_pendingTabAlignment);
+        _deffStack.push_back(_currentDeff);
+        _deftabStack.push_back(_currentDeftab);
 
         // Check for known table groups
         skipWhitespace();
@@ -820,6 +840,20 @@ private:
             _pendingTabAlignment = _pendingTabAlignmentStack.back();
             _pendingTabAlignmentStack.pop_back();
         }
+        // Save document-level group-persistent values when exiting outermost group
+        if (!_deffStack.empty()) {
+            if (_groupDepth == 1)
+                _doc.defaultFontIndex = _currentDeff;
+            _currentDeff = _deffStack.back();
+            _deffStack.pop_back();
+        }
+        if (!_deftabStack.empty()) {
+            if (_groupDepth == 1)
+                _doc.defaultTabStopTwips = _currentDeftab;
+            _currentDeftab = _deftabStack.back();
+            _deftabStack.pop_back();
+        }
+        if (_groupDepth > 0) _groupDepth--;
     }
 
     void parseControl() {
@@ -1243,12 +1277,6 @@ private:
     void processControlWord(const std::string& word, int arg) {
         // Table group markers (should have been caught in parseGroup)
         if (word == "colortbl" || word == "fonttbl") return;
-
-        // Handle \deffN separately — set default font index
-        if (word == "deff") {
-            _doc.defaultFontIndex = arg;
-            return;
-        }
 
         // Special typographic characters (RE 2.0)
         if (word == "bullet") { appendUtf8(0x2022); return; }

@@ -218,6 +218,10 @@ std::string ExportRtf(const QTextDocument& document) {
 
     QFont defaultFont = document.defaultFont();
 
+    // Read default tab stop twips (stored during import)
+    int defaultTabStopTwips = document.property(UserPropMetaDefaultTabStopTwips).toInt();
+    if (defaultTabStopTwips <= 0) defaultTabStopTwips = 180;  // RTF spec default
+
     std::map<std::string, int> fontMap;
     std::vector<QColor> colorList;
     std::vector<QColor> bgColorList;
@@ -225,6 +229,9 @@ std::string ExportRtf(const QTextDocument& document) {
     std::map<const QTextList*, ListStyle> listStyleMap;
     int defaultFontIdx = 0;
     int listIdCounter = 1;
+    int lastDeff = defaultFontIdx;
+    int lastDeftab = defaultTabStopTwips > 0 ? defaultTabStopTwips : 180;
+    int deffDeftabGroupDepth = 0;
     {
         int idx = 0;
         std::string defFamily = defaultFont.family().toStdString();
@@ -269,6 +276,8 @@ std::string ExportRtf(const QTextDocument& document) {
     }
 
     out << "{\\rtf1\\ansi\\deff" << defaultFontIdx;
+    if (defaultTabStopTwips != 180)
+        out << "\\deftab" << defaultTabStopTwips;
 
     if (!colorList.empty() || !bgColorList.empty()) {
         out << "{\\colortbl ;";
@@ -432,6 +441,29 @@ std::string ExportRtf(const QTextDocument& document) {
             }
         }
 
+        // Emit per-paragraph group-persistent values in scoped groups.
+        // \deffN and \deftabN are group-persistent per the RTF spec — wrapping
+        // each paragraph that differs from the previous value in a group prevents
+        // the control word from leaking into subsequent paragraphs.
+        {
+            int paraDeff = blockFmt.property(UserPropParaDefaultFontIndex).toInt();
+            int paraDeftab = blockFmt.property(UserPropParaDefaultTabStopTwips).toInt();
+            bool deffChanged = (paraDeff != lastDeff);
+            bool deftabChanged = (paraDeftab != lastDeftab);
+            if (deffChanged || deftabChanged) {
+                out << "{";
+                deffDeftabGroupDepth++;
+                if (deffChanged) {
+                    out << "\\deff" << paraDeff;
+                    lastDeff = paraDeff;
+                }
+                if (deftabChanged) {
+                    out << "\\deftab" << paraDeftab;
+                    lastDeftab = paraDeftab;
+                }
+            }
+        }
+
         out << "\n";
 
         // Check for images in this block
@@ -571,10 +603,18 @@ std::string ExportRtf(const QTextDocument& document) {
             if (!firstRun) {
                 if (inListGroup) out << '}';
                 WritePlainTextOff(out, lastEmitted);
-                out << "\\par\n";
+                out << "\\par";
+                for (int i = 0; i < deffDeftabGroupDepth; i++)
+                    out << '}';
+                deffDeftabGroupDepth = 0;
+                out << "\n";
             } else {
                 if (inListGroup) out << '}';
-                out << "\\par\n";
+                out << "\\par";
+                for (int i = 0; i < deffDeftabGroupDepth; i++)
+                    out << '}';
+                deffDeftabGroupDepth = 0;
+                out << "\n";
             }
         }
     };

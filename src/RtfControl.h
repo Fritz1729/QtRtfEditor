@@ -28,6 +28,7 @@ struct RtfControl {
         TableControl,
         SetTabAlign,
         TableControlWord,
+        GroupPersistent,
         Unknown,
     };
 
@@ -80,7 +81,7 @@ struct RtfControl {
     Value value;
 };
 
-constexpr std::size_t kRtfControlTableSize = 145;
+constexpr std::size_t kRtfControlTableSize = 146;
 
 extern const std::array<RtfControl, kRtfControlTableSize> rtfControlTable;
 

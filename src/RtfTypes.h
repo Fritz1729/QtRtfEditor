@@ -15,9 +15,12 @@ static constexpr int UserPropProtect = 1000;
 static constexpr int UserPropUpOffset = 1004;
 static constexpr int UserPropDnOffset = 1005;
 static constexpr int UserPropLangId = 1006;
+static constexpr int UserPropParaDefaultFontIndex = 1007;
+static constexpr int UserPropParaDefaultTabStopTwips = 1008;
 static constexpr const char* UserPropMetaDefaultLangId = "rtf_meta_defaultLangId";
 static constexpr const char* UserPropMetaViewKind = "rtf_meta_viewKind";
 static constexpr const char* UserPropMetaUcByteCount = "rtf_meta_ucByteCount";
+static constexpr const char* UserPropMetaDefaultTabStopTwips = "rtf_meta_defaultTabStopTwips";
 
 enum class UnderlineStyle : uint8_t {
     None,
@@ -98,6 +101,8 @@ struct ParagraphFormatting {
     int lineHeight = 0;
     int slMult = 1;
     std::vector<TabStop> tabStops;
+    int defaultFontIndex = 0;       // \deffN group-persistent per RTF 1.5/1.9.1 spec
+    int defaultTabStopTwips = 180;  // \deftabN group-persistent per RTF 1.5/1.9.1 spec (180 = 1/8 inch)
 };
 
 enum class BorderStyle : uint8_t {
