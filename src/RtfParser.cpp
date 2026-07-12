@@ -836,8 +836,12 @@ private:
             if (_pos + 1 >= _len || !isWordChar(_rtf[_pos + 1])) {
                 _pos++;
                 _literalText += static_cast<char>(9);
+                // Consume space delimiter for \tab
+                if (_pos < _len && _rtf[_pos] == ' ') _pos++;
             } else {
                 parseControlWord();
+                // Consume space delimiter for \tab
+                if (_pos < _len && _rtf[_pos] == ' ') _pos++;
             }
         } else if (c == '~') {
             // Non-breaking space

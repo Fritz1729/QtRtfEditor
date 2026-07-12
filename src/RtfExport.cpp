@@ -111,7 +111,7 @@ std::string RtfEscape(const QString& text) {
             case '\\':  result += "\\\\"; break;
             case '{':   result += "\\{"; break;
             case '}':   result += "\\}"; break;
-            case '\t':  result += "\\t"; break;
+            case '\t':  result += "\\tab "; break;
             default:
                 if (code > 127) {
                     int val = static_cast<int>(code);
