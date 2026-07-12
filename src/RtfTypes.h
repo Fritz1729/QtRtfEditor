@@ -54,7 +54,7 @@ struct RtfRunFormat {
     bool strikeOut = false;
     bool protected_ = false;
     int fontIndex = 0;
-    int fontSize = 0;
+    int fontSize = 24;
     int colorIndex = -1;
     int bgColorIndex = -1;
     bool superscript = false;

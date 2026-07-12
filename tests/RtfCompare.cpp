@@ -2,6 +2,7 @@
 #include "RtfParser.h"
 
 #include <algorithm>
+#include <QFont>
 #include <string>
 #include <vector>
 
@@ -102,12 +103,15 @@ static bool CompareFormatSemantic(const RtfRunFormat& fmtA, const RtfRunFormat& 
     if (reportBool("italic", fmtA.italic, fmtB.italic)) return false;
     if (reportBool("underline", fmtA.underline, fmtB.underline)) return false;
 
-    // Font — resolve by family
+    // Font — resolve by family; missing \fonttbl ≡ Qt default font
+    static const std::string defaultFamily = QFont().family().toStdString();
     std::string familyA, familyB;
     bool hasFontA = fmtA.fontIndex >= 0 && fmtA.fontIndex < static_cast<int>(docA.fonts.size());
     bool hasFontB = fmtB.fontIndex >= 0 && fmtB.fontIndex < static_cast<int>(docB.fonts.size());
     if (hasFontA) familyA = docA.fonts[fmtA.fontIndex].family;
     if (hasFontB) familyB = docB.fonts[fmtB.fontIndex].family;
+    if (familyA.empty()) familyA = defaultFamily;
+    if (familyB.empty()) familyB = defaultFamily;
     if ((hasFontA || hasFontB) && familyA != familyB) {
         reason = loc + " fontIndex: " + std::to_string(fmtA.fontIndex) +
             " (" + familyA + ") vs " + std::to_string(fmtB.fontIndex) + " (" + familyB + ")";

@@ -1,4 +1,5 @@
 #include "RtfParser.h"
+#include "RtfCharset.h"
 #include "RtfControl.h"
 #include "RtfTypes.h"
 
@@ -15,8 +16,10 @@ namespace {
 class RtfParserImpl {
 public:
 
-    RtfDocument parse(const std::string& rtf) {
+    RtfDocument parse(const std::string& rtf, int codePage) {
         _doc = RtfDocument{};
+        _codePage = codePage;
+        _doc.codePage = codePage;
         _rtf = rtf;
         _pos = 0;
         _len = rtf.size();
@@ -48,6 +51,7 @@ public:
         flushCurrentParagraph();
         // Remove trailing empty paragraphs and table rows from elements
         removeTrailingEmptyElements();
+
 
         return _doc;
     }
@@ -305,6 +309,10 @@ private:
             }
             if (strcmp(ctrl.keyword, "viewkind") == 0) {
                 if (arg >= 0) _doc.viewKind = arg;
+                return;
+            }
+            if (strcmp(ctrl.keyword, "ansicpg") == 0) {
+                if (arg >= 0) _doc.codePage = arg;
                 return;
             }
             break;
@@ -660,6 +668,7 @@ private:
     std::string _literalText;
     bool _skipLeadingWsTrim = false;
     size_t _iter = 0;
+    int _codePage = 1252;
     RtfRunFormat _format;
     ParagraphFormatting _para;
     std::vector<RtfRunFormat> _formatStack;
@@ -848,14 +857,19 @@ private:
             _pos++;
             appendUtf8(0x00A0);
         } else if (c == '\'') {
-            // Hex escape: \\'hh
+            // Hex escape: \\'hh — charset-aware decoding
             _pos++;
             int val = 0;
             for (int h = 0; h < 2 && _pos < _len; ++h) {
                 char hc = _rtf[_pos++];
                 val = val * 16 + (hc >= '0' && hc <= '9' ? hc - '0' : (hc >= 'a' && hc <= 'f' ? hc - 'a' + 10 : hc - 'A' + 10));
             }
-            appendUtf8(val);
+            int fcharset = 0;
+            int fi = _format.fontIndex;
+            if (fi >= 0 && static_cast<size_t>(fi) < _doc.fonts.size()) {
+                fcharset = _doc.fonts[static_cast<size_t>(fi)].fcharset;
+            }
+            appendUtf8(MapHexByteToCodepoint(val, fcharset, _doc.codePage));
         } else if ((c == 'u' || c == 'U') && _pos + 1 < _len && isDigit(_rtf[_pos + 1])) {
             // Unicode escape: \uNNN? (only if 'u' is immediately followed by digit)
             parseUnicodeEscape();
@@ -970,11 +984,20 @@ private:
                 _pos++;
 
                 int index = 0;
+                int fcharset = 0;
                 std::string family;
 
                 while (_pos < _len && _rtf[_pos] != '}') {
                     if (_rtf[_pos] == '\\') {
-                        parseControl();
+                        if (matches("\\fcharset")) {
+                            _pos += 9;
+                            fcharset = parseInt();
+                        } else if (matches("\\f")) {
+                            _pos += 2;
+                            index = parseInt();
+                        } else {
+                            parseControl();
+                        }
                     } else if (isPrintable(_rtf[_pos])) {
                         family += _rtf[_pos++];
                     } else {
@@ -989,7 +1012,7 @@ private:
                 while (!family.empty() && family.front() == ' ') family.erase(family.begin());
 
                 if (!family.empty()) {
-                    _doc.fonts.push_back({family});
+                    _doc.fonts.push_back({family, fcharset});
                 }
             } else {
                 _pos++;
@@ -1337,12 +1360,15 @@ private:
 
 } // namespace
 
-RtfDocument RtfParser::parse(const std::string& rtf) {
-    return RtfParserImpl().parse(rtf);
+RtfDocument RtfParser::parse(const std::string& rtf, int codePage) {
+    _codePage = codePage;
+    RtfParserImpl impl;
+    return impl.parse(rtf, codePage);
 }
 
-RtfDocument ParseRtf(const std::string& rtf) {
-    return RtfParserImpl().parse(rtf);
+RtfDocument ParseRtf(const std::string& rtf, int codePage) {
+    RtfParserImpl impl;
+    return impl.parse(rtf, codePage);
 }
 
 } // namespace Rte

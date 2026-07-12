@@ -45,6 +45,7 @@ struct RtfColorEntry {
 
 struct RtfFontEntry {
     std::string family;
+    int fcharset = 0;
     bool operator==(const RtfFontEntry &) const = default;
 };
 
@@ -54,6 +55,7 @@ struct RtfDocument {
     int defaultLangId = 0;        // \deflangN (0 = not present)
     int viewKind = 0;             // \viewkindN (0 = not present)
     int ucByteCount = 1;          // \ucN (default 1)
+    int codePage = 1252;          // \ansicpgN (default 1252)
     std::vector<RtfColorEntry> colors;
     std::vector<RtfFontEntry> fonts;
     std::vector<std::variant<RtfParagraph, RtfTableRowEntry, RtfImage>> elements;

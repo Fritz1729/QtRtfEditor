@@ -40,6 +40,11 @@ lists (bullet, number, letter, roman)
 escape sequences (`\uNNN`), hex escapes (`\'hh`), non-breaking space (`\~`),
 typographic characters (bullet, emdash, endash, smart quotes, en/em space)
 
+**Note:** Export always uses Unicode escapes (`\uNNN`) for characters above 0x7F.
+Hex escapes (`\'hh`) are decoded on import using the active font's character set
+(`\fcharsetN`) and the document code page (`\ansicpgN`, default 1252).
+The export does not emit `\ansicpgN` — all text is Unicode-encoded.
+
 ### Document tables
 
 color table (RGB), font table (family name, charset)

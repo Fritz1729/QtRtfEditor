@@ -297,7 +297,9 @@ std::string ExportRtf(const QTextDocument& document) {
         out << "}";
     }
 
-    out << "{\\fonttbl";
+    // Build fonttbl into a separate buffer; emit only if non-default fonts exist
+    std::ostringstream fonttblOut;
+    fonttblOut << "{\\fonttbl";
     std::map<std::string, std::string> typeHints = {
         {"arial", "\\fswiss"},
         {"times new roman", "\\froman"},
@@ -309,19 +311,34 @@ std::string ExportRtf(const QTextDocument& document) {
         if (fontIt == fontMap.end()) continue;
         const std::string& family = fontIt->first;
         int idx = fontIt->second;
-        out << "{\\f" << idx;
+        fonttblOut << "{\\f" << idx;
         std::string lower = family;
         std::transform(lower.begin(), lower.end(), lower.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+                        [](unsigned char c) { return std::tolower(c); });
         auto it = typeHints.find(lower);
         if (it != typeHints.end()) {
-            out << it->second;
+            fonttblOut << it->second;
         } else {
-            out << "\\fnil";
+            fonttblOut << "\\fnil";
         }
-        out << "\\fcharset0 " << family << ";}";
+        fonttblOut << "\\fcharset0 " << family << ";}";
     }
-    out << "}";
+    fonttblOut << "}";
+
+    // Emit fonttbl only if it contains fonts other than Qt's default
+    {
+        std::string defaultFamily = QFont().family().toStdString();
+        bool hasNonDefaultFont = false;
+        for (const auto& [family, _] : fontMap) {
+            if (family != defaultFamily) {
+                hasNonDefaultFont = true;
+                break;
+            }
+        }
+        if (hasNonDefaultFont) {
+            out << fonttblOut.str();
+        }
+    }
 
     // Emit metadata (only if present in imported document)
     {

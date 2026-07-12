@@ -57,7 +57,7 @@ class RTE_EXPORT RichTextEdit : public QTextEdit
     Q_OBJECT
 
 public:
-    explicit RichTextEdit(QWidget* parent = nullptr);
+    explicit RichTextEdit(QWidget* parent = nullptr, int codePage = 1252);
 
     ~RichTextEdit() override;
 
@@ -96,6 +96,18 @@ public:
      * @return          true if the character at the position is protected.
      */
     [[nodiscard]] bool IsProtected(std::size_t position) const;
+
+    /**
+     * @brief Set the default code page for ANSI hex escape decoding.
+     * @param codePage  Windows code page number (default 1252).
+     */
+    void SetCodePage(int codePage);
+
+    /**
+     * @brief Get the default code page for ANSI hex escape decoding.
+     * @return Code page number (default 1252).
+     */
+    [[nodiscard]] int codePage() const;
 
     void keyPressEvent(QKeyEvent* event) override;
 
@@ -137,6 +149,7 @@ private:
     void SyncProtectedRanges();
 
     std::vector<std::pair<std::size_t, std::size_t>> _protectedRanges;
+    int _codePage = 1252;
 };
 
 } // namespace Rte

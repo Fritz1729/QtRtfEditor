@@ -8,8 +8,9 @@
 
 namespace Rte {
 
-RichTextEdit::RichTextEdit(QWidget* parent)
+RichTextEdit::RichTextEdit(QWidget* parent, int codePage)
     : QTextEdit(parent)
+    , _codePage(codePage)
 {
     setAcceptRichText(true);
     setUndoRedoEnabled(true);
@@ -70,6 +71,14 @@ bool RichTextEdit::IsProtected(std::size_t position) const {
         }
     }
     return false;
+}
+
+void RichTextEdit::SetCodePage(int codePage) {
+    _codePage = codePage;
+}
+
+int RichTextEdit::codePage() const {
+    return _codePage;
 }
 
 void RichTextEdit::SyncProtectedRanges() {
@@ -195,7 +204,7 @@ void RichTextEdit::ClampCursor() {
 }
 
 void RichTextEdit::LoadRtf(const std::string& blob) {
-    ImportRtf(document(), blob);
+    ImportRtf(document(), blob, _codePage);
     SyncProtectedRanges();
 }
 

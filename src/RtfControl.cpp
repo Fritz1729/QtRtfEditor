@@ -117,7 +117,6 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("deff0",    Action::HeaderControl,    0),
     DATA("mac",      Action::HeaderControl,    0),
     DATA("pca",      Action::HeaderControl,    0),
-    DATA("ansicpg",  Action::HeaderControl,    0),
     DATA("ucci",     Action::HeaderControl,    0),
     DATA("deff",     Action::HeaderControl,    0),
     DATA("qi",       Action::SetAlignment,     Align::Justified),
@@ -128,6 +127,7 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("uc",       Action::HeaderMetadata,   0),
     DATA("deflang",  Action::HeaderMetadata,   0),
     DATA("viewkind", Action::HeaderMetadata,   0),
+    DATA("ansicpg",  Action::HeaderMetadata,   0),
 
     // Table controls
     DATA("colortbl", Action::TableControl,     0),
