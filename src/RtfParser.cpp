@@ -210,10 +210,13 @@ private:
             const RtfControl::RtfUlStyle style = ctrl.value.ulStyle;
             switch (style) {
             case RtfControl::RtfUlStyle::UlSolid:
-                // arg < 0 = no argument → toggle on
-                // arg >= 0 = explicit argument (e.g. \ul0) → arg is ignored
-                _format.underlineStyle = UnderlineStyle::Solid;
-                _format.underline = true;
+                if (arg == 0) {
+                    _format.underlineStyle = UnderlineStyle::None;
+                    _format.underline = false;
+                } else {
+                    _format.underlineStyle = UnderlineStyle::Solid;
+                    _format.underline = true;
+                }
                 break;
             case RtfControl::RtfUlStyle::UlDotted:
                 _format.underlineStyle = UnderlineStyle::Dotted;
@@ -271,6 +274,40 @@ private:
             return;
 
         case RtfControl::Action::HeaderControl:
+            break;
+        case RtfControl::Action::HeaderMetadata:
+            if (strcmp(ctrl.keyword, "pard") == 0) {
+                if (_inTableCell) {
+                    finalizeRun();
+                    _para = ParagraphFormatting{};
+                    _pendingTabAlignment = 1;
+                    _listId = 0;
+                    _listLevel = 0;
+                    _listStyle = ListStyle::None;
+                } else {
+                    handleParagraph();
+                }
+                return;
+            }
+            if (strcmp(ctrl.keyword, "plain") == 0) {
+                finalizeRun();
+                _format = RtfRunFormat{};
+                _skipLeadingWsTrim = false;
+                return;
+            }
+            if (strcmp(ctrl.keyword, "uc") == 0) {
+                _doc.ucByteCount = (arg >= 0) ? arg : 1;
+                return;
+            }
+            if (strcmp(ctrl.keyword, "deflang") == 0) {
+                if (arg >= 0) _doc.defaultLangId = arg;
+                return;
+            }
+            if (strcmp(ctrl.keyword, "viewkind") == 0) {
+                if (arg >= 0) _doc.viewKind = arg;
+                return;
+            }
+            break;
         case RtfControl::Action::TableControl:
             break;
         case RtfControl::Action::TableControlWord:
@@ -787,13 +824,13 @@ private:
             // Control symbol: single digit
             _pos++;
         } else if (c == '{') {
-            // Braced control symbol: \{
+            // Escaped literal {
             _pos++;
-            std::string digits;
-            while (_pos < _len && _rtf[_pos] != '}' && isDigit(_rtf[_pos])) {
-                digits += _rtf[_pos++];
-            }
-            if (_pos < _len) _pos++; // skip '}'
+            _literalText += '{';
+        } else if (c == '}') {
+            // Escaped literal }
+            _pos++;
+            _literalText += '}';
         } else if (c == 't') {
             // Tab character — only if not followed by more word chars (\trowd etc.)
             if (_pos + 1 >= _len || !isWordChar(_rtf[_pos + 1])) {

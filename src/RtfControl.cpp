@@ -120,6 +120,14 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("ansicpg",  Action::HeaderControl,    0),
     DATA("ucci",     Action::HeaderControl,    0),
     DATA("deff",     Action::HeaderControl,    0),
+    DATA("qi",       Action::SetAlignment,     Align::Justified),
+
+    // Header metadata (roundtrip preservation)
+    DATA("pard",     Action::HeaderMetadata,   0),
+    DATA("plain",    Action::HeaderMetadata,   0),
+    DATA("uc",       Action::HeaderMetadata,   0),
+    DATA("deflang",  Action::HeaderMetadata,   0),
+    DATA("viewkind", Action::HeaderMetadata,   0),
 
     // Table controls
     DATA("colortbl", Action::TableControl,     0),

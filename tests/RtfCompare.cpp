@@ -114,6 +114,19 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
         return RtfCompareResult::UnknownTag;
     }
 
+    if (a.defaultLangId != b.defaultLangId) {
+        reason = "defaultLangId: " + std::to_string(a.defaultLangId) + " vs " + std::to_string(b.defaultLangId);
+        return RtfCompareResult::StructuralDiff;
+    }
+    if (a.viewKind != b.viewKind) {
+        reason = "viewKind: " + std::to_string(a.viewKind) + " vs " + std::to_string(b.viewKind);
+        return RtfCompareResult::StructuralDiff;
+    }
+    if (a.ucByteCount != b.ucByteCount) {
+        reason = "ucByteCount: " + std::to_string(a.ucByteCount) + " vs " + std::to_string(b.ucByteCount);
+        return RtfCompareResult::StructuralDiff;
+    }
+
     struct TableGroup {
         size_t startIdx;
         size_t rowCount;
@@ -161,6 +174,7 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
     size_t elemIdxA = 0, elemIdxB = 0;
     size_t tableIdxA = 0, tableIdxB = 0;
     size_t paraIdx = 0, imgIdx = 0;
+    int effFontSizeA = 0, effFontSizeB = 0;
 
     while (elemIdxA < a.elements.size() || elemIdxB < b.elements.size()) {
         // Skip to next logical element (table, paragraph, or image)
@@ -428,7 +442,11 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
                         }
                     }
                     if (CompareField(paraIdx, j, "fontSize",
-                                     runA.format.fontSize, runB.format.fontSize, reason)) return RtfCompareResult::StructuralDiff;
+                                      runA.format.fontSize > 0 ? runA.format.fontSize : effFontSizeA,
+                                      runB.format.fontSize > 0 ? runB.format.fontSize : effFontSizeB,
+                                      reason)) return RtfCompareResult::StructuralDiff;
+                    effFontSizeA = runA.format.fontSize > 0 ? runA.format.fontSize : effFontSizeA;
+                    effFontSizeB = runB.format.fontSize > 0 ? runB.format.fontSize : effFontSizeB;
                     if (runA.format.colorIndex != runB.format.colorIndex) {
                         if (CompareResolvedColors(paraIdx, j, runA.format.colorIndex, runB.format.colorIndex,
                                                    a, b,

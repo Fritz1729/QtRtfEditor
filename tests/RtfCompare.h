@@ -51,6 +51,9 @@ struct RtfFontEntry {
 struct RtfDocument {
     int defaultFontIndex = 0;
     int defaultFontSize = 0;      // half-points (\fs in header)
+    int defaultLangId = 0;        // \deflangN (0 = not present)
+    int viewKind = 0;             // \viewkindN (0 = not present)
+    int ucByteCount = 1;          // \ucN (default 1)
     std::vector<RtfColorEntry> colors;
     std::vector<RtfFontEntry> fonts;
     std::vector<std::variant<RtfParagraph, RtfTableRowEntry, RtfImage>> elements;

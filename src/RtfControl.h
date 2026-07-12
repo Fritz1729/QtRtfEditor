@@ -24,6 +24,7 @@ struct RtfControl {
         SetCapitalization,
         EmitParagraph,
         HeaderControl,
+        HeaderMetadata,
         TableControl,
         SetTabAlign,
         TableControlWord,
@@ -79,7 +80,7 @@ struct RtfControl {
     Value value;
 };
 
-constexpr std::size_t kRtfControlTableSize = 139;
+constexpr std::size_t kRtfControlTableSize = 145;
 
 extern const std::array<RtfControl, kRtfControlTableSize> rtfControlTable;
 

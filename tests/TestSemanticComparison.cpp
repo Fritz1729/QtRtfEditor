@@ -126,6 +126,15 @@ private slots:
     // Protect
     void DifferentProtect();
 
+    // Header metadata
+    void DifferentDeflang();
+    void DifferentViewKind();
+    void DifferentUcByteCount();
+
+    // \plain / \pard semantic equivalence
+    void SemanticPlainVsManualReset();
+    void SemanticPardVsManualReset();
+
     // Edge cases
     void EmptyDocs();
     void HeaderOnly();
@@ -884,6 +893,46 @@ void TestSemanticComparison::DifferentBorderStyle() {
     std::string reason;
     QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
     QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentDeflang() {
+    std::string rtfA = R"({\rtf1\ansi\deff0\deflang1031 Text\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0\deflang1033 Text\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentViewKind() {
+    std::string rtfA = R"({\rtf1\ansi\deff0\viewkind4 Text\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0\viewkind3 Text\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentUcByteCount() {
+    std::string rtfA = R"({\rtf1\ansi\deff0\uc1 Text\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0\uc2 Text\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::SemanticPlainVsManualReset() {
+    std::string rtfA = R"({\rtf1\ansi\deff0\b Bold\i Italic\super Sup\plain Normal\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0\b Bold\i Italic\super Sup\b0\i0\super0 Normal\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QVERIFY(reason.empty());
+}
+
+void TestSemanticComparison::SemanticPardVsManualReset() {
+    std::string rtfA = R"({\rtf1\ansi\deff0\li500\qc Centered\pard\ql Left\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0\li500\qc Centered\pard\ql Left\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QVERIFY(reason.empty());
 }
 
 void TestSemanticComparison::cleanupTestCase() {

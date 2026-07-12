@@ -94,6 +94,12 @@ static void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
         if (run.format.protected_) {
             charFmt.setProperty(UserPropProtect, true);
         }
+        if (run.format.upOffset != 0) {
+            charFmt.setProperty(UserPropUpOffset, run.format.upOffset);
+        }
+        if (run.format.dnOffset != 0) {
+            charFmt.setProperty(UserPropDnOffset, run.format.dnOffset);
+        }
 
         cursor.insertText(QString::fromUtf8(run.text.data(),
                                               static_cast<int>(run.text.size())),
@@ -421,6 +427,14 @@ void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
 void ImportRtf(QTextDocument* document, const std::string& rtf) {
     RtfDocument doc = ParseRtf(rtf);
     BuildDocument(document, doc);
+
+    // Store metadata for roundtrip
+    if (doc.defaultLangId != 0)
+        document->setProperty(UserPropMetaDefaultLangId, doc.defaultLangId);
+    if (doc.viewKind != 0)
+        document->setProperty(UserPropMetaViewKind, doc.viewKind);
+    if (doc.ucByteCount != 1)
+        document->setProperty(UserPropMetaUcByteCount, doc.ucByteCount);
 }
 
 } // namespace Rte

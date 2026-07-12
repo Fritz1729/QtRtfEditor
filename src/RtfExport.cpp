@@ -43,28 +43,48 @@ static const char* UnderlineStyleTag(UnderlineStyle style) {
     return "";
 }
 
-static void WriteConditionalFormatOff(std::ostringstream& out, const RtfRunFormat& fmt, bool trailingSpace) {
+static void WriteConditionalFormatOff(std::ostringstream& out, const RtfRunFormat& cur, const RtfRunFormat& lastEmitted, bool trailingSpace) {
     const char* space = trailingSpace ? " " : "";
-    if (fmt.bold) out << "\\b0" << space;
-    if (fmt.italic) out << "\\i0" << space;
-    if (fmt.superscript) out << "\\super0" << space;
-    if (fmt.subscript) out << "\\sub0" << space;
-    if (fmt.colorIndex > 0) out << "\\cf0" << space;
-    if (fmt.bgColorIndex > 0) out << "\\cb0" << space;
-    if (fmt.underlineStyle != UnderlineStyle::None) out << "\\ul0" << space;
-    if (fmt.strikeOut) out << "\\strike0" << space;
-    if (fmt.capitalization == Capitalization::AllCaps) out << "\\caps0" << space;
-    if (fmt.capitalization == Capitalization::SmallCaps) out << "\\scaps0" << space;
-    if (fmt.kerning) out << "\\kerning0" << space;
-    if (fmt.protected_) out << "\\protect0" << space;
+    if (!cur.bold && lastEmitted.bold) out << "\\b0" << space;
+    if (!cur.italic && lastEmitted.italic) out << "\\i0" << space;
+    if (!cur.superscript && lastEmitted.superscript) out << "\\super0" << space;
+    if (!cur.subscript && lastEmitted.subscript) out << "\\sub0" << space;
+    if (cur.colorIndex == 0 && lastEmitted.colorIndex != 0) out << "\\cf0" << space;
+    if (cur.bgColorIndex == 0 && lastEmitted.bgColorIndex != 0) out << "\\cb0" << space;
+    if (cur.underlineStyle == UnderlineStyle::None && lastEmitted.underlineStyle != UnderlineStyle::None)
+        out << "\\ul0" << space;
+    if (!cur.strikeOut && lastEmitted.strikeOut) out << "\\strike0" << space;
+    if (cur.capitalization == Capitalization::None && lastEmitted.capitalization == Capitalization::AllCaps)
+        out << "\\caps0" << space;
+    if (cur.capitalization == Capitalization::None && lastEmitted.capitalization == Capitalization::SmallCaps)
+        out << "\\scaps0" << space;
+    if (!cur.kerning && lastEmitted.kerning) out << "\\kerning0" << space;
+    if (!cur.protected_ && lastEmitted.protected_) out << "\\protect0" << space;
+    if (cur.upOffset == 0 && lastEmitted.upOffset != 0) out << "\\up0" << space;
+    if (cur.dnOffset == 0 && lastEmitted.dnOffset != 0) out << "\\dn0" << space;
 }
 
-static void WriteFormatOff(std::ostringstream& out, const RtfRunFormat& fmt, bool trailingSpace) {
+static void WriteFormatOff(std::ostringstream& out, const RtfRunFormat& fmt, const RtfRunFormat& lastEmitted, bool trailingSpace) {
     const char* space = trailingSpace ? " " : "";
-    if (fmt.underlineStyle != UnderlineStyle::None) out << "\\ul0" << space;
-    if (fmt.strikeOut) out << "\\strike0" << space;
-    if (fmt.capitalization == Capitalization::AllCaps) out << "\\caps0" << space;
-    if (fmt.capitalization == Capitalization::SmallCaps) out << "\\scaps0" << space;
+    if (fmt.underlineStyle != UnderlineStyle::None && lastEmitted.underlineStyle == UnderlineStyle::None)
+        out << "\\ul0" << space;
+    if (fmt.strikeOut && !lastEmitted.strikeOut) out << "\\strike0" << space;
+    if (fmt.capitalization == Capitalization::AllCaps && lastEmitted.capitalization != Capitalization::AllCaps)
+        out << "\\caps0" << space;
+    if (fmt.capitalization == Capitalization::SmallCaps && lastEmitted.capitalization != Capitalization::SmallCaps)
+        out << "\\scaps0" << space;
+}
+
+static bool IsFormatActive(const RtfRunFormat& fmt) {
+    return fmt.bold || fmt.italic || fmt.superscript || fmt.subscript ||
+        fmt.colorIndex > 0 || fmt.bgColorIndex > 0 ||
+        fmt.underlineStyle != UnderlineStyle::None || fmt.strikeOut ||
+        fmt.capitalization != Capitalization::None || fmt.kerning || fmt.protected_ ||
+        fmt.upOffset != 0 || fmt.dnOffset != 0;
+}
+
+static void WritePlainTextOff(std::ostringstream& out, const RtfRunFormat& fmt) {
+    if (IsFormatActive(fmt)) out << "\\plain ";
 }
 
 static UnderlineStyle EffectiveUnderlineStyle(const QTextCharFormat& fmt) {
@@ -110,7 +130,7 @@ std::string AlignmentToRtf(Qt::Alignment alignment) {
     if (alignment & Qt::AlignRight) return "\\qr";
     if (alignment & Qt::AlignHCenter) return "\\qc";
     if (alignment & Qt::AlignJustify) return "\\qj";
-    return "\\ql";
+    return "";
 }
 
 static std::string EmitImageAsPict(const QTextDocument& doc, const QString& name,
@@ -233,7 +253,11 @@ std::string ExportRtf(const QTextDocument& document) {
                     if (col.isValid() && col.alpha() == 255 && FindColorIndex(list, col) < 0)
                         list.push_back(col);
                 };
-                collectColor(frag.charFormat().foreground().color(), colorList);
+                {
+                    QColor fg = frag.charFormat().foreground().color();
+                    if (!(fg.red() == 0 && fg.green() == 0 && fg.blue() == 0))
+                        collectColor(fg, colorList);
+                }
                 {
                     QBrush bgBrush = frag.charFormat().background();
                     if (bgBrush.style() != Qt::NoBrush)
@@ -246,29 +270,32 @@ std::string ExportRtf(const QTextDocument& document) {
 
     out << "{\\rtf1\\ansi\\deff" << defaultFontIdx;
 
-    out << "{\\colortbl ;";
-    for (const auto& color : colorList) {
-        out << "\\red" << color.red()
-            << "\\green" << color.green()
-            << "\\blue" << color.blue() << ";";
+    if (!colorList.empty() || !bgColorList.empty()) {
+        out << "{\\colortbl ;";
+        for (const auto& color : colorList) {
+            out << "\\red" << color.red()
+                << "\\green" << color.green()
+                << "\\blue" << color.blue() << ";";
+        }
+        for (const auto& color : bgColorList) {
+            out << "\\red" << color.red()
+                << "\\green" << color.green()
+                << "\\blue" << color.blue() << ";";
+        }
+        out << "}";
     }
-    for (const auto& color : bgColorList) {
-        out << "\\red" << color.red()
-            << "\\green" << color.green()
-            << "\\blue" << color.blue() << ";";
-    }
-    out << "}";
 
-    // Emit listtable
-    out << "{\\listtable";
-    for (const auto& [list, id] : listMap) {
-        out << "\\list\\listid" << id
-            << "\\liststylebulletsimple\\liststyletype"
-            << static_cast<int>(listStyleMap[list] == ListStyle::Number ? 3 :
-                listStyleMap[list] == ListStyle::Letter ? 6 :
-                listStyleMap[list] == ListStyle::Roman ? 4 : 1);
+    if (!listMap.empty()) {
+        out << "{\\listtable";
+        for (const auto& [list, id] : listMap) {
+            out << "\\list\\listid" << id
+                << "\\liststylebulletsimple\\liststyletype"
+                << static_cast<int>(listStyleMap[list] == ListStyle::Number ? 3 :
+                    listStyleMap[list] == ListStyle::Letter ? 6 :
+                    listStyleMap[list] == ListStyle::Roman ? 4 : 1);
+        }
+        out << "}";
     }
-    out << "}";
 
     out << "{\\fonttbl";
     std::map<std::string, std::string> typeHints = {
@@ -276,7 +303,12 @@ std::string ExportRtf(const QTextDocument& document) {
         {"times new roman", "\\froman"},
         {"courier new", "\\fmodern"},
     };
-    for (const auto& [family, idx] : fontMap) {
+    for (int i = 0; i < static_cast<int>(fontMap.size()); ++i) {
+        auto fontIt = std::find_if(fontMap.begin(), fontMap.end(),
+            [i](const auto& p) { return p.second == i; });
+        if (fontIt == fontMap.end()) continue;
+        const std::string& family = fontIt->first;
+        int idx = fontIt->second;
         out << "{\\f" << idx;
         std::string lower = family;
         std::transform(lower.begin(), lower.end(), lower.begin(),
@@ -290,6 +322,23 @@ std::string ExportRtf(const QTextDocument& document) {
         out << "\\fcharset0 " << family << ";}";
     }
     out << "}";
+
+    // Emit metadata (only if present in imported document)
+    {
+        QVariant langIdVar = document.property(UserPropMetaDefaultLangId);
+        if (langIdVar.isValid()) {
+            out << "\\deflang" << langIdVar.toInt();
+        }
+        QVariant viewKindVar = document.property(UserPropMetaViewKind);
+        if (viewKindVar.isValid()) {
+            out << "\\viewkind" << viewKindVar.toInt();
+        }
+        QVariant ucVar = document.property(UserPropMetaUcByteCount);
+        if (ucVar.isValid()) {
+            int ucVal = ucVar.toInt();
+            out << "\\uc" << ucVal;
+        }
+    }
 
     // Content export — iterate root frame to handle tables and paragraphs
     auto exportBlock = [&](const QTextBlock& block, bool isTableCell) {
@@ -308,6 +357,17 @@ std::string ExportRtf(const QTextDocument& document) {
                 out << "{\\listid" << listIt->second << "\\listlevel0";
                 inListGroup = true;
             }
+        }
+
+        // Emit \pard if any paragraph formatting is non-default
+        {
+            bool hasParaFormatting = blockFmt.alignment() != Qt::AlignLeft ||
+                blockFmt.leftMargin() > 0 || blockFmt.indent() > 0 ||
+                blockFmt.rightMargin() > 0 || blockFmt.topMargin() > 0 ||
+                blockFmt.bottomMargin() > 0 ||
+                blockFmt.lineHeightType() == QTextBlockFormat::FixedHeight ||
+                !blockFmt.tabPositions().isEmpty();
+            if (hasParaFormatting) out << "\\pard ";
         }
 
         out << AlignmentToRtf(blockFmt.alignment());
@@ -386,9 +446,13 @@ std::string ExportRtf(const QTextDocument& document) {
                 itImg++;
             }
             if (inListGroup) out << '}';
-            out << "\\b0\\i0\\super0\\sub0\\cf0\\protect0\\par\n";
+            out << "\\plain\\par\n";
         } else {
             RtfRunFormat prev;
+            RtfRunFormat lastEmitted{};
+            lastEmitted.colorIndex = 0;
+            lastEmitted.bgColorIndex = 0;
+            lastEmitted.fontIndex = defaultFontIdx;
             bool firstRun = true;
 
             QTextBlock::iterator it = block.begin();
@@ -424,6 +488,8 @@ std::string ExportRtf(const QTextDocument& document) {
                     QBrush bgBrush = charFmt.background();
                     if (bgBrush.style() != Qt::NoBrush)
                         cur.bgColorIndex = lookupColor(bgBrush.color(), bgColorList);
+                    else
+                        cur.bgColorIndex = 0;
                 }
 
                 cur.bold = charFmt.fontWeight() >= 700;
@@ -435,6 +501,8 @@ std::string ExportRtf(const QTextDocument& document) {
                 cur.capitalization = toCapitalization(charFmt.fontCapitalization());
                 cur.kerning = charFmt.fontKerning();
                 cur.protected_ = charFmt.property(UserPropProtect).toBool();
+                cur.upOffset = charFmt.property(UserPropUpOffset).toInt();
+                cur.dnOffset = charFmt.property(UserPropDnOffset).toInt();
                 {
                     qreal spacing = charFmt.fontLetterSpacing();
                     if (spacing > 0) {
@@ -444,27 +512,35 @@ std::string ExportRtf(const QTextDocument& document) {
 
                 if (firstRun || cur != prev) {
                     if (!firstRun) {
-                        WriteConditionalFormatOff(out, prev, true);
+                        WriteConditionalFormatOff(out, cur, lastEmitted, true);
                     }
 
-                    if (cur.fontSize > 0 && (!firstRun || cur.fontSize != prev.fontSize))
+                    if (firstRun || cur.fontSize != lastEmitted.fontSize)
                         out << "\\fs" << cur.fontSize << ' ';
-                    if (cur.fontIndex != prev.fontIndex)
+                    if (cur.fontIndex != lastEmitted.fontIndex)
                         out << "\\f" << cur.fontIndex << ' ';
-                    if (cur.colorIndex > 0) out << "\\cf" << cur.colorIndex << ' ';
-                    if (cur.bgColorIndex > 0) out << "\\cb" << cur.bgColorIndex << ' ';
-                    if (cur.bold) out << "\\b ";
-                    if (cur.italic) out << "\\i ";
-                    if (cur.strikeOut) out << "\\strike ";
-                    if (cur.underlineStyle != UnderlineStyle::None)
+                    if (cur.colorIndex != lastEmitted.colorIndex)
+                        out << "\\cf" << cur.colorIndex << ' ';
+                    if (cur.bgColorIndex != lastEmitted.bgColorIndex)
+                        out << "\\cb" << cur.bgColorIndex << ' ';
+                    if (cur.bold && !lastEmitted.bold) out << "\\b ";
+                    if (cur.italic && !lastEmitted.italic) out << "\\i ";
+                    if (cur.strikeOut && !lastEmitted.strikeOut) out << "\\strike ";
+                    if (cur.underlineStyle != UnderlineStyle::None && cur.underlineStyle != lastEmitted.underlineStyle)
                         out << UnderlineStyleTag(cur.underlineStyle) << ' ';
-                    if (cur.superscript) out << "\\super ";
-                    if (cur.subscript) out << "\\sub ";
-                    if (cur.capitalization == Capitalization::AllCaps) out << "\\caps ";
-                    if (cur.capitalization == Capitalization::SmallCaps) out << "\\scaps ";
-                    if (cur.kerning) out << "\\kerning ";
-                    if (cur.expnd != 0) out << "\\expnd" << cur.expnd << ' ';
-                    if (cur.protected_) out << "\\protect ";
+                    if (cur.superscript && !lastEmitted.superscript) out << "\\super ";
+                    if (cur.subscript && !lastEmitted.subscript) out << "\\sub ";
+                    if (cur.capitalization != Capitalization::None && cur.capitalization != lastEmitted.capitalization) {
+                        if (cur.capitalization == Capitalization::AllCaps) out << "\\caps ";
+                        if (cur.capitalization == Capitalization::SmallCaps) out << "\\scaps ";
+                    }
+                    if (cur.kerning && !lastEmitted.kerning) out << "\\kerning ";
+                    if (cur.expnd != lastEmitted.expnd) out << "\\expnd" << cur.expnd << ' ';
+                    if (cur.protected_ && !lastEmitted.protected_) out << "\\protect ";
+                    if (cur.upOffset != lastEmitted.upOffset) out << "\\up" << cur.upOffset << ' ';
+                    if (cur.dnOffset != lastEmitted.dnOffset) out << "\\dn" << cur.dnOffset << ' ';
+
+                    lastEmitted = cur;
                 }
 
                 out << RtfEscape(frag.text());
@@ -474,12 +550,12 @@ std::string ExportRtf(const QTextDocument& document) {
             }
 
             if (!firstRun) {
-                WriteFormatOff(out, prev, false);
                 if (inListGroup) out << '}';
-                out << "\\b0\\i0\\super0\\sub0\\cf0\\protect0\\par\n";
+                WritePlainTextOff(out, lastEmitted);
+                out << "\\par\n";
             } else {
                 if (inListGroup) out << '}';
-                out << "\\b0\\i0\\super0\\sub0\\cf0\\protect0\\par\n";
+                out << "\\par\n";
             }
         }
     };
@@ -515,7 +591,9 @@ std::string ExportRtf(const QTextDocument& document) {
                         auto tryCollect = [&](const QBrush& brush) {
                             if (brush.style() != Qt::NoBrush && brush.color().isValid()) {
                                 QColor col = brush.color();
-                                if (col.alpha() == 255 && FindColorIndex(colorList, col) < 0)
+                                if (col.alpha() == 255 &&
+                                    !(col.red() == 0 && col.green() == 0 && col.blue() == 0) &&
+                                    FindColorIndex(colorList, col) < 0)
                                     colorList.push_back(col);
                             }
                         };
