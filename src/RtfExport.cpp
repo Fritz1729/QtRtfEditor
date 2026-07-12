@@ -374,13 +374,22 @@ std::string ExportRtf(const QTextDocument& document) {
     // Carry over persistent RTF format state (font, color, bgColor) across blocks.
     // RTF formatting is stream-global — \par does not reset it.
     RtfRunFormat carriedOverFormat{};
+    bool firstBlock = true;
 
     auto exportBlock = [&](const QTextBlock& block, bool isTableCell) {
         QString text = block.text();
         bool hasText = !text.trimmed().isEmpty();
         if (!hasText) {
+            // Skip the very first empty block — Qt always creates an extra
+            // empty block at the document start that doesn't correspond to any RTF paragraph.
+            if (firstBlock) {
+                firstBlock = false;
+                return;
+            }
+            out << "\\par ";
             return;
         }
+        firstBlock = false;
 
         QTextBlockFormat blockFmt = block.blockFormat();
         bool inListGroup = false;

@@ -599,7 +599,7 @@ private:
     }
 
     void emitTableRow() {
-        if (hasTextContent(_currentRow)) {
+        if (ParagraphHasNonWhitespaceContent(_currentRow)) {
             _doc.elements.push_back(std::move(_currentRow));
         }
         _currentRow = {};
@@ -614,7 +614,7 @@ private:
             _currentRow = {};
             return;
         }
-        if (hasTextContent(_currentRow)) {
+        if (ParagraphHasNonWhitespaceContent(_currentRow)) {
             _doc.elements.push_back(std::move(_currentRow));
         }
         _inTable = false;
@@ -625,28 +625,34 @@ private:
     }
 
     void flushCurrentParagraph() {
-        if (!_currentParagraph.runs.empty()) {
-            _currentParagraph.setFormatting(_para);
-            _currentParagraph.listId = _listId;
-            _currentParagraph.listLevel = _listLevel;
-            _currentParagraph.listStyle = _listStyle;
-            _currentParagraph.listIndent = _para.leftIndent;
-            _currentParagraph.defaultFontIndex = _currentDeff;
-            _currentParagraph.defaultTabStopTwips = _currentDeftab;
-            _doc.elements.push_back(std::move(_currentParagraph));
+        if (!ParagraphHasNonWhitespaceContent(_currentParagraph)) {
+            _currentParagraph = {};
+            return;
         }
+        _currentParagraph.setFormatting(_para);
+        _currentParagraph.listId = _listId;
+        _currentParagraph.listLevel = _listLevel;
+        _currentParagraph.listStyle = _listStyle;
+        _currentParagraph.listIndent = _para.leftIndent;
+        _currentParagraph.defaultFontIndex = _currentDeff;
+        _currentParagraph.defaultTabStopTwips = _currentDeftab;
+        _doc.elements.push_back(std::move(_currentParagraph));
         _currentParagraph = {};
     }
 
-    bool hasTextContent(const RtfParagraph& p) {
-        return std::any_of(p.runs.begin(), p.runs.end(),
-            [](const RtfRun& r) { return !r.text.empty(); });
+    static bool ParagraphHasNonWhitespaceContent(const RtfParagraph& p) {
+        for (const auto& r : p.runs) {
+            QString text(QString::fromUtf8(r.text.data(), static_cast<int>(r.text.size())));
+            if (!text.trimmed().isEmpty()) return true;
+        }
+        return false;
     }
 
-    bool hasTextContent(const RtfTableRowEntry& r) {
+    static bool ParagraphHasNonWhitespaceContent(const RtfTableRowEntry& r) {
         for (const auto& [runs, _] : r.cells) {
             for (const auto& run : runs) {
-                if (!run.text.empty()) return true;
+                QString text(QString::fromUtf8(run.text.data(), static_cast<int>(run.text.size())));
+                if (!text.trimmed().isEmpty()) return true;
             }
         }
         return false;
@@ -654,10 +660,10 @@ private:
 
     void removeTrailingEmptyElements() {
         while (!_doc.elements.empty()) {
-            bool hasText = std::visit([this](const auto& elem) -> bool {
+            bool hasText = std::visit([](const auto& elem) -> bool {
                 using T = std::decay_t<decltype(elem)>;
-                if constexpr (std::is_same_v<T, RtfParagraph>) return hasTextContent(elem);
-                else if constexpr (std::is_same_v<T, RtfTableRowEntry>) return hasTextContent(elem);
+                if constexpr (std::is_same_v<T, RtfParagraph>) return ParagraphHasNonWhitespaceContent(elem);
+                else if constexpr (std::is_same_v<T, RtfTableRowEntry>) return ParagraphHasNonWhitespaceContent(elem);
                 else return true;
             }, _doc.elements.back());
             if (!hasText) {
