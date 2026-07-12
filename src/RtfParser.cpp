@@ -893,12 +893,11 @@ private:
             if (_pos + 1 >= _len || !isWordChar(_rtf[_pos + 1])) {
                 _pos++;
                 _literalText += static_cast<char>(9);
-                // Consume space delimiter for \tab
+                // Consume space delimiter for \t
                 if (_pos < _len && _rtf[_pos] == ' ') _pos++;
             } else {
                 parseControlWord();
-                // Consume space delimiter for \tab
-                if (_pos < _len && _rtf[_pos] == ' ') _pos++;
+                // parseControlWord already consumes the delimiter
             }
         } else if (c == '~') {
             // Non-breaking space
@@ -944,6 +943,8 @@ private:
 
         if (hasArg && _pos < _len && !isWordChar(_rtf[_pos]) && _rtf[_pos] != '\\' && _rtf[_pos] != '}' && _rtf[_pos] != '{') {
             _pos++; // skip trailing whitespace after numeric argument
+        } else if (!hasArg && _pos < _len && _rtf[_pos] == ' ') {
+            _pos++; // consume space delimiter for no-arg control words
         }
 
         if (word.empty()) return;
@@ -1311,20 +1312,9 @@ private:
 
         std::string trimmed = _literalText;
 
-        // Only trim leading whitespace at paragraph start, or when we're
-        // not right after a formatting toggle. After a toggle (e.g. \b0),
-        // leading whitespace is intentional content.
-        if (_skipLeadingWsTrim) {
-            _skipLeadingWsTrim = false;
-        } else {
-            size_t start = trimmed.find_first_not_of(" \t\n\r");
-            if (start != std::string::npos) {
-                trimmed = trimmed.substr(start);
-            } else {
-                _literalText.clear();
-                return;
-            }
-        }
+        // Delimiter spaces are now consumed by the tokenizer, so
+        // _literalText only contains actual content. Don't trim.
+        _skipLeadingWsTrim = false;
 
         if (_inTableCell) {
             _currentCellRuns.emplace_back(trimmed, _format);
