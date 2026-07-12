@@ -83,8 +83,12 @@ static bool IsFormatActive(const RtfRunFormat& fmt) {
         fmt.upOffset != 0 || fmt.dnOffset != 0 || fmt.langId != 0;
 }
 
-static void WritePlainTextOff(std::ostringstream& out, const RtfRunFormat& fmt) {
-    if (IsFormatActive(fmt)) out << "\\plain ";
+static bool WritePlainTextOff(std::ostringstream& out, const RtfRunFormat& fmt) {
+    if (IsFormatActive(fmt)) {
+        out << "\\plain ";
+        return true;
+    }
+    return false;
 }
 
 static UnderlineStyle EffectiveUnderlineStyle(const QTextCharFormat& fmt) {
@@ -367,6 +371,10 @@ std::string ExportRtf(const QTextDocument& document) {
     }
 
     // Content export — iterate root frame to handle tables and paragraphs
+    // Carry over persistent RTF format state (font, color, bgColor) across blocks.
+    // RTF formatting is stream-global — \par does not reset it.
+    RtfRunFormat carriedOverFormat{};
+
     auto exportBlock = [&](const QTextBlock& block, bool isTableCell) {
         QString text = block.text();
         bool hasText = !text.trimmed().isEmpty();
@@ -496,12 +504,13 @@ std::string ExportRtf(const QTextDocument& document) {
             }
             if (inListGroup) out << '}';
             out << "\\plain\\par\n";
+            carriedOverFormat.fontIndex = defaultFontIdx; // \plain resets font
         } else {
             RtfRunFormat prev;
             RtfRunFormat lastEmitted{};
             lastEmitted.colorIndex = 0;
             lastEmitted.bgColorIndex = 0;
-            lastEmitted.fontIndex = defaultFontIdx;
+            lastEmitted.fontIndex = carriedOverFormat.fontIndex;
             bool firstRun = true;
 
             QTextBlock::iterator it = block.begin();
@@ -602,12 +611,17 @@ std::string ExportRtf(const QTextDocument& document) {
 
             if (!firstRun) {
                 if (inListGroup) out << '}';
-                WritePlainTextOff(out, lastEmitted);
+                bool plainEmitted = WritePlainTextOff(out, lastEmitted);
                 out << "\\par";
                 for (int i = 0; i < deffDeftabGroupDepth; i++)
                     out << '}';
                 deffDeftabGroupDepth = 0;
                 out << "\n";
+                if (plainEmitted) {
+                    carriedOverFormat.fontIndex = defaultFontIdx;
+                } else {
+                    carriedOverFormat.fontIndex = lastEmitted.fontIndex;
+                }
             } else {
                 if (inListGroup) out << '}';
                 out << "\\par";
@@ -615,6 +629,7 @@ std::string ExportRtf(const QTextDocument& document) {
                     out << '}';
                 deffDeftabGroupDepth = 0;
                 out << "\n";
+                // No runs emitted — font state unchanged from previous block
             }
         }
     };
