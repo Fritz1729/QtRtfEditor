@@ -80,7 +80,7 @@ static bool IsFormatActive(const RtfRunFormat& fmt) {
         fmt.colorIndex > 0 || fmt.bgColorIndex > 0 ||
         fmt.underlineStyle != UnderlineStyle::None || fmt.strikeOut ||
         fmt.capitalization != Capitalization::None || fmt.kerning || fmt.protected_ ||
-        fmt.upOffset != 0 || fmt.dnOffset != 0;
+        fmt.upOffset != 0 || fmt.dnOffset != 0 || fmt.langId != 0;
 }
 
 static void WritePlainTextOff(std::ostringstream& out, const RtfRunFormat& fmt) {
@@ -503,6 +503,7 @@ std::string ExportRtf(const QTextDocument& document) {
                 cur.protected_ = charFmt.property(UserPropProtect).toBool();
                 cur.upOffset = charFmt.property(UserPropUpOffset).toInt();
                 cur.dnOffset = charFmt.property(UserPropDnOffset).toInt();
+                cur.langId = charFmt.property(UserPropLangId).toInt();
                 {
                     qreal spacing = charFmt.fontLetterSpacing();
                     if (spacing > 0) {
@@ -539,6 +540,7 @@ std::string ExportRtf(const QTextDocument& document) {
                     if (cur.protected_ && !lastEmitted.protected_) out << "\\protect ";
                     if (cur.upOffset != lastEmitted.upOffset) out << "\\up" << cur.upOffset << ' ';
                     if (cur.dnOffset != lastEmitted.dnOffset) out << "\\dn" << cur.dnOffset << ' ';
+                    if (cur.langId != lastEmitted.langId) out << "\\lang" << cur.langId << ' ';
 
                     lastEmitted = cur;
                 }

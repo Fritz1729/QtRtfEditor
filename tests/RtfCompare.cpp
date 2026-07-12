@@ -13,47 +13,6 @@ static RtfColorEntry ResolveColorFromTable(int idx, const RtfDocument& doc, bool
     return {0, 0, 0};
 }
 
-static bool CompareResolvedColors(int paraIdx, int runIdx, int idxA, int idxB,
-    const RtfDocument& docA, const RtfDocument& docB,
-    RtfColorEntry(*resolveA)(int, const RtfDocument&, bool*),
-    RtfColorEntry(*resolveB)(int, const RtfDocument&, bool*),
-    std::string& reason, const char* fieldName) {
-    bool hasA, hasB;
-    RtfColorEntry resolvedA = resolveA(idxA, docA, &hasA);
-    RtfColorEntry resolvedB = resolveB(idxB, docB, &hasB);
-
-    if (hasA && hasB && resolvedA.red == resolvedB.red &&
-        resolvedA.green == resolvedB.green && resolvedA.blue == resolvedB.blue) {
-        return false;
-    }
-    if (resolvedA.red == resolvedB.red &&
-        resolvedA.green == resolvedB.green && resolvedA.blue == resolvedB.blue) {
-        return false;
-    }
-
-    std::string rgbA = "(" + std::to_string(resolvedA.red) + "," +
-        std::to_string(resolvedA.green) + "," +
-        std::to_string(resolvedA.blue) + ")";
-    std::string rgbB = "(" + std::to_string(resolvedB.red) + "," +
-        std::to_string(resolvedB.green) + "," +
-        std::to_string(resolvedB.blue) + ")";
-
-    std::string boundMsg;
-    if (!hasA || !hasB) {
-        boundMsg = " [out-of-bounds: A=" + std::to_string(idxA) + "/" +
-            std::to_string(docA.colors.size()) +
-            ", B=" + std::to_string(idxB) + "/" +
-            std::to_string(docB.colors.size()) + "]";
-    }
-
-    reason = "Paragraph " + std::to_string(paraIdx) +
-        " run " + std::to_string(runIdx) +
-        " " + fieldName + ": " + std::to_string(idxA) +
-        " (" + rgbA + ") vs " + std::to_string(idxB) +
-        " (" + rgbB + ")" + boundMsg;
-    return true;
-}
-
 template<typename T>
 static bool CompareField(size_t paraIdx, size_t runIdx, const char* name,
                          const T& a, const T& b,
@@ -62,17 +21,6 @@ static bool CompareField(size_t paraIdx, size_t runIdx, const char* name,
         reason = "Paragraph " + std::to_string(paraIdx) +
                  (runIdx == SIZE_MAX ? "" : " run " + std::to_string(runIdx) + " ") +
                  name + ": " + std::to_string(a) + " vs " + std::to_string(b);
-        return true;
-    }
-    return false;
-}
-
-static bool CompareBoolField(size_t paraIdx, size_t runIdx, const char* name,
-                             bool a, bool b, std::string& reason) {
-    if (a != b) {
-        reason = "Paragraph " + std::to_string(paraIdx) +
-                 " run " + std::to_string(runIdx) + " " +
-                 name + ": " + (a ? "true" : "false") + " vs " + (b ? "true" : "false");
         return true;
     }
     return false;
@@ -100,6 +48,149 @@ static TableCellBorders NormalizeCellBorders(const TableCellBorders& cellBorders
 
 static int EffectiveCellPadding(int cellPad, int rowPad) {
     return (cellPad > 0 || rowPad > 0) ? std::max(cellPad, rowPad) : 0;
+}
+
+static std::string BuildRunLocation(const std::string& kind, size_t locIdx,
+                                     size_t charPos, size_t runA, size_t runB) {
+    return kind + " " + std::to_string(locIdx) +
+           " char " + std::to_string(charPos) +
+           " (runA " + std::to_string(runA) +
+           ", runB " + std::to_string(runB) + ")";
+}
+
+static bool CompareFormatSemantic(const RtfRunFormat& fmtA, const RtfRunFormat& fmtB,
+    const RtfDocument& docA, const RtfDocument& docB,
+    const std::string& loc, int& effFsA, int& effFsB, std::string& reason) {
+    const auto reportBool = [&](const char* name, bool a, bool b) {
+        if (a != b) {
+            reason = loc + " " + name + ": " + (a ? "true" : "false") + " vs " + (b ? "true" : "false");
+            return true;
+        }
+        return false;
+    };
+    const auto reportInt = [&](const char* name, int a, int b) {
+        if (a != b) {
+            reason = loc + " " + name + ": " + std::to_string(a) + " vs " + std::to_string(b);
+            return true;
+        }
+        return false;
+    };
+    const auto reportResolvedColor = [&](const char* name, int idxA, int idxB) {
+        bool hasA, hasB;
+        RtfColorEntry resolvedA = ResolveColorFromTable(idxA, docA, &hasA);
+        RtfColorEntry resolvedB = ResolveColorFromTable(idxB, docB, &hasB);
+        if (resolvedA.red == resolvedB.red && resolvedA.green == resolvedB.green &&
+            resolvedA.blue == resolvedB.blue) {
+            return false;
+        }
+        std::string rgbA = "(" + std::to_string(resolvedA.red) + "," +
+            std::to_string(resolvedA.green) + "," + std::to_string(resolvedA.blue) + ")";
+        std::string rgbB = "(" + std::to_string(resolvedB.red) + "," +
+            std::to_string(resolvedB.green) + "," + std::to_string(resolvedB.blue) + ")";
+        std::string boundMsg;
+        if (!hasA || !hasB) {
+            boundMsg = " [out-of-bounds: A=" + std::to_string(idxA) + "/" +
+                std::to_string(docA.colors.size()) + ", B=" + std::to_string(idxB) + "/" +
+                std::to_string(docB.colors.size()) + "]";
+        }
+        reason = loc + " " + name + ": " + std::to_string(idxA) +
+            " (" + rgbA + ") vs " + std::to_string(idxB) + " (" + rgbB + ")" + boundMsg;
+        return true;
+    };
+
+    if (reportBool("bold", fmtA.bold, fmtB.bold)) return false;
+    if (reportBool("italic", fmtA.italic, fmtB.italic)) return false;
+    if (reportBool("underline", fmtA.underline, fmtB.underline)) return false;
+
+    // Font — resolve by family
+    if (fmtA.fontIndex != fmtB.fontIndex) {
+        std::string familyA, familyB;
+        bool hasFontA = fmtA.fontIndex >= 0 && fmtA.fontIndex < static_cast<int>(docA.fonts.size());
+        bool hasFontB = fmtB.fontIndex >= 0 && fmtB.fontIndex < static_cast<int>(docB.fonts.size());
+        if (hasFontA) familyA = docA.fonts[fmtA.fontIndex].family;
+        if (hasFontB) familyB = docB.fonts[fmtB.fontIndex].family;
+        if (!(hasFontA && hasFontB && familyA == familyB)) {
+            reason = loc + " fontIndex: " + std::to_string(fmtA.fontIndex) +
+                " (" + familyA + ") vs " + std::to_string(fmtB.fontIndex) + " (" + familyB + ")";
+            return false;
+        }
+    }
+
+    int effA = fmtA.fontSize > 0 ? fmtA.fontSize : effFsA;
+    int effB = fmtB.fontSize > 0 ? fmtB.fontSize : effFsB;
+    if (reportInt("fontSize", effA, effB)) return false;
+    effFsA = effA;
+    effFsB = effB;
+
+    if (fmtA.colorIndex != fmtB.colorIndex) {
+        if (reportResolvedColor("colorIndex", fmtA.colorIndex, fmtB.colorIndex)) return false;
+    }
+    if (reportBool("superscript", fmtA.superscript, fmtB.superscript)) return false;
+    if (reportBool("subscript", fmtA.subscript, fmtB.subscript)) return false;
+    if (reportBool("strikeOut", fmtA.strikeOut, fmtB.strikeOut)) return false;
+    if (fmtA.bgColorIndex != fmtB.bgColorIndex) {
+        if (reportResolvedColor("bgColorIndex", fmtA.bgColorIndex, fmtB.bgColorIndex)) return false;
+    }
+    if (reportInt("underlineStyle", static_cast<int>(fmtA.underlineStyle),
+                                  static_cast<int>(fmtB.underlineStyle))) return false;
+    if (reportInt("capitalization", static_cast<int>(fmtA.capitalization),
+                                   static_cast<int>(fmtB.capitalization))) return false;
+    if (reportInt("upOffset", fmtA.upOffset, fmtB.upOffset)) return false;
+    if (reportInt("dnOffset", fmtA.dnOffset, fmtB.dnOffset)) return false;
+    if (reportBool("kerning", fmtA.kerning, fmtB.kerning)) return false;
+    if (reportInt("expnd", fmtA.expnd, fmtB.expnd)) return false;
+    if (fmtA.ulColorIndex != 0 || fmtB.ulColorIndex != 0) {
+        if (reportResolvedColor("ulColorIndex", fmtA.ulColorIndex, fmtB.ulColorIndex)) return false;
+    }
+    if (reportInt("langId", fmtA.langId, fmtB.langId)) return false;
+    if (reportBool("protected", fmtA.protected_, fmtB.protected_)) return false;
+    return true;
+}
+
+static RtfCompareResult CompareRunsSemantic(const std::vector<RtfRun>& runsA,
+    const std::vector<RtfRun>& runsB, const RtfDocument& docA, const RtfDocument& docB,
+    const std::string& kind, size_t locIdx, int& effFsA, int& effFsB, std::string& reason) {
+    // Compare total text
+    std::string textA, textB;
+    for (const auto& run : runsA) textA += run.text;
+    for (const auto& run : runsB) textB += run.text;
+    if (textA != textB) {
+        reason = kind + " " + std::to_string(locIdx) +
+            " text: '" + textA + "' vs '" + textB + "'";
+        return RtfCompareResult::StructuralDiff;
+    }
+
+    // Walk both run lists, compare formats at each boundary.
+    // endA/endB track the absolute end position of each current run.
+    size_t idxA = 0, idxB = 0;
+    size_t charPos = 0;
+    size_t endA = runsA.empty() ? 0 : runsA[0].text.length();
+    size_t endB = runsB.empty() ? 0 : runsB[0].text.length();
+    while (idxA < runsA.size() || idxB < runsB.size()) {
+        size_t nextPos;
+        if (idxA >= runsA.size()) nextPos = endB;
+        else if (idxB >= runsB.size()) nextPos = endA;
+        else nextPos = std::min(endA, endB);
+
+        if (idxA < runsA.size() && idxB < runsB.size()) {
+            std::string loc = BuildRunLocation(kind, locIdx, charPos, idxA, idxB);
+            if (!CompareFormatSemantic(runsA[idxA].format, runsB[idxB].format,
+                    docA, docB, loc, effFsA, effFsB, reason)) {
+                return RtfCompareResult::StructuralDiff;
+            }
+        }
+
+        if (endA == nextPos) {
+            idxA++;
+            if (idxA < runsA.size()) endA += runsA[idxA].text.length();
+        }
+        if (endB == nextPos) {
+            idxB++;
+            if (idxB < runsB.size()) endB += runsB[idxB].text.length();
+        }
+        charPos = nextPos;
+    }
+    return RtfCompareResult::Identical;
 }
 
 RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
@@ -244,29 +335,12 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
                     const auto& [runsA, fmtA] = rowA.cells[ci];
                     const auto& [runsB, fmtB] = rowB.cells[ci];
 
-                    if (runsA.size() != runsB.size()) {
-                        reason = "Table " + std::to_string(tableIdxA) +
-                                 " row " + std::to_string(ri) +
-                                 " cell " + std::to_string(ci) +
-                                 " run count: " + std::to_string(runsA.size()) +
-                                 " vs " + std::to_string(runsB.size());
+                    std::string cellKind = "Table " + std::to_string(tableIdxA) +
+                        " row " + std::to_string(ri) + " cell " + std::to_string(ci);
+                    int cellEffFsA = 0, cellEffFsB = 0;
+                    if (CompareRunsSemantic(runsA, runsB, a, b, cellKind, 0,
+                            cellEffFsA, cellEffFsB, reason) != RtfCompareResult::Identical) {
                         return RtfCompareResult::StructuralDiff;
-                    }
-                    for (size_t j = 0; j < runsA.size(); ++j) {
-                        if (runsA[j].text != runsB[j].text) {
-                            reason = "Table " + std::to_string(tableIdxA) +
-                                     " row " + std::to_string(ri) +
-                                     " cell " + std::to_string(ci) +
-                                     " run " + std::to_string(j) +
-                                     " text: '" + runsA[j].text + "' vs '" + runsB[j].text + "'";
-                            return RtfCompareResult::StructuralDiff;
-                        }
-                        if (CompareBoolField(tableIdxA, j, "cell bold",
-                                             runsA[j].format.bold, runsB[j].format.bold, reason))
-                            return RtfCompareResult::StructuralDiff;
-                        if (CompareBoolField(tableIdxA, j, "cell italic",
-                                             runsA[j].format.italic, runsB[j].format.italic, reason))
-                            return RtfCompareResult::StructuralDiff;
                     }
 
                     if (fmtA.vertAlign != fmtB.vertAlign) {
@@ -399,100 +473,10 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
                     }
                 }
 
-                if (paraA.runs.size() != paraB.runs.size()) {
-                    reason = "Paragraph " + std::to_string(paraIdx) +
-                             " run count: " + std::to_string(paraA.runs.size()) +
-                             " vs " + std::to_string(paraB.runs.size());
+                if (CompareRunsSemantic(paraA.runs, paraB.runs, a, b,
+                        "Paragraph", paraIdx, effFontSizeA, effFontSizeB,
+                        reason) != RtfCompareResult::Identical) {
                     return RtfCompareResult::StructuralDiff;
-                }
-
-                for (size_t j = 0; j < paraA.runs.size(); ++j) {
-                    const auto& runA = paraA.runs[j];
-                    const auto& runB = paraB.runs[j];
-
-                    if (runA.text != runB.text) {
-                        reason = "Paragraph " + std::to_string(paraIdx) +
-                                 " run " + std::to_string(j) +
-                                 " text: '" + runA.text + "' vs '" + runB.text + "'";
-                        return RtfCompareResult::StructuralDiff;
-                    }
-
-                    if (CompareBoolField(paraIdx, j, "bold",
-                                         runA.format.bold, runB.format.bold, reason)) return RtfCompareResult::StructuralDiff;
-                    if (CompareBoolField(paraIdx, j, "italic",
-                                         runA.format.italic, runB.format.italic, reason)) return RtfCompareResult::StructuralDiff;
-                    if (CompareBoolField(paraIdx, j, "underline",
-                                         runA.format.underline, runB.format.underline, reason)) return RtfCompareResult::StructuralDiff;
-                    if (runA.format.fontIndex != runB.format.fontIndex) {
-                        std::string familyA, familyB;
-                        bool hasFontA = runA.format.fontIndex >= 0 &&
-                            runA.format.fontIndex < static_cast<int>(a.fonts.size());
-                        bool hasFontB = runB.format.fontIndex >= 0 &&
-                            runB.format.fontIndex < static_cast<int>(b.fonts.size());
-                        if (hasFontA) familyA = a.fonts[runA.format.fontIndex].family;
-                        if (hasFontB) familyB = b.fonts[runB.format.fontIndex].family;
-                        if (hasFontA && hasFontB && familyA == familyB) {
-                        } else {
-                            reason = "Paragraph " + std::to_string(paraIdx) +
-                                     " run " + std::to_string(j) +
-                                     " fontIndex: " + std::to_string(runA.format.fontIndex) +
-                                     " (" + familyA + ") vs " + std::to_string(runB.format.fontIndex) +
-                                     " (" + familyB + ")";
-                            return RtfCompareResult::StructuralDiff;
-                        }
-                    }
-                    if (CompareField(paraIdx, j, "fontSize",
-                                      runA.format.fontSize > 0 ? runA.format.fontSize : effFontSizeA,
-                                      runB.format.fontSize > 0 ? runB.format.fontSize : effFontSizeB,
-                                      reason)) return RtfCompareResult::StructuralDiff;
-                    effFontSizeA = runA.format.fontSize > 0 ? runA.format.fontSize : effFontSizeA;
-                    effFontSizeB = runB.format.fontSize > 0 ? runB.format.fontSize : effFontSizeB;
-                    if (runA.format.colorIndex != runB.format.colorIndex) {
-                        if (CompareResolvedColors(paraIdx, j, runA.format.colorIndex, runB.format.colorIndex,
-                                                   a, b,
-                                                   ResolveColorFromTable, ResolveColorFromTable,
-                                                   reason, "colorIndex")) {
-                            return RtfCompareResult::StructuralDiff;
-                        }
-                    }
-                    if (CompareBoolField(paraIdx, j, "superscript",
-                                         runA.format.superscript, runB.format.superscript, reason)) return RtfCompareResult::StructuralDiff;
-                    if (CompareBoolField(paraIdx, j, "subscript",
-                                         runA.format.subscript, runB.format.subscript, reason)) return RtfCompareResult::StructuralDiff;
-                    if (CompareBoolField(paraIdx, j, "strikeOut",
-                                         runA.format.strikeOut, runB.format.strikeOut, reason)) return RtfCompareResult::StructuralDiff;
-                    if (runA.format.bgColorIndex != runB.format.bgColorIndex) {
-                        if (CompareResolvedColors(paraIdx, j, runA.format.bgColorIndex, runB.format.bgColorIndex,
-                                                   a, b,
-                                                   ResolveColorFromTable, ResolveColorFromTable,
-                                                   reason, "bgColorIndex")) {
-                            return RtfCompareResult::StructuralDiff;
-                        }
-                    }
-                    if (CompareField(paraIdx, j, "underlineStyle",
-                                     static_cast<int>(runA.format.underlineStyle), static_cast<int>(runB.format.underlineStyle), reason)) return RtfCompareResult::StructuralDiff;
-                    if (CompareField(paraIdx, j, "capitalization",
-                                     static_cast<int>(runA.format.capitalization), static_cast<int>(runB.format.capitalization), reason)) return RtfCompareResult::StructuralDiff;
-                    if (CompareField(paraIdx, j, "upOffset",
-                                      runA.format.upOffset, runB.format.upOffset, reason)) return RtfCompareResult::StructuralDiff;
-                    if (CompareField(paraIdx, j, "dnOffset",
-                                      runA.format.dnOffset, runB.format.dnOffset, reason)) return RtfCompareResult::StructuralDiff;
-                    if (CompareBoolField(paraIdx, j, "kerning",
-                                          runA.format.kerning, runB.format.kerning, reason)) return RtfCompareResult::StructuralDiff;
-                    if (CompareField(paraIdx, j, "expnd",
-                                       runA.format.expnd, runB.format.expnd, reason)) return RtfCompareResult::StructuralDiff;
-                    if (runA.format.ulColorIndex != 0 || runB.format.ulColorIndex != 0) {
-                        if (CompareResolvedColors(paraIdx, j, runA.format.ulColorIndex, runB.format.ulColorIndex,
-                                                    a, b,
-                                                    ResolveColorFromTable, ResolveColorFromTable,
-                                                    reason, "ulColorIndex")) {
-                            return RtfCompareResult::StructuralDiff;
-                        }
-                    }
-                    if (CompareField(paraIdx, j, "langId",
-                                        runA.format.langId, runB.format.langId, reason)) return RtfCompareResult::StructuralDiff;
-                    if (CompareBoolField(paraIdx, j, "protected",
-                                          runA.format.protected_, runB.format.protected_, reason)) return RtfCompareResult::StructuralDiff;
                 }
 
                 paraIdx++;

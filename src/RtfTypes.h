@@ -14,6 +14,7 @@ namespace Rte {
 static constexpr int UserPropProtect = 1000;
 static constexpr int UserPropUpOffset = 1004;
 static constexpr int UserPropDnOffset = 1005;
+static constexpr int UserPropLangId = 1006;
 static constexpr const char* UserPropMetaDefaultLangId = "rtf_meta_defaultLangId";
 static constexpr const char* UserPropMetaViewKind = "rtf_meta_viewKind";
 static constexpr const char* UserPropMetaUcByteCount = "rtf_meta_ucByteCount";

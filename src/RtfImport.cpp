@@ -100,6 +100,9 @@ static void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
         if (run.format.dnOffset != 0) {
             charFmt.setProperty(UserPropDnOffset, run.format.dnOffset);
         }
+        if (run.format.langId != 0) {
+            charFmt.setProperty(UserPropLangId, run.format.langId);
+        }
 
         cursor.insertText(QString::fromUtf8(run.text.data(),
                                               static_cast<int>(run.text.size())),
