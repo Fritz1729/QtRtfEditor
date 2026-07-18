@@ -5,6 +5,7 @@
 
 #include <QTextBlock>
 #include <QTextCursor>
+#include <algorithm>
 
 namespace Rte {
 
@@ -42,15 +43,12 @@ std::string RichTextEdit::Save(FormatMode mode) const {
 void RichTextEdit::SetProtection(std::size_t start, std::size_t end) {
     if (start >= end) return;
 
-    // Set user property on the range (best effort — used for RTF export)
     QTextCursor cursor(document());
     cursor.setPosition(static_cast<int>(start));
     cursor.setPosition(static_cast<int>(end), QTextCursor::KeepAnchor);
     QTextCharFormat fmt;
     fmt.setProperty(UserPropProtect, true);
     cursor.mergeCharFormat(fmt);
-
-    _protectedRanges.emplace_back(start, end);
 }
 
 void RichTextEdit::ClearProtection() {
@@ -60,17 +58,22 @@ void RichTextEdit::ClearProtection() {
     QTextCharFormat fmt;
     fmt.setProperty(UserPropProtect, false);
     cursor.mergeCharFormat(fmt);
-
-    _protectedRanges.clear();
 }
 
 bool RichTextEdit::IsProtected(std::size_t position) const {
     if (position >= static_cast<std::size_t>(document()->characterCount())) {
         return false;
     }
-    for (const auto& [start, end] : _protectedRanges) {
-        if (position >= start && position < end) {
-            return true;
+    QTextBlock block = document()->findBlock(static_cast<int>(position));
+    if (!block.isValid()) {
+        return false;
+    }
+    for (QTextBlock::iterator it = block.begin(); !it.atEnd(); ++it) {
+        const QTextFragment& frag = it.fragment();
+        int fragStart = frag.position();
+        int fragEnd = fragStart + frag.length();
+        if (static_cast<std::size_t>(fragStart) <= position && position < static_cast<std::size_t>(fragEnd)) {
+            return frag.charFormat().property(UserPropProtect).toBool();
         }
     }
     return false;
@@ -84,51 +87,27 @@ int RichTextEdit::codePage() const {
     return _codePage;
 }
 
-void RichTextEdit::SyncProtectedRanges() {
-    _protectedRanges.clear();
-
-    int docLen = document()->characterCount();
-    if (docLen == 0) return;
-
-    std::size_t runStart = 0;
-    bool inProtected = false;
-
-    auto checkPos = [this](std::size_t pos) -> bool {
-        int docLen = document()->characterCount();
-        if (pos >= static_cast<std::size_t>(docLen)) return false;
-        QTextBlock block = document()->findBlock(static_cast<int>(pos));
-        if (block.isValid()) {
-            QTextBlock::iterator it;
-            for (it = block.begin(); !it.atEnd(); ++it) {
-                const QTextFragment& fragment = it.fragment();
-                int fragStart = fragment.position();
-                int fragEnd = fragStart + fragment.length();
-                if (static_cast<std::size_t>(fragStart) <= pos && pos < static_cast<std::size_t>(fragEnd)) {
-                    return fragment.charFormat().property(UserPropProtect).toBool();
-                }
-            }
-        }
-        return false;
-    };
-
-    for (int i = 0; i <= docLen; ++i) {
-        bool protected_ = (i < docLen) && checkPos(static_cast<std::size_t>(i));
-        if (protected_ != inProtected) {
-            if (inProtected) {
-                _protectedRanges.emplace_back(runStart, static_cast<std::size_t>(i));
-            } else {
-                runStart = static_cast<std::size_t>(i);
-            }
-            inProtected = protected_;
-        }
-    }
-}
 
 bool RichTextEdit::RangeHasProtected(int start, int end) const {
-    for (int i = start; i < end; ++i) {
-        if (IsProtected(static_cast<std::size_t>(i))) {
-            return true;
+    if (start >= end) {
+        return false;
+    }
+    QTextBlock block = document()->findBlock(start);
+    int pos = start;
+    while (block.isValid() && pos < end) {
+        for (QTextBlock::iterator it = block.begin(); !it.atEnd(); ++it) {
+            const QTextFragment& frag = it.fragment();
+            int fragStart = frag.position();
+            int fragEnd = fragStart + frag.length();
+            if (fragStart >= end) {
+                break;
+            }
+            if (fragEnd > start && frag.charFormat().property(UserPropProtect).toBool()) {
+                return true;
+            }
+            pos = std::max(pos, fragEnd);
         }
+        block = block.next();
     }
     return false;
 }
@@ -161,7 +140,6 @@ void RichTextEdit::keyPressEvent(QKeyEvent* event) {
     }
 
     QTextEdit::keyPressEvent(event);
-    SyncProtectedRanges();
     bool forward = (event->key() != Qt::Key_Left);
     ClampCursor(forward);
 }
@@ -194,7 +172,6 @@ void RichTextEdit::mousePressEvent(QMouseEvent* event) {
 void RichTextEdit::insertFromMimeData(const QMimeData* source) {
     ClampCursor();
     QTextEdit::insertFromMimeData(source);
-    SyncProtectedRanges();
     ClampCursor();
 }
 
@@ -222,7 +199,6 @@ void RichTextEdit::ClampCursor(bool forward) {
 
 void RichTextEdit::LoadRtf(const std::string& blob) {
     ImportRtf(document(), blob, _codePage);
-    SyncProtectedRanges();
 
     // Apply default tab stop distance (stored during import as twips)
     int tabStopTwips = document()->property(UserPropMetaDefaultTabStopTwips).toInt();
@@ -236,8 +212,7 @@ void RichTextEdit::LoadRtf(const std::string& blob) {
 
 void RichTextEdit::LoadHtml(const std::string& blob) {
     setHtml(QString::fromUtf8(blob.data(),
-                                static_cast<int>(blob.size())));
-    _protectedRanges.clear();
+                                 static_cast<int>(blob.size())));
 }
 
 std::string RichTextEdit::SerializeRtf() const {

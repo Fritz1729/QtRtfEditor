@@ -18,7 +18,6 @@
 #include <QMimeData>
 #include <QMouseEvent>
 #include <string>
-#include <vector>
 
 // Symbol export macro (DLL/shared builds)
 #ifndef RTE_EXPORT
@@ -145,14 +144,8 @@ private:
      */
     void ClampCursor(bool forward = true);
 
-    /**
-     * @brief Rebuild _protectedRanges from user property in the document.
-     */
-    void SyncProtectedRanges();
-
     bool RangeHasProtected(int start, int end) const;
 
-    std::vector<std::pair<std::size_t, std::size_t>> _protectedRanges;
     int _codePage = 1252;
 };
 
