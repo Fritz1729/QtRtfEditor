@@ -148,6 +148,8 @@ private:
      */
     void SyncProtectedRanges();
 
+    bool RangeHasProtected(int start, int end) const;
+
     std::vector<std::pair<std::size_t, std::size_t>> _protectedRanges;
     int _codePage = 1252;
 };

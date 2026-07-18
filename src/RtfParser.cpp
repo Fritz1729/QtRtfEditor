@@ -424,19 +424,19 @@ private:
             break;
 
         case RtfControl::TableCtrlWord::ClBorderLeft:
-            beginBorderSide(0);
+            beginBorderSide(0, false);
             break;
 
         case RtfControl::TableCtrlWord::ClBorderTop:
-            beginBorderSide(1);
+            beginBorderSide(1, false);
             break;
 
         case RtfControl::TableCtrlWord::ClBorderRight:
-            beginBorderSide(2);
+            beginBorderSide(2, false);
             break;
 
         case RtfControl::TableCtrlWord::ClBorderBottom:
-            beginBorderSide(3);
+            beginBorderSide(3, false);
             break;
 
         case RtfControl::TableCtrlWord::BrdrSolid:
@@ -515,19 +515,19 @@ private:
             break;
 
         case RtfControl::TableCtrlWord::TrBorderLeft:
-            beginRowBorderSide(0);
+            beginBorderSide(0, true);
             break;
 
         case RtfControl::TableCtrlWord::TrBorderTop:
-            beginRowBorderSide(1);
+            beginBorderSide(1, true);
             break;
 
         case RtfControl::TableCtrlWord::TrBorderRight:
-            beginRowBorderSide(2);
+            beginBorderSide(2, true);
             break;
 
         case RtfControl::TableCtrlWord::TrBorderBottom:
-            beginRowBorderSide(3);
+            beginBorderSide(3, true);
             break;
         }
     }
@@ -570,22 +570,13 @@ private:
         _pendingBorderIsRow = false;
     }
 
-    void beginBorderSide(int side) {
+    void beginBorderSide(int side, bool isRow) {
         applyPendingBorder();
         _pendingBorderSide = side;
         _pendingBorderStyle = 0;
         _pendingBorderWidth = 0;
         _pendingBorderColor = 0;
-        _pendingBorderIsRow = false;
-    }
-
-    void beginRowBorderSide(int side) {
-        applyPendingBorder();
-        _pendingBorderSide = side;
-        _pendingBorderStyle = 0;
-        _pendingBorderWidth = 0;
-        _pendingBorderColor = 0;
-        _pendingBorderIsRow = true;
+        _pendingBorderIsRow = isRow;
     }
 
     void addCurrentCellToRow() {
@@ -936,30 +927,11 @@ private:
     }
 
     void parseControlWord() {
-        std::string word;
-        int arg = 0;
-        bool hasArg = false;
-
-        while (_pos < _len && (isWordChar(_rtf[_pos]) || isDigit(_rtf[_pos]))) {
-            if (_rtf[_pos] >= '0' && _rtf[_pos] <= '9') {
-                arg = arg * 10 + (_rtf[_pos] - '0');
-                hasArg = true;
-            } else {
-                word += static_cast<char>(
-                    static_cast<unsigned char>(_rtf[_pos]) | 0x20); // lowercase
-            }
-            _pos++;
-        }
-
-        if (hasArg && _pos < _len && !isWordChar(_rtf[_pos]) && _rtf[_pos] != '\\' && _rtf[_pos] != '}' && _rtf[_pos] != '{') {
-            _pos++; // skip trailing whitespace after numeric argument
-        } else if (!hasArg && _pos < _len && _rtf[_pos] == ' ') {
-            _pos++; // consume space delimiter for no-arg control words
-        }
-
+        auto [word, arg] = ReadControlWord();
+        bool hasArg = arg >= 0;
+        ConsumeControlDelimiter(arg, hasArg);
         if (word.empty()) return;
-
-        processControlWord(word, hasArg ? arg : -1);
+        processControlWord(word, arg);
     }
 
     void parseUnicodeEscape() {
@@ -1170,19 +1142,8 @@ private:
         _pos++;
         if (_pos >= _len) return;
 
-        std::string word;
-        int arg = 0;
-        bool hasArg = false;
-
-        while (_pos < _len && (isWordChar(_rtf[_pos]) || isDigit(_rtf[_pos]))) {
-            if (_rtf[_pos] >= '0' && _rtf[_pos] <= '9') {
-                arg = arg * 10 + (_rtf[_pos] - '0');
-                hasArg = true;
-            } else {
-                word += static_cast<char>(static_cast<unsigned char>(_rtf[_pos]) | 0x20);
-            }
-            _pos++;
-        }
+        auto [word, arg] = ReadControlWord();
+        bool hasArg = arg >= 0;
 
         if (word == "list" || word == "listoverride") {
             if (_currentListId > 0 && _currentListStyle != ListStyle::None) {
@@ -1244,21 +1205,8 @@ private:
 
         char c = _rtf[_pos];
         if (isWordChar(c)) {
-            std::string word;
-            int arg = 0;
-            bool hasArg = false;
-
-            while (_pos < _len && (isWordChar(_rtf[_pos]) || isDigit(_rtf[_pos]))) {
-                if (_rtf[_pos] >= '0' && _rtf[_pos] <= '9') {
-                    arg = arg * 10 + (_rtf[_pos] - '0');
-                    hasArg = true;
-                } else {
-                    word += static_cast<char>(
-                        static_cast<unsigned char>(_rtf[_pos]) | 0x20);
-                }
-                _pos++;
-            }
-
+            auto [word, arg] = ReadControlWord();
+            bool hasArg = arg >= 0;
             if (word.empty()) return;
 
             // Known pict control words
@@ -1376,6 +1324,30 @@ private:
         return val;
     }
 
+    std::pair<std::string, int> ReadControlWord() {
+        std::string word;
+        int arg = 0;
+        bool hasArg = false;
+        while (_pos < _len && (isWordChar(_rtf[_pos]) || isDigit(_rtf[_pos]))) {
+            if (_rtf[_pos] >= '0' && _rtf[_pos] <= '9') {
+                arg = arg * 10 + (_rtf[_pos] - '0');
+                hasArg = true;
+            } else {
+                word += static_cast<char>(static_cast<unsigned char>(_rtf[_pos]) | 0x20);
+            }
+            _pos++;
+        }
+        return {word, hasArg ? arg : -1};
+    }
+
+    void ConsumeControlDelimiter(int arg, bool hasArg) {
+        if (hasArg && _pos < _len && !isWordChar(_rtf[_pos]) && _rtf[_pos] != '\\' && _rtf[_pos] != '}' && _rtf[_pos] != '{') {
+            _pos++;
+        } else if (!hasArg && _pos < _len && _rtf[_pos] == ' ') {
+            _pos++;
+        }
+    }
+
     void skipWhitespace() {
         while (_pos < _len && isWhitespace(_rtf[_pos])) {
             _pos++;
@@ -1401,12 +1373,6 @@ private:
 };
 
 } // namespace
-
-RtfDocument RtfParser::parse(const std::string& rtf, int codePage) {
-    _codePage = codePage;
-    RtfParserImpl impl;
-    return impl.parse(rtf, codePage);
-}
 
 RtfDocument ParseRtf(const std::string& rtf, int codePage) {
     RtfParserImpl impl;

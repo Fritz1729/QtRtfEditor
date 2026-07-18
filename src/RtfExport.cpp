@@ -138,6 +138,15 @@ std::string AlignmentToRtf(Qt::Alignment alignment) {
     return "";
 }
 
+static void EmitPictHeader(std::ostringstream& out, const QString& blipTag, qreal width, qreal height) {
+    out << "{\\pict\\" << blipTag.toStdString() << " ";
+    int picwgoal = static_cast<int>(width * 2.0);
+    int pichgoal = static_cast<int>(height * 2.0);
+    if (picwgoal > 0) out << "\\picwgoal" << picwgoal;
+    if (pichgoal > 0) out << "\\pichgoal" << pichgoal;
+    out << ' ';
+}
+
 static std::string EmitImageAsPict(const QTextDocument& doc, const QString& name,
                                       qreal width, qreal height) {
     // Extract counter from name (e.g., "rtfimage://1.png" -> "1")
@@ -171,12 +180,7 @@ static std::string EmitImageAsPict(const QTextDocument& doc, const QString& name
     if (hexVariant.canConvert<QString>()) {
         QString hexStr = hexVariant.toString();
         std::ostringstream out;
-        out << "{\\pict\\" << blipTag.toStdString() << " ";
-        int picwgoal = static_cast<int>(width * 2.0);
-        int pichgoal = static_cast<int>(height * 2.0);
-        if (picwgoal > 0) out << "\\picwgoal" << picwgoal;
-        if (pichgoal > 0) out << "\\pichgoal" << pichgoal;
-        out << ' ';
+        EmitPictHeader(out, blipTag, width, height);
         out << hexStr.toStdString();
         out << '}';
         return out.str();
@@ -204,13 +208,7 @@ static std::string EmitImageAsPict(const QTextDocument& doc, const QString& name
     }
 
     std::ostringstream out;
-    out << "{\\pict\\" << blipTag.toStdString() << " ";
-
-    int picwgoal = static_cast<int>(width * 2.0);
-    int pichgoal = static_cast<int>(height * 2.0);
-    if (picwgoal > 0) out << "\\picwgoal" << picwgoal;
-    if (pichgoal > 0) out << "\\pichgoal" << pichgoal;
-
+    EmitPictHeader(out, blipTag, width, height);
     out << encodedData.toHex().data();
     out << "}";
     return out.str();
@@ -319,13 +317,25 @@ struct CellBorderInfo {
     }
 };
 
+static void CollectColor(const QColor& col, std::vector<QColor>& list) {
+    if (col.isValid() && col.alpha() == 255 && FindColorIndex(list, col) < 0)
+        list.push_back(col);
+}
+
+static int LookupColorIndex(const QColor& col, const std::vector<QColor>& list) {
+    if (col.isValid() && col.alpha() == 255) {
+        int idx = FindColorIndex(list, col);
+        if (idx >= 0) return idx + 1;
+    }
+    return 0;
+}
+
 static void CollectBorderColor(const QBrush& brush, std::vector<QColor>& colorList) {
     if (brush.style() != Qt::NoBrush && brush.color().isValid()) {
         QColor col = brush.color();
         if (col.alpha() == 255 &&
-            !(col.red() == 0 && col.green() == 0 && col.blue() == 0) &&
-            FindColorIndex(colorList, col) < 0)
-            colorList.push_back(col);
+            !(col.red() == 0 && col.green() == 0 && col.blue() == 0))
+            CollectColor(col, colorList);
     }
 }
 
@@ -423,19 +433,15 @@ std::string ExportRtf(const QTextDocument& document) {
                 if (!fam.isEmpty() && fontMap.find(fam.toStdString()) == fontMap.end()) {
                     fontMap[fam.toStdString()] = ++idx;
                 }
-                auto collectColor = [&](const QColor& col, std::vector<QColor>& list) {
-                    if (col.isValid() && col.alpha() == 255 && FindColorIndex(list, col) < 0)
-                        list.push_back(col);
-                };
                 {
                     QColor fg = frag.charFormat().foreground().color();
                     if (!(fg.red() == 0 && fg.green() == 0 && fg.blue() == 0))
-                        collectColor(fg, colorList);
+                        CollectColor(fg, colorList);
                 }
                 {
                     QBrush bgBrush = frag.charFormat().background();
                     if (bgBrush.style() != Qt::NoBrush)
-                        collectColor(bgBrush.color(), bgColorList);
+                        CollectColor(bgBrush.color(), bgColorList);
                 }
                 it++;
             }
@@ -659,18 +665,11 @@ std::string ExportRtf(const QTextDocument& document) {
                 auto fIt = fontMap.find(fam.toStdString());
                 cur.fontIndex = (fIt != fontMap.end()) ? fIt->second : defaultFontIdx;
 
-                auto lookupColor = [&](const QColor& col, std::vector<QColor>& list) -> int {
-                    if (col.isValid() && col.alpha() == 255) {
-                        int idx = FindColorIndex(list, col);
-                        if (idx >= 0) return idx + 1;
-                    }
-                    return 0;
-                };
-                cur.colorIndex = lookupColor(charFmt.foreground().color(), colorList);
+                cur.colorIndex = LookupColorIndex(charFmt.foreground().color(), colorList);
                 {
                     QBrush bgBrush = charFmt.background();
                     if (bgBrush.style() != Qt::NoBrush)
-                        cur.bgColorIndex = lookupColor(bgBrush.color(), bgColorList);
+                        cur.bgColorIndex = LookupColorIndex(bgBrush.color(), bgColorList);
                     else
                         cur.bgColorIndex = 0;
                 }

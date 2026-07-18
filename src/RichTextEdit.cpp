@@ -110,34 +110,31 @@ void RichTextEdit::SyncProtectedRanges() {
     }
 }
 
+bool RichTextEdit::RangeHasProtected(int start, int end) const {
+    for (int i = start; i < end; ++i) {
+        if (IsProtected(static_cast<std::size_t>(i))) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void RichTextEdit::keyPressEvent(QKeyEvent* event) {
     QTextCursor cursor = textCursor();
     int pos = cursor.position();
 
     if (event->key() == Qt::Key_Backspace) {
-        if (cursor.hasSelection()) {
-            int selStart = cursor.selectionStart();
-            int selEnd = cursor.selectionEnd();
-            for (int i = selStart; i < selEnd; ++i) {
-                if (IsProtected(static_cast<std::size_t>(i))) {
-                    event->ignore();
-                    return;
-                }
-            }
+        if (cursor.hasSelection() && RangeHasProtected(cursor.selectionStart(), cursor.selectionEnd())) {
+            event->ignore();
+            return;
         } else if (pos > 0 && IsProtected(static_cast<std::size_t>(pos - 1))) {
             event->ignore();
             return;
         }
     } else if (event->key() == Qt::Key_Delete) {
-        if (cursor.hasSelection()) {
-            int selStart = cursor.selectionStart();
-            int selEnd = cursor.selectionEnd();
-            for (int i = selStart; i < selEnd; ++i) {
-                if (IsProtected(static_cast<std::size_t>(i))) {
-                    event->ignore();
-                    return;
-                }
-            }
+        if (cursor.hasSelection() && RangeHasProtected(cursor.selectionStart(), cursor.selectionEnd())) {
+            event->ignore();
+            return;
         } else {
             int docLen = document()->characterCount();
             if (IsProtected(static_cast<std::size_t>(pos)) ||
