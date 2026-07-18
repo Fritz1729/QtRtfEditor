@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <map>
 #include <sstream>
@@ -221,21 +222,35 @@ struct ParaFmtState {
     int indent = 0;
     int lineHeightType = QTextBlockFormat::SingleHeight;
     double lineHeight = 0;
+
+    static ParaFmtState From(const QTextBlockFormat& bf) {
+        ParaFmtState s{};
+        s.alignment = bf.alignment();
+        s.leftMargin = bf.leftMargin();
+        s.rightMargin = bf.rightMargin();
+        s.topMargin = bf.topMargin();
+        s.bottomMargin = bf.bottomMargin();
+        s.indent = bf.indent();
+        s.lineHeightType = bf.lineHeightType();
+        s.lineHeight = bf.lineHeight();
+        return s;
+    }
 };
+
+static void EmitTwipsTag(std::ostringstream& out, double val, const char* tag) {
+    if (val > 0) {
+        int twips = lround(val * 2.0);
+        out << "\\" << tag << twips;
+    }
+}
 
 static void EmitParaFormatting(std::ostringstream& out, const QTextBlockFormat& blockFmt) {
     out << AlignmentToRtf(blockFmt.alignment());
-    auto emitIfPositive = [&](double val, const char* tag) {
-        if (val > 0) {
-            int halfPoints = static_cast<int>(val * 2.0);
-            out << "\\" << tag << halfPoints;
-        }
-    };
-    emitIfPositive(blockFmt.leftMargin(), "li");
-    emitIfPositive(static_cast<double>(blockFmt.indent()), "fi");
-    emitIfPositive(blockFmt.rightMargin(), "ri");
-    emitIfPositive(blockFmt.topMargin(), "sb");
-    emitIfPositive(blockFmt.bottomMargin(), "sa");
+    EmitTwipsTag(out, blockFmt.leftMargin(), "li");
+    EmitTwipsTag(out, static_cast<double>(blockFmt.indent()), "fi");
+    EmitTwipsTag(out, blockFmt.rightMargin(), "ri");
+    EmitTwipsTag(out, blockFmt.topMargin(), "sb");
+    EmitTwipsTag(out, blockFmt.bottomMargin(), "sa");
     int lhType = blockFmt.lineHeightType();
     if (lhType == QTextBlockFormat::FixedHeight) {
         double lhVal = blockFmt.lineHeight();
@@ -288,15 +303,79 @@ static void EmitParaFormattingIfNeeded(std::ostringstream& out, const QTextBlock
         out << "\\pard ";
         if (hasParaFormatting) EmitParaFormatting(out, blockFmt);
     }
-    lastParaFmt.alignment = blockFmt.alignment();
-    lastParaFmt.leftMargin = blockFmt.leftMargin();
-    lastParaFmt.rightMargin = blockFmt.rightMargin();
-    lastParaFmt.topMargin = blockFmt.topMargin();
-    lastParaFmt.bottomMargin = blockFmt.bottomMargin();
-    lastParaFmt.indent = blockFmt.indent();
-    lastParaFmt.lineHeightType = blockFmt.lineHeightType();
-    lastParaFmt.lineHeight = blockFmt.lineHeight();
+    lastParaFmt = ParaFmtState::From(blockFmt);
     lastParaFmtSet = true;
+}
+
+struct CellBorderInfo {
+    double width = 0;
+    QTextFrameFormat::BorderStyle style = QTextFrameFormat::BorderStyle_None;
+    int colorIdx = 0;
+    bool operator==(const CellBorderInfo& other) const {
+        return width == other.width && style == other.style && colorIdx == other.colorIdx;
+    }
+    bool operator!=(const CellBorderInfo& other) const {
+        return !(*this == other);
+    }
+};
+
+static void CollectBorderColor(const QBrush& brush, std::vector<QColor>& colorList) {
+    if (brush.style() != Qt::NoBrush && brush.color().isValid()) {
+        QColor col = brush.color();
+        if (col.alpha() == 255 &&
+            !(col.red() == 0 && col.green() == 0 && col.blue() == 0) &&
+            FindColorIndex(colorList, col) < 0)
+            colorList.push_back(col);
+    }
+}
+
+static CellBorderInfo ReadCellBorder(const QTextTableCellFormat& cf, const std::vector<QColor>& colorList, int side) {
+    CellBorderInfo bi{};
+    switch (side) {
+        case 0:
+            bi.width = cf.leftBorder();
+            bi.style = cf.leftBorderStyle();
+            if (cf.leftBorderBrush().style() != Qt::NoBrush)
+                bi.colorIdx = FindColorIndex(colorList, cf.leftBorderBrush().color()) + 1;
+            break;
+        case 1:
+            bi.width = cf.topBorder();
+            bi.style = cf.topBorderStyle();
+            if (cf.topBorderBrush().style() != Qt::NoBrush)
+                bi.colorIdx = FindColorIndex(colorList, cf.topBorderBrush().color()) + 1;
+            break;
+        case 2:
+            bi.width = cf.rightBorder();
+            bi.style = cf.rightBorderStyle();
+            if (cf.rightBorderBrush().style() != Qt::NoBrush)
+                bi.colorIdx = FindColorIndex(colorList, cf.rightBorderBrush().color()) + 1;
+            break;
+        default:
+            bi.width = cf.bottomBorder();
+            bi.style = cf.bottomBorderStyle();
+            if (cf.bottomBorderBrush().style() != Qt::NoBrush)
+                bi.colorIdx = FindColorIndex(colorList, cf.bottomBorderBrush().color()) + 1;
+            break;
+    }
+    return bi;
+}
+
+static void EmitBorderSpec(std::ostringstream& out, double width, QTextFrameFormat::BorderStyle style, int colorIdx) {
+    if (width <= 0.0) return;
+    int halfPts = lround(width * 2.0);
+    switch (style) {
+        case QTextFrameFormat::BorderStyle_Solid:  out << "\\brdrs"; break;
+        case QTextFrameFormat::BorderStyle_Dashed:  out << "\\brdrd"; break;
+        default: return;
+    }
+    out << "\\brdrw" << halfPts;
+    if (colorIdx > 0) out << "\\brdrcf" << colorIdx;
+}
+
+static void EmitBorderSide(std::ostringstream& out, const char* sideTag, double width, QTextFrameFormat::BorderStyle style, int colorIdx) {
+    if (width <= 0.0) return;
+    out << sideTag;
+    EmitBorderSpec(out, width, style, colorIdx);
 }
 
 } // namespace
@@ -611,7 +690,7 @@ std::string ExportRtf(const QTextDocument& document) {
                 {
                     qreal spacing = charFmt.fontLetterSpacing();
                     if (spacing > 0) {
-                        cur.expnd = static_cast<int>(spacing * 20.0 / ptSize + 0.5);
+                        cur.expnd = lround(spacing * 20.0 / ptSize);
                     }
                 }
 
@@ -656,27 +735,19 @@ std::string ExportRtf(const QTextDocument& document) {
             }
 
             if (!firstRun) {
-                if (inListGroup) out << '}';
                 bool plainEmitted = WritePlainTextOff(out, lastEmitted);
-                out << "\\par";
-                for (int i = 0; i < deffDeftabGroupDepth; i++)
-                    out << '}';
-                deffDeftabGroupDepth = 0;
-                out << "\n";
                 if (plainEmitted) {
                     carriedOverFormat.fontIndex = defaultFontIdx;
                 } else {
                     carriedOverFormat.fontIndex = lastEmitted.fontIndex;
                 }
-            } else {
-                if (inListGroup) out << '}';
-                out << "\\par";
-                for (int i = 0; i < deffDeftabGroupDepth; i++)
-                    out << '}';
-                deffDeftabGroupDepth = 0;
-                out << "\n";
-                // No runs emitted — font state unchanged from previous block
             }
+            if (inListGroup) out << '}';
+            out << "\\par";
+            for (int i = 0; i < deffDeftabGroupDepth; i++)
+                out << '}';
+            deffDeftabGroupDepth = 0;
+            out << "\n";
         }
     };
 
@@ -709,89 +780,13 @@ std::string ExportRtf(const QTextDocument& document) {
                         QTextTableCell cell = table->cellAt(r, c);
                         if (!cell.isValid()) continue;
                         QTextTableCellFormat cf(cell.format().toTableCellFormat());
-                        auto tryCollect = [&](const QBrush& brush) {
-                            if (brush.style() != Qt::NoBrush && brush.color().isValid()) {
-                                QColor col = brush.color();
-                                if (col.alpha() == 255 &&
-                                    !(col.red() == 0 && col.green() == 0 && col.blue() == 0) &&
-                                    FindColorIndex(colorList, col) < 0)
-                                    colorList.push_back(col);
-                            }
-                        };
-                        tryCollect(cf.leftBorderBrush());
-                        tryCollect(cf.topBorderBrush());
-                        tryCollect(cf.rightBorderBrush());
-                        tryCollect(cf.bottomBorderBrush());
+                        CollectBorderColor(cf.leftBorderBrush(), colorList);
+                        CollectBorderColor(cf.topBorderBrush(), colorList);
+                        CollectBorderColor(cf.rightBorderBrush(), colorList);
+                        CollectBorderColor(cf.bottomBorderBrush(), colorList);
                     }
                 }
             }
-
-            struct CellBorderInfo {
-                double width = 0;
-                QTextFrameFormat::BorderStyle style = QTextFrameFormat::BorderStyle_None;
-                int colorIdx = 0;
-                bool operator==(const CellBorderInfo& other) const {
-                    return width == other.width && style == other.style && colorIdx == other.colorIdx;
-                }
-                bool operator!=(const CellBorderInfo& other) const {
-                    return !(*this == other);
-                }
-            };
-
-            auto readCellBorder = [&](const QTextTableCellFormat& cf, int side) -> CellBorderInfo {
-                CellBorderInfo bi{};
-                switch (side) {
-                    case 0:
-                        bi.width = cf.leftBorder();
-                        bi.style = cf.leftBorderStyle();
-                        if (cf.leftBorderBrush().style() != Qt::NoBrush)
-                            bi.colorIdx = FindColorIndex(colorList, cf.leftBorderBrush().color()) + 1;
-                        break;
-                    case 1:
-                        bi.width = cf.topBorder();
-                        bi.style = cf.topBorderStyle();
-                        if (cf.topBorderBrush().style() != Qt::NoBrush)
-                            bi.colorIdx = FindColorIndex(colorList, cf.topBorderBrush().color()) + 1;
-                        break;
-                    case 2:
-                        bi.width = cf.rightBorder();
-                        bi.style = cf.rightBorderStyle();
-                        if (cf.rightBorderBrush().style() != Qt::NoBrush)
-                            bi.colorIdx = FindColorIndex(colorList, cf.rightBorderBrush().color()) + 1;
-                        break;
-                    default:
-                        bi.width = cf.bottomBorder();
-                        bi.style = cf.bottomBorderStyle();
-                        if (cf.bottomBorderBrush().style() != Qt::NoBrush)
-                            bi.colorIdx = FindColorIndex(colorList, cf.bottomBorderBrush().color()) + 1;
-                        break;
-                }
-                return bi;
-            };
-
-            auto emitBorderSpec = [&](std::ostringstream& ostr, double width, QTextFrameFormat::BorderStyle style, int colorIdx) {
-                if (width <= 0.0) return;
-                int halfPts = static_cast<int>(width * 2.0 + 0.5);
-                switch (style) {
-                    case QTextFrameFormat::BorderStyle_Solid:  ostr << "\\brdrs"; break;
-                    case QTextFrameFormat::BorderStyle_Dashed:  ostr << "\\brdrd"; break;
-                    default: return;
-                }
-                ostr << "\\brdrw" << halfPts;
-                if (colorIdx > 0) ostr << "\\brdrcf" << colorIdx;
-            };
-
-            auto emitCellBorderSide = [&](std::ostringstream& ostr, const char* sideTag, double width, QTextFrameFormat::BorderStyle style, int colorIdx) {
-                if (width <= 0.0) return;
-                ostr << sideTag;
-                emitBorderSpec(ostr, width, style, colorIdx);
-            };
-
-            auto emitRowBorderSide = [&](std::ostringstream& ostr, const char* sideTag, double width, QTextFrameFormat::BorderStyle style, int colorIdx) {
-                if (width <= 0.0) return;
-                ostr << sideTag;
-                emitBorderSpec(ostr, width, style, colorIdx);
-            };
 
             for (int r = 0; r < rowCount; ++r) {
                 out << "{\\trowd ";
@@ -817,7 +812,7 @@ std::string ExportRtf(const QTextDocument& document) {
                     if (cell.isValid()) {
                         QTextTableCellFormat cf(cell.format().toTableCellFormat());
                         for (int side = 0; side < 4; ++side) {
-                            rowCellBorders[c][side] = readCellBorder(cf, side);
+                            rowCellBorders[c][side] = ReadCellBorder(cf, colorList, side);
                         }
                     }
                 }
@@ -838,10 +833,10 @@ std::string ExportRtf(const QTextDocument& document) {
                 }
 
                 // Emit row-level borders for uniform sides
-                if (uniformSide[0]) emitRowBorderSide(out, "\\trbrdrl", uniformBorder[0].width, uniformBorder[0].style, uniformBorder[0].colorIdx);
-                if (uniformSide[1]) emitRowBorderSide(out, "\\trbrdrt", uniformBorder[1].width, uniformBorder[1].style, uniformBorder[1].colorIdx);
-                if (uniformSide[2]) emitRowBorderSide(out, "\\trbrdrr", uniformBorder[2].width, uniformBorder[2].style, uniformBorder[2].colorIdx);
-                if (uniformSide[3]) emitRowBorderSide(out, "\\trbrdrb", uniformBorder[3].width, uniformBorder[3].style, uniformBorder[3].colorIdx);
+                if (uniformSide[0]) EmitBorderSide(out, "\\trbrdrl", uniformBorder[0].width, uniformBorder[0].style, uniformBorder[0].colorIdx);
+                if (uniformSide[1]) EmitBorderSide(out, "\\trbrdrt", uniformBorder[1].width, uniformBorder[1].style, uniformBorder[1].colorIdx);
+                if (uniformSide[2]) EmitBorderSide(out, "\\trbrdrr", uniformBorder[2].width, uniformBorder[2].style, uniformBorder[2].colorIdx);
+                if (uniformSide[3]) EmitBorderSide(out, "\\trbrdrb", uniformBorder[3].width, uniformBorder[3].style, uniformBorder[3].colorIdx);
 
                 for (int c = 0; c < colCount; ++c) {
                     QTextTableCell cell = table->cellAt(r, c);
@@ -853,16 +848,10 @@ std::string ExportRtf(const QTextDocument& document) {
                     QTextTableCellFormat cf(cell.format().toTableCellFormat());
 
                     // Emit cell padding
-                    auto emitIfPositive = [&](double val, const char* tag) {
-                        if (val > 0) {
-                            int halfPts = static_cast<int>(val * 2.0 + 0.5);
-                            out << "\\" << tag << halfPts;
-                        }
-                    };
-                    emitIfPositive(cf.leftPadding(), "clpadl");
-                    emitIfPositive(cf.rightPadding(), "clpadr");
-                    emitIfPositive(cf.topPadding(), "clpadt");
-                    emitIfPositive(cf.bottomPadding(), "clpadb");
+                    EmitTwipsTag(out, cf.leftPadding(), "clpadl");
+                    EmitTwipsTag(out, cf.rightPadding(), "clpadr");
+                    EmitTwipsTag(out, cf.topPadding(), "clpadt");
+                    EmitTwipsTag(out, cf.bottomPadding(), "clpadb");
 
                     // Emit cell borders (skip sides that are emitted as row borders)
                     for (int side = 0; side < 4; ++side) {
@@ -875,7 +864,7 @@ std::string ExportRtf(const QTextDocument& document) {
                             default: sideTag = "\\clbrdrb"; break;
                         }
                         auto& bi = rowCellBorders[c][side];
-                        emitCellBorderSide(out, sideTag, bi.width, bi.style, bi.colorIdx);
+                        EmitBorderSide(out, sideTag, bi.width, bi.style, bi.colorIdx);
                     }
 
                     // Iterate over blocks within the cell
