@@ -6,7 +6,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(QtRtfEditor
-    VERSION 0.1.1
+    VERSION 0.1.2
     DESCRIPTION "Reusable RTF-capable QTextEdit subclass"
     HOMEPAGE_URL https://github.com/Fritz1729/QtRtfEditor
     LANGUAGES CXX

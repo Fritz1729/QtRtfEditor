@@ -2,7 +2,7 @@
 
 pkgname=qt-rtf-editor
 _pkgbasename=QtRtfEditor
-pkgver=0.1.1
+pkgver=0.1.2
 pkgrel=1
 pkgdesc='Reusable RTF-capable QTextEdit subclass'
 arch=('x86_64' 'aarch64')
@@ -47,7 +47,7 @@ prepare() {
   cat > "${srcdir}/CMakeLists.txt" << 'CMAKE'
 cmake_minimum_required(VERSION 3.16)
 project(QtRtfEditor
-    VERSION 0.1.1
+     VERSION 0.1.2
     DESCRIPTION "Reusable RTF-capable QTextEdit subclass"
     HOMEPAGE_URL https://github.com/Fritz1729/QtRtfEditor
     LANGUAGES CXX
