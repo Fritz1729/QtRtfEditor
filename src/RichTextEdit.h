@@ -140,8 +140,10 @@ private:
     /**
      * @brief If cursor is inside protected text, move it to the
      *        nearest unprotected position.
+     * @param forward  If true, skip forward past the protected run.
+     *                 If false, skip backward past the protected run.
      */
-    void ClampCursor();
+    void ClampCursor(bool forward = true);
 
     /**
      * @brief Rebuild _protectedRanges from user property in the document.

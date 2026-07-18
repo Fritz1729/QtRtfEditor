@@ -65,6 +65,9 @@ void RichTextEdit::ClearProtection() {
 }
 
 bool RichTextEdit::IsProtected(std::size_t position) const {
+    if (position >= static_cast<std::size_t>(document()->characterCount())) {
+        return false;
+    }
     for (const auto& [start, end] : _protectedRanges) {
         if (position >= start && position < end) {
             return true;
@@ -90,11 +93,22 @@ void RichTextEdit::SyncProtectedRanges() {
     std::size_t runStart = 0;
     bool inProtected = false;
 
-    auto checkPos = [docLen, this](std::size_t pos) -> bool {
+    auto checkPos = [this](std::size_t pos) -> bool {
+        int docLen = document()->characterCount();
         if (pos >= static_cast<std::size_t>(docLen)) return false;
-        QTextCursor cursor(document());
-        cursor.setPosition(static_cast<int>(pos));
-        return cursor.charFormat().property(UserPropProtect).toBool();
+        QTextBlock block = document()->findBlock(static_cast<int>(pos));
+        if (block.isValid()) {
+            QTextBlock::iterator it;
+            for (it = block.begin(); !it.atEnd(); ++it) {
+                const QTextFragment& fragment = it.fragment();
+                int fragStart = fragment.position();
+                int fragEnd = fragStart + fragment.length();
+                if (static_cast<std::size_t>(fragStart) <= pos && pos < static_cast<std::size_t>(fragEnd)) {
+                    return fragment.charFormat().property(UserPropProtect).toBool();
+                }
+            }
+        }
+        return false;
     };
 
     for (int i = 0; i <= docLen; ++i) {
@@ -148,7 +162,8 @@ void RichTextEdit::keyPressEvent(QKeyEvent* event) {
 
     QTextEdit::keyPressEvent(event);
     SyncProtectedRanges();
-    ClampCursor();
+    bool forward = (event->key() != Qt::Key_Left);
+    ClampCursor(forward);
 }
 
 void RichTextEdit::mousePressEvent(QMouseEvent* event) {
@@ -168,7 +183,7 @@ void RichTextEdit::mousePressEvent(QMouseEvent* event) {
 
         QTextCursor run(document());
         run.setPosition(start);
-        run.setPosition(end, QTextCursor::KeepAnchor);
+        run.setPosition(end < document()->characterCount() ? end : document()->characterCount(), QTextCursor::KeepAnchor);
 
         emit protectedRegionClicked(start, end, run.selectedText());
     }
@@ -183,20 +198,25 @@ void RichTextEdit::insertFromMimeData(const QMimeData* source) {
     ClampCursor();
 }
 
-void RichTextEdit::ClampCursor() {
+void RichTextEdit::ClampCursor(bool forward) {
     QTextCursor cursor = textCursor();
     int pos = cursor.position();
+    int docLen = document()->characterCount();
 
     if (!IsProtected(static_cast<std::size_t>(pos))) {
         return;
     }
 
-    // Skip forward past the protected run
-    int docLen = document()->characterCount();
-    while (pos < docLen && IsProtected(static_cast<std::size_t>(pos))) {
-        pos++;
+    if (forward) {
+        while (pos < docLen && IsProtected(static_cast<std::size_t>(pos))) {
+            pos++;
+        }
+    } else {
+        while (pos > 0 && IsProtected(static_cast<std::size_t>(pos - 1))) {
+            pos--;
+        }
     }
-    cursor.setPosition(pos);
+    cursor.setPosition(pos < document()->characterCount() ? pos : document()->characterCount());
     setTextCursor(cursor);
 }
 
