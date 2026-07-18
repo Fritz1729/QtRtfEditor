@@ -1,12 +1,13 @@
 #include "RtfCharset.h"
 
+#include <array>
+#include <cstddef>
+
 namespace Rte {
 
 namespace {
 
-constexpr int kSymbolTable[] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+constexpr std::array<int, 0x100> kSymbolTable = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -28,10 +29,11 @@ constexpr int kSymbolTable[] = {
     0x25CA, 0x2329, 0x00AE, 0x00A9, 0x2122, 0x2211, 0x239B, 0x239C,
     0x239D, 0x23A1, 0x23A2, 0x23A3, 0x23A7, 0x23A8, 0x23A9, 0x23AA,
     0x232A, 0x222B, 0x2320, 0xFFFD, 0x2321, 0x239E, 0x239F, 0x23A0,
-    0x23A4, 0x23A5, 0x23A6, 0x23AB, 0x23AC, 0x23AD
+    0x23A4, 0x23A5, 0x23A6, 0x23AB, 0x23AC, 0x23AD,
+    0, 0
 };
 
-constexpr int kCp1252Table[] = {
+constexpr std::array<int, 128> kCp1252Table = {
     0x20AC, 0, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
     0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0, 0x017D, 0,
     0, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
@@ -54,15 +56,13 @@ constexpr int kCp1252Table[] = {
 
 int MapSymbolByte(int byte) {
     if (byte < 0 || byte > 0xFF) return byte;
-    int cp = kSymbolTable[byte];
+    int cp = kSymbolTable[static_cast<std::size_t>(byte)];
     return cp == 0 ? byte : cp;
 }
 
 int MapCp1252Byte(int byte) {
-    if (byte < 0 || byte > 0xFF) return byte;
-    int offset = byte - 0x80;
-    if (offset < 0 || offset > 127) return byte;
-    return kCp1252Table[offset];
+    if (byte < 0x80 || byte > 0xFF) return byte;
+    return kCp1252Table[static_cast<std::size_t>(byte - 0x80)];
 }
 
 int MapHexByteToCodepoint(int byte, int fcharset, int codePage) {

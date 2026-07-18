@@ -63,4 +63,4 @@ archive.tar.gz
 # QMake artifacts
 .qmake.stash
 *.pro
-diagtest2.cpp
+

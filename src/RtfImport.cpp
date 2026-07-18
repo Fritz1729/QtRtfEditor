@@ -44,9 +44,17 @@ static void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
 
         if (run.format.fontIndex >= 0 &&
             run.format.fontIndex < static_cast<int>(doc.fonts.size())) {
-            QString fam = QString::fromStdString(doc.fonts[run.format.fontIndex].family);
+            const RtfFontEntry& fontEntry = doc.fonts[run.format.fontIndex];
+            QString fam = QString::fromStdString(fontEntry.family);
             if (!fam.isEmpty()) {
-                charFmt.setFontFamilies({fam});
+                QStringList families = {fam};
+                // Symbol font is a Windows-only legacy font; on non-Windows OS it's
+                // almost certainly missing, so add fallbacks that cover its glyph range.
+                if (fam.toLower() == "symbol") {
+                    families << "Segoe UI Symbol" << "Noto Sans Symbols2" << "Libertinus Math"
+                             << "Standard Symbols PS" << "DejaVu Sans" << "Noto Sans Math";
+                }
+                charFmt.setFontFamilies(families);
             }
         }
 

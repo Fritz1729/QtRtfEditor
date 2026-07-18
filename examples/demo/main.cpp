@@ -23,6 +23,7 @@ DemoWindow::DemoWindow(QWidget* parent)
 {
     setWindowTitle("QtRtfEditor Demo");
     setCentralWidget(&_editor);
+    _editor.setStyleSheet("background-color: white;");
     statusBar()->showMessage("Ready");
 
     QToolBar* toolbar = addToolBar("Formatting");
@@ -33,6 +34,7 @@ DemoWindow::DemoWindow(QWidget* parent)
     _pMenuBuilder->Build();
 
     _pRecentFileHandler = new RecentFileHandler(this, this);
+    showMaximized();
 }
 
 void DemoWindow::MergeFormatOnSelection(const QTextCharFormat& format) {
@@ -226,7 +228,6 @@ int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
 
     DemoWindow window;
-    window.resize(900, 650);
     window.show();
 
     return app.exec();
