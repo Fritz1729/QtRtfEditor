@@ -16,7 +16,7 @@ namespace {
 class RtfParserImpl {
 public:
 
-    RtfDocument parse(const std::string& rtf, int codePage) {
+    RtfDocument Parse(const std::string& rtf, int codePage) {
         _doc = RtfDocument{};
         _codePage = codePage;
         _doc.codePage = codePage;
@@ -46,12 +46,12 @@ public:
         _listLevel = 0;
         _listStyle = ListStyle::None;
 
-        parse();
-        finalizeRun();
+        Parse();
+        FinalizeRun();
         // Flush current paragraph if it has content
-        flushCurrentParagraph();
+        FlushCurrentParagraph();
         // Remove trailing empty paragraphs and table rows from elements
-        removeTrailingEmptyElements();
+        RemoveTrailingEmptyElements();
 
         return _doc;
     }
@@ -59,17 +59,17 @@ public:
 private:
     static constexpr size_t kMaxIter = 10'000'000;
 
-    const RtfControl* findControl(const char* word) const {
-        for (auto& ctrl : rtfControlTable) {
+    const RtfControl* FindControl(const char* word) const {
+        for (const RtfControl& ctrl : rtfControlTable) {
             if (strcmp(word, ctrl.keyword) == 0) return &ctrl;
         }
         return nullptr;
     }
 
-    void dispatch(const RtfControl& ctrl, int arg) {
+    void Dispatch(const RtfControl& ctrl, int arg) {
         switch (ctrl.action) {
         case RtfControl::Action::ToggleCharProp: {
-            finalizeRun();
+            FinalizeRun();
             // arg < 0 = no argument provided → treat as on
             bool on = (arg >= 0) ? (arg != 0) : true;
             // Preserve leading whitespace after toggle-OFF (e.g. \b0),
@@ -104,7 +104,7 @@ private:
             break;
         }
         case RtfControl::Action::SetCharProp: {
-            finalizeRun();
+            FinalizeRun();
             const RtfControl::CharSetProp prop = ctrl.value.charSetProp;
             if (arg < 0) break;
             switch (prop) {
@@ -137,11 +137,11 @@ private:
                 }
                 break;
             case RtfControl::CharSetProp::UlColorIndex:
-                finalizeRun();
+                FinalizeRun();
                 _format.ulColorIndex = arg;
                 break;
             case RtfControl::CharSetProp::LangId:
-                finalizeRun();
+                FinalizeRun();
                 _format.langId = arg;
                 break;
             }
@@ -210,7 +210,7 @@ private:
             break;
         }
         case RtfControl::Action::SetUlStyle: {
-            finalizeRun();
+            FinalizeRun();
             const RtfControl::RtfUlStyle style = ctrl.value.ulStyle;
             switch (style) {
             case RtfControl::RtfUlStyle::UlSolid:
@@ -254,7 +254,7 @@ private:
             break;
         }
         case RtfControl::Action::SetCapitalization: {
-            finalizeRun();
+            FinalizeRun();
             const RtfControl::RtfCaps caps = ctrl.value.caps;
             switch (caps) {
             case RtfControl::RtfCaps::CapsAll:
@@ -271,9 +271,9 @@ private:
         }
         case RtfControl::Action::EmitParagraph:
             if (_inTableCell) {
-                finalizeRun();
+                FinalizeRun();
             } else {
-                handleParagraph();
+                HandleParagraph();
             }
             return;
 
@@ -291,7 +291,7 @@ private:
                 return;
             }
             if (strcmp(ctrl.keyword, "plain") == 0) {
-                finalizeRun();
+                FinalizeRun();
                 _format = RtfRunFormat{};
                 _skipLeadingWsTrim = false;
                 return;
@@ -316,7 +316,7 @@ private:
         case RtfControl::Action::TableControl:
             break;
         case RtfControl::Action::TableControlWord:
-            handleTableControl(ctrl, arg);
+            HandleTableControl(ctrl, arg);
             return;
         case RtfControl::Action::GroupPersistent:
             if (strcmp(ctrl.keyword, "deff") == 0) {
@@ -330,13 +330,13 @@ private:
         }
     }
 
-    void handleParagraph() {
+    void HandleParagraph() {
         if (_inTable) {
-            flushPendingTableRow();
+            FlushPendingTableRow();
         }
-        finalizeRun();
+        FinalizeRun();
         _skipLeadingWsTrim = false;
-        flushCurrentParagraph();
+        FlushCurrentParagraph();
         // Create paragraph for content that follows.
         // \par resets tab stops and list state (paragraph-local) but preserves
         // alignment, indents, and spacing (which persist across paragraphs).
@@ -348,21 +348,21 @@ private:
         _listStyle = ListStyle::None;
     }
 
-    void handleTableControl(const RtfControl& ctrl, int arg) {
+    void HandleTableControl(const RtfControl& ctrl, int arg) {
         switch (ctrl.value.tableCtrlWord) {
         case RtfControl::TableCtrlWord::Trowd:
             if (!_inTable) {
                 _inTable = true;
-                finalizeRun();
+                FinalizeRun();
                 if (ParagraphHasNonWhitespaceContent(_currentParagraph)) {
-                    flushCurrentParagraph();
+                    FlushCurrentParagraph();
                 }
             }
             _inRow = true;
             _currentCellIndex = 0;
             _currentCellRuns.clear();
             _currentCellFormat = {};
-            resetPendingBorder();
+            ResetPendingBorder();
             _currentRow = {};
             _currentRow.tableAlignment = 0;
             break;
@@ -375,34 +375,34 @@ private:
 
         case RtfControl::TableCtrlWord::Intbl:
             _inTableCell = true;
-            finalizeRun();
+            FinalizeRun();
             _currentCellRuns.clear();
             break;
 
         case RtfControl::TableCtrlWord::Cell:
             if (_inTableCell) {
-                finalizeRun();
-                applyPendingBorder();
-                addCurrentCellToRow();
+                FinalizeRun();
+                ApplyPendingBorder();
+                AddCurrentCellToRow();
                 _inTableCell = false;
                 _currentCellIndex++;
             }
             _currentCellFormat = {};
-            resetPendingBorder();
+            ResetPendingBorder();
             break;
 
         case RtfControl::TableCtrlWord::Row:
             if (_inTableCell) {
-                finalizeRun();
-                applyPendingBorder();
-                addCurrentCellToRow();
+                FinalizeRun();
+                ApplyPendingBorder();
+                AddCurrentCellToRow();
                 _inTableCell = false;
             }
-            applyPendingBorder();
-            emitTableRow();
+            ApplyPendingBorder();
+            EmitTableRow();
             _inRow = false;
             _currentCellIndex = 0;
-            resetPendingBorder();
+            ResetPendingBorder();
             break;
 
         case RtfControl::TableCtrlWord::ClShading:
@@ -424,19 +424,19 @@ private:
             break;
 
         case RtfControl::TableCtrlWord::ClBorderLeft:
-            beginBorderSide(0, false);
+            BeginBorderSide(0, false);
             break;
 
         case RtfControl::TableCtrlWord::ClBorderTop:
-            beginBorderSide(1, false);
+            BeginBorderSide(1, false);
             break;
 
         case RtfControl::TableCtrlWord::ClBorderRight:
-            beginBorderSide(2, false);
+            BeginBorderSide(2, false);
             break;
 
         case RtfControl::TableCtrlWord::ClBorderBottom:
-            beginBorderSide(3, false);
+            BeginBorderSide(3, false);
             break;
 
         case RtfControl::TableCtrlWord::BrdrSolid:
@@ -515,24 +515,24 @@ private:
             break;
 
         case RtfControl::TableCtrlWord::TrBorderLeft:
-            beginBorderSide(0, true);
+            BeginBorderSide(0, true);
             break;
 
         case RtfControl::TableCtrlWord::TrBorderTop:
-            beginBorderSide(1, true);
+            BeginBorderSide(1, true);
             break;
 
         case RtfControl::TableCtrlWord::TrBorderRight:
-            beginBorderSide(2, true);
+            BeginBorderSide(2, true);
             break;
 
         case RtfControl::TableCtrlWord::TrBorderBottom:
-            beginBorderSide(3, true);
+            BeginBorderSide(3, true);
             break;
         }
     }
 
-    void applyPendingBorder() {
+    void ApplyPendingBorder() {
         if (_pendingBorderSide < 0) return;
         auto& borders = _pendingBorderIsRow ? _currentRow.rowBorders : _currentCellFormat.borders;
         int style = _pendingBorderStyle;
@@ -559,10 +559,10 @@ private:
                 borders.bottomStyle = static_cast<BorderStyle>(style);
                 break;
         }
-        resetPendingBorder();
+        ResetPendingBorder();
     }
 
-    void resetPendingBorder() {
+    void ResetPendingBorder() {
         _pendingBorderSide = -1;
         _pendingBorderStyle = 0;
         _pendingBorderWidth = 0;
@@ -570,8 +570,8 @@ private:
         _pendingBorderIsRow = false;
     }
 
-    void beginBorderSide(int side, bool isRow) {
-        applyPendingBorder();
+    void BeginBorderSide(int side, bool isRow) {
+        ApplyPendingBorder();
         _pendingBorderSide = side;
         _pendingBorderStyle = 0;
         _pendingBorderWidth = 0;
@@ -579,7 +579,7 @@ private:
         _pendingBorderIsRow = isRow;
     }
 
-    void addCurrentCellToRow() {
+    void AddCurrentCellToRow() {
         while (static_cast<int>(_currentRow.cells.size()) <= _currentCellIndex) {
             _currentRow.cells.push_back({{}, {}});
         }
@@ -589,14 +589,14 @@ private:
         _currentCellFormat = {};
     }
 
-    void emitTableRow() {
+    void EmitTableRow() {
         if (ParagraphHasNonWhitespaceContent(_currentRow)) {
             _doc.elements.push_back(std::move(_currentRow));
         }
         _currentRow = {};
     }
 
-    void flushPendingTableRow() {
+    void FlushPendingTableRow() {
         if (!_inTable || !_inRow) {
             _inTable = false;
             _inRow = false;
@@ -615,7 +615,7 @@ private:
         _currentRow = {};
     }
 
-    void flushCurrentParagraph() {
+    void FlushCurrentParagraph() {
         // Skip the initial empty paragraph before any content has been flushed.
         // Empty paragraphs after the first flush are preserved (blank lines).
         if (!_paragraphFlushed && !ParagraphHasNonWhitespaceContent(_currentParagraph)) {
@@ -635,7 +635,7 @@ private:
     }
 
     static bool ParagraphHasNonWhitespaceContent(const RtfParagraph& p) {
-        for (const auto& r : p.runs) {
+        for (const RtfRun& r : p.runs) {
             QString text(QString::fromUtf8(r.text.data(), static_cast<int>(r.text.size())));
             if (!text.trimmed().isEmpty()) return true;
         }
@@ -644,7 +644,7 @@ private:
 
     static bool ParagraphHasNonWhitespaceContent(const RtfTableRowEntry& r) {
         for (const auto& [runs, _] : r.cells) {
-            for (const auto& run : runs) {
+            for (const RtfRun& run : runs) {
                 QString text(QString::fromUtf8(run.text.data(), static_cast<int>(run.text.size())));
                 if (!text.trimmed().isEmpty()) return true;
             }
@@ -652,7 +652,7 @@ private:
         return false;
     }
 
-    void removeTrailingEmptyElements() {
+    void RemoveTrailingEmptyElements() {
         while (!_doc.elements.empty()) {
             bool hasText = std::visit([](const auto& elem) -> bool {
                 using T = std::decay_t<decltype(elem)>;
@@ -730,30 +730,30 @@ private:
     int _pendingBorderColor = 0;
     bool _pendingBorderIsRow = false;
 
-    void parse() {
+    void Parse() {
         while (_pos < _len) {
             if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
             char c = _rtf[_pos];
             if (c == '{') {
-                parseGroup();
+                ParseGroup();
             } else if (c == '}') {
                 // Group closing — handled by parseGroup
                 break;
             } else if (c == '\\') {
-                parseControl();
-            } else if (isPrintable(c)) {
-                accumulateLiteral(c);
+                ParseControl();
+            } else if (IsPrintable(c)) {
+                AccumulateLiteral(c);
             } else {
                 _pos++;
             }
         }
         // Flush pending table row at end of input (outermost parse only)
         if (_inTable && _pos >= _len) {
-            flushPendingTableRow();
+            FlushPendingTableRow();
         }
     }
 
-    void parseGroup() {
+    void ParseGroup() {
         _pos++; // skip '{'
         _groupDepth++;
 
@@ -765,70 +765,70 @@ private:
         _deftabStack.push_back(_currentDeftab);
 
         // Check for known table groups
-        skipWhitespace();
-        if (_pos < _len && matches("\\colortbl")) {
+        SkipWhitespace();
+        if (_pos < _len && Matches("\\colortbl")) {
             // Consume \\colortbl control word and optional argument
             _pos += 9;
-            while (_pos < _len && isDigit(_rtf[_pos])) _pos++;
-            skipWhitespace();
+            while (_pos < _len && IsDigit(_rtf[_pos])) _pos++;
+            SkipWhitespace();
 
             _inColortbl = true;
-            parseColortbl();
+            ParseColortbl();
             _inColortbl = false;
-            restoreState();
+            RestoreState();
             // parseColortbl consumes the closing '}'
             return;
         }
-        if (_pos < _len && matches("\\fonttbl")) {
+        if (_pos < _len && Matches("\\fonttbl")) {
             // Consume \\fonttbl control word and optional argument
             _pos += 7;
-            while (_pos < _len && isDigit(_rtf[_pos])) _pos++;
-            skipWhitespace();
+            while (_pos < _len && IsDigit(_rtf[_pos])) _pos++;
+            SkipWhitespace();
 
             _inFonttbl = true;
-            parseFonttbl();
+            ParseFonttbl();
             _inFonttbl = false;
-            restoreState();
+            RestoreState();
             // parseFonttbl consumes the closing '}'
             return;
         }
 
-        if (_pos < _len && matches("\\listtable")) {
+        if (_pos < _len && Matches("\\listtable")) {
             _pos += 9;
-            skipWhitespace();
+            SkipWhitespace();
             _inListtable = true;
-            parseListtable();
+            ParseListtable();
             _inListtable = false;
-            restoreState();
+            RestoreState();
             return;
         }
 
-        if (_pos < _len && matches("\\pict")) {
+        if (_pos < _len && Matches("\\pict")) {
             // Consume \\pict control word
             _pos += 4;
-            skipWhitespace();
+            SkipWhitespace();
 
             _inPict = true;
-            parsePict();
+            ParsePict();
             _inPict = false;
-            restoreState();
+            RestoreState();
             // parsePict consumes the closing '}'
             return;
         }
 
         // Unknown group — parse contents normally
-        parse();
+        Parse();
 
         // Expect '}'
         if (_pos < _len && _rtf[_pos] == '}') {
             _pos++;
         }
 
-        restoreState();
+        RestoreState();
     }
 
-    void restoreState() {
-        finalizeRun();
+    void RestoreState() {
+        FinalizeRun();
         if (!_formatStack.empty()) {
             _format = _formatStack.back();
             _formatStack.pop_back();
@@ -857,14 +857,14 @@ private:
         if (_groupDepth > 0) _groupDepth--;
     }
 
-    void parseControl() {
+    void ParseControl() {
         _pos++; // skip '\'
 
         if (_pos >= _len) return;
 
         char c = _rtf[_pos];
 
-        if (isDigit(c)) {
+        if (IsDigit(c)) {
             // Control symbol: single digit
             _pos++;
         } else if (c == '{') {
@@ -891,19 +891,19 @@ private:
             }
         } else if (c == 't') {
             // Tab character — only if not followed by more word chars (\trowd etc.)
-            if (_pos + 1 >= _len || !isWordChar(_rtf[_pos + 1])) {
+            if (_pos + 1 >= _len || !IsWordChar(_rtf[_pos + 1])) {
                 _pos++;
                 _literalText += static_cast<char>(9);
                 // Consume space delimiter for \t
                 if (_pos < _len && _rtf[_pos] == ' ') _pos++;
             } else {
-                parseControlWord();
+                ParseControlWord();
                 // parseControlWord already consumes the delimiter
             }
         } else if (c == '~') {
             // Non-breaking space
             _pos++;
-            appendUtf8(0x00A0);
+            AppendUtf8(0x00A0);
         } else if (c == '\'') {
             // Hex escape: \\'hh — charset-aware decoding
             _pos++;
@@ -917,27 +917,27 @@ private:
             if (fi >= 0 && static_cast<size_t>(fi) < _doc.fonts.size()) {
                 fcharset = _doc.fonts[static_cast<size_t>(fi)].fcharset;
             }
-            appendUtf8(MapHexByteToCodepoint(val, fcharset, _doc.codePage));
-        } else if ((c == 'u' || c == 'U') && _pos + 1 < _len && isDigit(_rtf[_pos + 1])) {
+            AppendUtf8(MapHexByteToCodepoint(val, fcharset, _doc.codePage));
+        } else if ((c == 'u' || c == 'U') && _pos + 1 < _len && IsDigit(_rtf[_pos + 1])) {
             // Unicode escape: \uNNN? (only if 'u' is immediately followed by digit)
-            parseUnicodeEscape();
+            ParseUnicodeEscape();
         } else {
-            parseControlWord();
+            ParseControlWord();
         }
     }
 
-    void parseControlWord() {
+    void ParseControlWord() {
         auto [word, arg] = ReadControlWord();
         bool hasArg = arg >= 0;
         ConsumeControlDelimiter(arg, hasArg);
         if (word.empty()) return;
-        processControlWord(word, arg);
+        ProcessControlWord(word, arg);
     }
 
-    void parseUnicodeEscape() {
+    void ParseUnicodeEscape() {
         _pos++; // skip 'u'
         int val = 0;
-        while (_pos < _len && isDigit(_rtf[_pos])) {
+        while (_pos < _len && IsDigit(_rtf[_pos])) {
             val = val * 10 + (_rtf[_pos] - '0');
             _pos++;
         }
@@ -950,14 +950,14 @@ private:
                 _rtf[_pos] == '\\' && _rtf[_pos + 1] == 'u') {
                 _pos += 2;
                 int low = 0;
-                while (_pos < _len && isDigit(_rtf[_pos])) {
+                while (_pos < _len && IsDigit(_rtf[_pos])) {
                     low = low * 10 + (_rtf[_pos] - '0');
                     _pos++;
                 }
                 cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
             }
         }
-        appendUtf8(cp);
+        AppendUtf8(cp);
 
         // Skip '?' delimiter
         if (_pos < _len && _rtf[_pos] == '?') {
@@ -965,30 +965,30 @@ private:
         }
     }
 
-    void parseColortbl() {
+    void ParseColortbl() {
         // {\colortbl ;\red255\green0\blue0;\red0\green128\blue0;}
         // Each ';' separates a color entry. First entry is "auto" (may be empty).
         while (_pos < _len && _rtf[_pos] != '}') {
             if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
-            skipWhitespace();
+            SkipWhitespace();
 
             int r = 0, g = 0, b = 0;
             bool haveR = false, haveG = false, haveB = false;
 
             while (_pos < _len && _rtf[_pos] != ';' && _rtf[_pos] != '}') {
-                if (matches("\\red")) {
+                if (Matches("\\red")) {
                     _pos += 4;
-                    r = parseInt();
+                    r = ParseInt();
                     haveR = true;
-                } else if (matches("\\green")) {
+                } else if (Matches("\\green")) {
                     _pos += 6;
-                    g = parseInt();
+                    g = ParseInt();
                     haveG = true;
-                } else if (matches("\\blue")) {
+                } else if (Matches("\\blue")) {
                     _pos += 5;
-                    b = parseInt();
+                    b = ParseInt();
                     haveB = true;
-                } else if (isPrintable(_rtf[_pos])) {
+                } else if (IsPrintable(_rtf[_pos])) {
                     _pos++;
                 } else {
                     break;
@@ -1004,7 +1004,7 @@ private:
         if (_pos < _len && _rtf[_pos] == '}') _pos++;
     }
 
-    void parseFonttbl() {
+    void ParseFonttbl() {
         // {\fonttbl{\f0\froman\fcharset0 Times New Roman;}
         //        {\f1\fswiss\fcharset0 Arial;}}
         // Each font entry is a group containing \fN and the family name
@@ -1020,16 +1020,16 @@ private:
 
                 while (_pos < _len && _rtf[_pos] != '}') {
                     if (_rtf[_pos] == '\\') {
-                        if (matches("\\fcharset")) {
+                        if (Matches("\\fcharset")) {
                             _pos += 9;
-                            fcharset = parseInt();
-                        } else if (matches("\\f")) {
+                            fcharset = ParseInt();
+                        } else if (Matches("\\f")) {
                             _pos += 2;
-                            index = parseInt();
+                            index = ParseInt();
                         } else {
-                            parseControl();
+                            ParseControl();
                         }
-                    } else if (isPrintable(_rtf[_pos])) {
+                    } else if (IsPrintable(_rtf[_pos])) {
                         family += _rtf[_pos++];
                     } else {
                         _pos++;
@@ -1053,7 +1053,7 @@ private:
         if (_pos < _len && _rtf[_pos] == '}') _pos++;
     }
 
-    void parsePict() {
+    void ParsePict() {
         // {\pict\pngblip\picw500\pich500\picscalex500\picwgoal250 <hex-data>}
         // Collect hex-encoded image data between control words
         _pictData.clear();
@@ -1072,9 +1072,9 @@ private:
         while (_pos < _len && _rtf[_pos] != '}') {
             if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
             if (_rtf[_pos] == '\\') {
-                parsePictControl();
+                ParsePictControl();
                 // Skip whitespace after control words
-                while (_pos < _len && _rtf[_pos] != '}' && isWhitespace(_rtf[_pos])) {
+                while (_pos < _len && _rtf[_pos] != '}' && IsWhitespace(_rtf[_pos])) {
                     _pos++;
                 }
             } else {
@@ -1111,26 +1111,26 @@ private:
             img.piccropt = _pictPiccropt;
             img.piccropb = _pictPiccropb;
             img.rtfPictHex = _pictData.toStdString();
-            flushCurrentParagraph();
+            FlushCurrentParagraph();
             _doc.elements.push_back(std::move(img));
         }
     }
 
-    void parseListtable() {
+    void ParseListtable() {
         while (_pos < _len && _rtf[_pos] != '}') {
             if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
             if (_rtf[_pos] == '{') {
                 _pos++;
                 while (_pos < _len && _rtf[_pos] != '}') {
                     if (_rtf[_pos] == '\\') {
-                        parseListtableControl();
+                        ParseListtableControl();
                     } else {
                         _pos++;
                     }
                 }
                 if (_pos < _len && _rtf[_pos] == '}') _pos++;
             } else if (_rtf[_pos] == '\\') {
-                parseListtableControl();
+                ParseListtableControl();
             } else {
                 _pos++;
             }
@@ -1138,7 +1138,7 @@ private:
         if (_pos < _len && _rtf[_pos] == '}') _pos++;
     }
 
-    void parseListtableControl() {
+    void ParseListtableControl() {
         _pos++;
         if (_pos >= _len) return;
 
@@ -1156,7 +1156,7 @@ private:
             _currentListStyle = ListStyle::None;
         } else if (word == "liststylenum" || word == "liststyletype") {
             if (hasArg && _currentListId > 0) {
-                _currentListStyle = rtfStyleTypeToListStyle(arg);
+                _currentListStyle = RtfStyleTypeToListStyle(arg);
                 _listIdToStyle[_currentListId] = _currentListStyle;
             }
         } else if (word == "liststylebulletsimple") {
@@ -1179,7 +1179,7 @@ private:
         }
     }
 
-    static ListStyle rtfStyleTypeToListStyle(int type) {
+    static ListStyle RtfStyleTypeToListStyle(int type) {
         switch (type) {
             case 0: return ListStyle::Bullet;
             case 1: return ListStyle::Disc;
@@ -1198,13 +1198,13 @@ private:
     int _currentListId = 0;
     ListStyle _currentListStyle = ListStyle::None;
 
-    void parsePictControl() {
+    void ParsePictControl() {
         _pos++; // skip '\'
 
         if (_pos >= _len) return;
 
         char c = _rtf[_pos];
-        if (isWordChar(c)) {
+        if (IsWordChar(c)) {
             auto [word, arg] = ReadControlWord();
             bool hasArg = arg >= 0;
             if (word.empty()) return;
@@ -1228,28 +1228,28 @@ private:
         }
 
         // Skip other control symbols (digits, etc.)
-        if (isDigit(c)) {
+        if (IsDigit(c)) {
             _pos++;
         }
     }
 
-    void processControlWord(const std::string& word, int arg) {
+    void ProcessControlWord(const std::string& word, int arg) {
         // Table group markers (should have been caught in parseGroup)
         if (word == "colortbl" || word == "fonttbl") return;
 
         // Special typographic characters (RE 2.0)
-        if (word == "bullet") { appendUtf8(0x2022); return; }
-        if (word == "emdash") { appendUtf8(0x2014); return; }
-        if (word == "endash") { appendUtf8(0x2013); return; }
-        if (word == "lquote") { appendUtf8(0x2018); return; }
-        if (word == "rquote") { appendUtf8(0x2019); return; }
-        if (word == "ldblquote") { appendUtf8(0x201C); return; }
-        if (word == "rdblquote") { appendUtf8(0x201D); return; }
+        if (word == "bullet") { AppendUtf8(0x2022); return; }
+        if (word == "emdash") { AppendUtf8(0x2014); return; }
+        if (word == "endash") { AppendUtf8(0x2013); return; }
+        if (word == "lquote") { AppendUtf8(0x2018); return; }
+        if (word == "rquote") { AppendUtf8(0x2019); return; }
+        if (word == "ldblquote") { AppendUtf8(0x201C); return; }
+        if (word == "rdblquote") { AppendUtf8(0x201D); return; }
         if (word == "tab") { _literalText += static_cast<char>(9); return; }
 
-        auto* ctrl = findControl(word.c_str());
+        auto* ctrl = FindControl(word.c_str());
         if (ctrl) {
-            dispatch(*ctrl, arg);
+            Dispatch(*ctrl, arg);
         } else {
             // Unknown tag — record for preservation
             std::string tag = "\\" + word;
@@ -1260,12 +1260,12 @@ private:
         }
     }
 
-    void accumulateLiteral(char c) {
+    void AccumulateLiteral(char c) {
         _literalText += c;
         _pos++;
     }
 
-    void finalizeRun() {
+    void FinalizeRun() {
         if (_literalText.empty()) return;
 
         std::string trimmed = _literalText;
@@ -1282,7 +1282,7 @@ private:
         _literalText.clear();
     }
 
-    void appendUtf8(int cp) {
+    void AppendUtf8(int cp) {
         if (cp < 0x80) {
             _literalText += static_cast<char>(cp);
         } else if (cp < 0x800) {
@@ -1300,7 +1300,7 @@ private:
         }
     }
 
-    bool matches(const char* s) {
+    bool Matches(const char* s) {
         size_t len = strlen(s);
         if (_pos + len > _len) return false;
         for (size_t i = 0; i < len; ++i) {
@@ -1311,13 +1311,13 @@ private:
             }
         }
         // Verify it's a proper control word boundary
-        if (_pos + len < _len && isWordChar(_rtf[_pos + len])) return false;
+        if (_pos + len < _len && IsWordChar(_rtf[_pos + len])) return false;
         return true;
     }
 
-    int parseInt() {
+    int ParseInt() {
         int val = 0;
-        while (_pos < _len && isDigit(_rtf[_pos])) {
+        while (_pos < _len && IsDigit(_rtf[_pos])) {
             val = val * 10 + (_rtf[_pos] - '0');
             _pos++;
         }
@@ -1328,7 +1328,7 @@ private:
         std::string word;
         int arg = 0;
         bool hasArg = false;
-        while (_pos < _len && (isWordChar(_rtf[_pos]) || isDigit(_rtf[_pos]))) {
+        while (_pos < _len && (IsWordChar(_rtf[_pos]) || IsDigit(_rtf[_pos]))) {
             if (_rtf[_pos] >= '0' && _rtf[_pos] <= '9') {
                 arg = arg * 10 + (_rtf[_pos] - '0');
                 hasArg = true;
@@ -1341,32 +1341,32 @@ private:
     }
 
     void ConsumeControlDelimiter(int arg, bool hasArg) {
-        if (hasArg && _pos < _len && !isWordChar(_rtf[_pos]) && _rtf[_pos] != '\\' && _rtf[_pos] != '}' && _rtf[_pos] != '{') {
+        if (hasArg && _pos < _len && !IsWordChar(_rtf[_pos]) && _rtf[_pos] != '\\' && _rtf[_pos] != '}' && _rtf[_pos] != '{') {
             _pos++;
         } else if (!hasArg && _pos < _len && _rtf[_pos] == ' ') {
             _pos++;
         }
     }
 
-    void skipWhitespace() {
-        while (_pos < _len && isWhitespace(_rtf[_pos])) {
+    void SkipWhitespace() {
+        while (_pos < _len && IsWhitespace(_rtf[_pos])) {
             _pos++;
         }
     }
 
-    bool isWordChar(char c) const {
+    bool IsWordChar(char c) const {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
     }
 
-    bool isDigit(char c) const {
+    bool IsDigit(char c) const {
         return c >= '0' && c <= '9';
     }
 
-    bool isWhitespace(char c) const {
+    bool IsWhitespace(char c) const {
         return c == ' ' || c == '\t' || c == '\n' || c == '\r';
     }
 
-    bool isPrintable(char c) const {
+    bool IsPrintable(char c) const {
         return c != ';' && static_cast<unsigned char>(c) >= 32 &&
                static_cast<unsigned char>(c) <= 126;
     }
@@ -1376,7 +1376,7 @@ private:
 
 RtfDocument ParseRtf(const std::string& rtf, int codePage) {
     RtfParserImpl impl;
-    return impl.parse(rtf, codePage);
+    return impl.Parse(rtf, codePage);
 }
 
 } // namespace Rte

@@ -14,6 +14,38 @@ static RtfColorEntry ResolveColorFromTable(int idx, const RtfDocument& doc, bool
     return {0, 0, 0};
 }
 
+struct TableGroup {
+    size_t startIdx;
+    size_t rowCount;
+    const std::vector<int>& cellxPositions;
+};
+
+static std::vector<TableGroup> GroupTables(const RtfDocument& d) {
+    std::vector<TableGroup> tables;
+    for (size_t i = 0; i < d.elements.size(); ) {
+        if (std::holds_alternative<RtfTableRowEntry>(d.elements[i])) {
+            size_t start = i;
+            const auto& firstRow = std::get<RtfTableRowEntry>(d.elements[i]);
+            size_t count = 1;
+            while (i + count < d.elements.size() &&
+                   std::holds_alternative<RtfTableRowEntry>(d.elements[i + count])) {
+                count++;
+            }
+            tables.push_back({start, count, firstRow.cellxPositions});
+            i += count;
+        } else {
+            i++;
+        }
+    }
+    return tables;
+}
+
+static size_t CountLogical(const RtfDocument& d, const std::vector<TableGroup>& tables) {
+    size_t tableRows = 0;
+    for (const TableGroup& t : tables) tableRows += t.rowCount;
+    return tables.size() + d.elements.size() - tableRows;
+}
+
 template<typename T>
 static bool CompareField(size_t paraIdx, size_t runIdx, const char* name,
                          const T& a, const T& b,
@@ -56,52 +88,59 @@ static std::string BuildRunLocation(const std::string& kind, size_t locIdx,
     return kind + " " + std::to_string(locIdx) +
            " char " + std::to_string(charPos) +
            " (runA " + std::to_string(runA) +
-           ", runB " + std::to_string(runB) + ")";
+            ", runB " + std::to_string(runB) + ")";
+}
+
+static bool ReportBoolDiff(const std::string& loc, const char* name, bool a, bool b,
+                            std::string& reason) {
+    if (a != b) {
+        reason = loc + " " + name + ": " + (a ? "true" : "false") + " vs " + (b ? "true" : "false");
+        return true;
+    }
+    return false;
+}
+
+static bool ReportIntDiff(const std::string& loc, const char* name, int a, int b,
+                           std::string& reason) {
+    if (a != b) {
+        reason = loc + " " + name + ": " + std::to_string(a) + " vs " + std::to_string(b);
+        return true;
+    }
+    return false;
+}
+
+static bool ReportResolvedColorDiff(const std::string& loc, const char* name,
+                                     int idxA, int idxB,
+                                     const RtfDocument& docA, const RtfDocument& docB,
+                                     std::string& reason) {
+    bool hasA, hasB;
+    RtfColorEntry resolvedA = ResolveColorFromTable(idxA, docA, &hasA);
+    RtfColorEntry resolvedB = ResolveColorFromTable(idxB, docB, &hasB);
+    if (resolvedA.red == resolvedB.red && resolvedA.green == resolvedB.green &&
+        resolvedA.blue == resolvedB.blue) {
+        return false;
+    }
+    std::string rgbA = "(" + std::to_string(resolvedA.red) + "," +
+        std::to_string(resolvedA.green) + "," + std::to_string(resolvedA.blue) + ")";
+    std::string rgbB = "(" + std::to_string(resolvedB.red) + "," +
+        std::to_string(resolvedB.green) + "," + std::to_string(resolvedB.blue) + ")";
+    std::string boundMsg;
+    if (!hasA || !hasB) {
+        boundMsg = " [out-of-bounds: A=" + std::to_string(idxA) + "/" +
+            std::to_string(docA.colors.size()) + ", B=" + std::to_string(idxB) + "/" +
+            std::to_string(docB.colors.size()) + "]";
+    }
+    reason = loc + " " + name + ": " + std::to_string(idxA) +
+        " (" + rgbA + ") vs " + std::to_string(idxB) + " (" + rgbB + ")" + boundMsg;
+    return true;
 }
 
 static bool CompareFormatSemantic(const RtfRunFormat& fmtA, const RtfRunFormat& fmtB,
     const RtfDocument& docA, const RtfDocument& docB,
     const std::string& loc, int& effFsA, int& effFsB, std::string& reason) {
-    const auto reportBool = [&](const char* name, bool a, bool b) {
-        if (a != b) {
-            reason = loc + " " + name + ": " + (a ? "true" : "false") + " vs " + (b ? "true" : "false");
-            return true;
-        }
-        return false;
-    };
-    const auto reportInt = [&](const char* name, int a, int b) {
-        if (a != b) {
-            reason = loc + " " + name + ": " + std::to_string(a) + " vs " + std::to_string(b);
-            return true;
-        }
-        return false;
-    };
-    const auto reportResolvedColor = [&](const char* name, int idxA, int idxB) {
-        bool hasA, hasB;
-        RtfColorEntry resolvedA = ResolveColorFromTable(idxA, docA, &hasA);
-        RtfColorEntry resolvedB = ResolveColorFromTable(idxB, docB, &hasB);
-        if (resolvedA.red == resolvedB.red && resolvedA.green == resolvedB.green &&
-            resolvedA.blue == resolvedB.blue) {
-            return false;
-        }
-        std::string rgbA = "(" + std::to_string(resolvedA.red) + "," +
-            std::to_string(resolvedA.green) + "," + std::to_string(resolvedA.blue) + ")";
-        std::string rgbB = "(" + std::to_string(resolvedB.red) + "," +
-            std::to_string(resolvedB.green) + "," + std::to_string(resolvedB.blue) + ")";
-        std::string boundMsg;
-        if (!hasA || !hasB) {
-            boundMsg = " [out-of-bounds: A=" + std::to_string(idxA) + "/" +
-                std::to_string(docA.colors.size()) + ", B=" + std::to_string(idxB) + "/" +
-                std::to_string(docB.colors.size()) + "]";
-        }
-        reason = loc + " " + name + ": " + std::to_string(idxA) +
-            " (" + rgbA + ") vs " + std::to_string(idxB) + " (" + rgbB + ")" + boundMsg;
-        return true;
-    };
-
-    if (reportBool("bold", fmtA.bold, fmtB.bold)) return false;
-    if (reportBool("italic", fmtA.italic, fmtB.italic)) return false;
-    if (reportBool("underline", fmtA.underline, fmtB.underline)) return false;
+    if (ReportBoolDiff(loc, "bold", fmtA.bold, fmtB.bold, reason)) return false;
+    if (ReportBoolDiff(loc, "italic", fmtA.italic, fmtB.italic, reason)) return false;
+    if (ReportBoolDiff(loc, "underline", fmtA.underline, fmtB.underline, reason)) return false;
 
     // Font — resolve by family; missing \fonttbl ≡ Qt default font
     static const std::string defaultFamily = QFont().family().toStdString();
@@ -120,32 +159,32 @@ static bool CompareFormatSemantic(const RtfRunFormat& fmtA, const RtfRunFormat& 
 
     int effA = fmtA.fontSize > 0 ? fmtA.fontSize : effFsA;
     int effB = fmtB.fontSize > 0 ? fmtB.fontSize : effFsB;
-    if (reportInt("fontSize", effA, effB)) return false;
+    if (ReportIntDiff(loc, "fontSize", effA, effB, reason)) return false;
     effFsA = effA;
     effFsB = effB;
 
     if (fmtA.colorIndex != fmtB.colorIndex) {
-        if (reportResolvedColor("colorIndex", fmtA.colorIndex, fmtB.colorIndex)) return false;
+        if (ReportResolvedColorDiff(loc, "colorIndex", fmtA.colorIndex, fmtB.colorIndex, docA, docB, reason)) return false;
     }
-    if (reportBool("superscript", fmtA.superscript, fmtB.superscript)) return false;
-    if (reportBool("subscript", fmtA.subscript, fmtB.subscript)) return false;
-    if (reportBool("strikeOut", fmtA.strikeOut, fmtB.strikeOut)) return false;
+    if (ReportBoolDiff(loc, "superscript", fmtA.superscript, fmtB.superscript, reason)) return false;
+    if (ReportBoolDiff(loc, "subscript", fmtA.subscript, fmtB.subscript, reason)) return false;
+    if (ReportBoolDiff(loc, "strikeOut", fmtA.strikeOut, fmtB.strikeOut, reason)) return false;
     if (fmtA.bgColorIndex != fmtB.bgColorIndex) {
-        if (reportResolvedColor("bgColorIndex", fmtA.bgColorIndex, fmtB.bgColorIndex)) return false;
+        if (ReportResolvedColorDiff(loc, "bgColorIndex", fmtA.bgColorIndex, fmtB.bgColorIndex, docA, docB, reason)) return false;
     }
-    if (reportInt("underlineStyle", static_cast<int>(fmtA.underlineStyle),
-                                  static_cast<int>(fmtB.underlineStyle))) return false;
-    if (reportInt("capitalization", static_cast<int>(fmtA.capitalization),
-                                   static_cast<int>(fmtB.capitalization))) return false;
-    if (reportInt("upOffset", fmtA.upOffset, fmtB.upOffset)) return false;
-    if (reportInt("dnOffset", fmtA.dnOffset, fmtB.dnOffset)) return false;
-    if (reportBool("kerning", fmtA.kerning, fmtB.kerning)) return false;
-    if (reportInt("expnd", fmtA.expnd, fmtB.expnd)) return false;
+    if (ReportIntDiff(loc, "underlineStyle", static_cast<int>(fmtA.underlineStyle),
+                                  static_cast<int>(fmtB.underlineStyle), reason)) return false;
+    if (ReportIntDiff(loc, "capitalization", static_cast<int>(fmtA.capitalization),
+                                   static_cast<int>(fmtB.capitalization), reason)) return false;
+    if (ReportIntDiff(loc, "upOffset", fmtA.upOffset, fmtB.upOffset, reason)) return false;
+    if (ReportIntDiff(loc, "dnOffset", fmtA.dnOffset, fmtB.dnOffset, reason)) return false;
+    if (ReportBoolDiff(loc, "kerning", fmtA.kerning, fmtB.kerning, reason)) return false;
+    if (ReportIntDiff(loc, "expnd", fmtA.expnd, fmtB.expnd, reason)) return false;
     if (fmtA.ulColorIndex != 0 || fmtB.ulColorIndex != 0) {
-        if (reportResolvedColor("ulColorIndex", fmtA.ulColorIndex, fmtB.ulColorIndex)) return false;
+        if (ReportResolvedColorDiff(loc, "ulColorIndex", fmtA.ulColorIndex, fmtB.ulColorIndex, docA, docB, reason)) return false;
     }
-    if (reportInt("langId", fmtA.langId, fmtB.langId)) return false;
-    if (reportBool("protected", fmtA.protected_, fmtB.protected_)) return false;
+    if (ReportIntDiff(loc, "langId", fmtA.langId, fmtB.langId, reason)) return false;
+    if (ReportBoolDiff(loc, "protected", fmtA.protected_, fmtB.protected_, reason)) return false;
     return true;
 }
 
@@ -154,8 +193,8 @@ static RtfCompareResult CompareRunsSemantic(const std::vector<RtfRun>& runsA,
     const std::string& kind, size_t locIdx, int& effFsA, int& effFsB, std::string& reason) {
     // Compare total text
     std::string textA, textB;
-    for (const auto& run : runsA) textA += run.text;
-    for (const auto& run : runsB) textB += run.text;
+    for (const RtfRun& run : runsA) textA += run.text;
+    for (const RtfRun& run : runsB) textB += run.text;
     if (textA != textB) {
         reason = kind + " " + std::to_string(locIdx) +
             " text: '" + textA + "' vs '" + textB + "'";
@@ -228,46 +267,14 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
         return RtfCompareResult::StructuralDiff;
     }
 
-    struct TableGroup {
-        size_t startIdx;
-        size_t rowCount;
-        const std::vector<int>& cellxPositions;
-    };
-
     // Group consecutive table rows into tables for comparison
-    auto groupTables = [](const RtfDocument& d) {
-        std::vector<TableGroup> tables;
-        for (size_t i = 0; i < d.elements.size(); ) {
-            if (std::holds_alternative<RtfTableRowEntry>(d.elements[i])) {
-                size_t start = i;
-                const auto& firstRow = std::get<RtfTableRowEntry>(d.elements[i]);
-                size_t count = 1;
-                while (i + count < d.elements.size() &&
-                       std::holds_alternative<RtfTableRowEntry>(d.elements[i + count])) {
-                    count++;
-                }
-                tables.push_back({start, count, firstRow.cellxPositions});
-                i += count;
-            } else {
-                i++;
-            }
-        }
-        return tables;
-    };
-
-    auto tablesA = groupTables(a);
-    auto tablesB = groupTables(b);
+    const std::vector<TableGroup> tablesA = GroupTables(a);
+    const std::vector<TableGroup> tablesB = GroupTables(b);
 
     // Count logical elements from table groups: tables + (totalElements - tableRowElements)
-    auto countLogical = [](const RtfDocument& d, const std::vector<TableGroup>& tables) {
-        size_t tableRows = 0;
-        for (const auto& t : tables) tableRows += t.rowCount;
-        return tables.size() + d.elements.size() - tableRows;
-    };
-
-    if (countLogical(a, tablesA) != countLogical(b, tablesB)) {
-        reason = "Total logical element count: " + std::to_string(countLogical(a, tablesA)) +
-                 " vs " + std::to_string(countLogical(b, tablesB));
+    if (CountLogical(a, tablesA) != CountLogical(b, tablesB)) {
+        reason = "Total logical element count: " + std::to_string(CountLogical(a, tablesA)) +
+                  " vs " + std::to_string(CountLogical(b, tablesB));
         return RtfCompareResult::StructuralDiff;
     }
 
@@ -376,26 +383,19 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
 
                     // Compare effective padding
                     {
-                        auto effPad = [&]() {
-                            struct Pad { int top, left, right, bottom; };
-                            return Pad{
-                                EffectiveCellPadding(fmtA.topPadding, rowA.rowTopPadding),
-                                EffectiveCellPadding(fmtA.leftPadding, rowA.rowLeftPadding),
-                                EffectiveCellPadding(fmtA.rightPadding, rowA.rowRightPadding),
-                                EffectiveCellPadding(fmtA.bottomPadding, rowA.rowBottomPadding)
-                            };
+                        struct Pad { int top, left, right, bottom; };
+                        const Pad padA{
+                            EffectiveCellPadding(fmtA.topPadding, rowA.rowTopPadding),
+                            EffectiveCellPadding(fmtA.leftPadding, rowA.rowLeftPadding),
+                            EffectiveCellPadding(fmtA.rightPadding, rowA.rowRightPadding),
+                            EffectiveCellPadding(fmtA.bottomPadding, rowA.rowBottomPadding)
                         };
-                        auto padA = effPad();
-                        auto effPadB = [&]() {
-                            struct Pad { int top, left, right, bottom; };
-                            return Pad{
-                                EffectiveCellPadding(fmtB.topPadding, rowB.rowTopPadding),
-                                EffectiveCellPadding(fmtB.leftPadding, rowB.rowLeftPadding),
-                                EffectiveCellPadding(fmtB.rightPadding, rowB.rowRightPadding),
-                                EffectiveCellPadding(fmtB.bottomPadding, rowB.rowBottomPadding)
-                            };
+                        const Pad padB{
+                            EffectiveCellPadding(fmtB.topPadding, rowB.rowTopPadding),
+                            EffectiveCellPadding(fmtB.leftPadding, rowB.rowLeftPadding),
+                            EffectiveCellPadding(fmtB.rightPadding, rowB.rowRightPadding),
+                            EffectiveCellPadding(fmtB.bottomPadding, rowB.rowBottomPadding)
                         };
-                        auto padB = effPadB();
                         if (padA.top != padB.top || padA.left != padB.left ||
                             padA.right != padB.right || padA.bottom != padB.bottom) {
                             reason = "Table " + std::to_string(tableIdxA) +

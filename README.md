@@ -175,7 +175,7 @@ target_link_libraries(MyTarget PRIVATE QtRtfEditor::QtRtfEditor)
 Rte::RichTextEdit editor;
 
 // Load RTF
-std::string rtf = R"({\rtf1\ansi{\b Bold}{\b0 normal})";
+std::string rtf = R"({\rtf1\ansi{\b Bold}{\b0 normal}})";
 editor.Load(rtf, Rte::FormatMode::Rtf);
 
 // Set protection — cursor skips this range

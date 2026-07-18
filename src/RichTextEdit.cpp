@@ -83,7 +83,7 @@ void RichTextEdit::SetCodePage(int codePage) {
     _codePage = codePage;
 }
 
-int RichTextEdit::codePage() const {
+int RichTextEdit::CodePage() const {
     return _codePage;
 }
 

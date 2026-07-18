@@ -43,11 +43,11 @@ private slots:
     void cleanupTestCase();
 
 public:
-    void setCustomDir(const QString& dir) { _customDir = dir; }
+    void SetCustomDir(const QString& dir) { _customDir = dir; }
 
 private:
-    void _runFromCustomDir(const QString& dirPath);
-    void _doRoundtrip(const QString& name, const std::string& rtf);
+    void RunFromCustomDir(const QString& dirPath);
+    void DoRoundtrip(const QString& name, const std::string& rtf);
 
     int _pass = 0;
     int _fail = 0;
@@ -94,10 +94,10 @@ void TestRoundtrip::TestRtfSuite() {
     } else {
         testDataDir = QCoreApplication::applicationDirPath() + "/testdata";
     }
-    _runFromCustomDir(testDataDir);
+    RunFromCustomDir(testDataDir);
 }
 
-void TestRoundtrip::_runFromCustomDir(const QString& dirPath) {
+void TestRoundtrip::RunFromCustomDir(const QString& dirPath) {
     QDir dir(dirPath);
     QStringList files = dir.entryList(QStringList() << "*.rtf", QDir::Files);
 
@@ -171,7 +171,7 @@ void TestRoundtrip::_runFromCustomDir(const QString& dirPath) {
     QVERIFY(_fail == 0);
 }
 
-void TestRoundtrip::_doRoundtrip(const QString& name, const std::string& rtf) {
+void TestRoundtrip::DoRoundtrip(const QString& name, const std::string& rtf) {
     if (HasUnknownTags(rtf)) {
         ReportCase(name, "FAIL (unsupported features)");
         _fail++;
@@ -210,12 +210,12 @@ void TestRoundtrip::_doRoundtrip(const QString& name, const std::string& rtf) {
 
 void TestRoundtrip::RoundtripDeff() {
     std::string input = R"({\rtf1\ansi\deff0\pard\plain Text\par})";
-    _doRoundtrip("RoundtripDeff", input);
+    DoRoundtrip("RoundtripDeff", input);
 }
 
 void TestRoundtrip::RoundtripDeftab() {
     std::string input = R"({\rtf1\ansi\deff0\deftab720\pard\plain Text\par})";
-    _doRoundtrip("RoundtripDeftab", input);
+    DoRoundtrip("RoundtripDeftab", input);
 }
 
 void TestRoundtrip::RoundtripDeffNested() {
@@ -223,14 +223,14 @@ void TestRoundtrip::RoundtripDeffNested() {
     // Export wraps changed values in scoped groups to preserve semantics:
     //   {\rtf1\deff0 {\deff2\...Deep\par} {\deff1\...Mid\par} \...Outer\par}
     std::string input = R"({\rtf1\ansi\deff0 {\deff1 {\deff2\pard\plain\f2 Deep\par}\pard\plain\f1 Mid\par}\pard\plain\f0 Outer\par})";
-    _doRoundtrip("RoundtripDeffNested", input);
+    DoRoundtrip("RoundtripDeffNested", input);
 }
 
 void TestRoundtrip::RoundtripDeftabNested() {
     // RTF 1.5/1.9.1 spec: \deftabN is group-persistent (pushed/popped with groups).
     // Export wraps changed values in scoped groups to preserve semantics.
     std::string input = R"({\rtf1\ansi\deff0\deftab180 {\deftab360\pard\plain\deftab360 Mid\par}\pard\plain\deftab180 Outer\par})";
-    _doRoundtrip("RoundtripDeftabNested", input);
+    DoRoundtrip("RoundtripDeftabNested", input);
 }
 
 void TestRoundtrip::cleanupTestCase() {
@@ -242,7 +242,7 @@ void TestRoundtrip::cleanupTestCase() {
     qDebug().noquote() << "======================================";
 }
 
-static int customMain(int argc, char **argv) {
+static int CustomMain(int argc, char **argv) {
     QStringList filtered;
     QString testDataDir;
     for (int i = 0; i < argc; ++i) {
@@ -284,12 +284,12 @@ static int customMain(int argc, char **argv) {
     app.setApplicationName("test_roundtrip");
 
     TestRoundtrip test;
-    test.setCustomDir(testDataDir);
+    test.SetCustomDir(testDataDir);
     return QTest::qExec(&test, adjustedArgc, filteredArgv.data());
 }
 
 int main(int argc, char **argv) {
-    return customMain(argc, argv);
+    return CustomMain(argc, argv);
 }
 
 #include "TestRoundtrip.moc"

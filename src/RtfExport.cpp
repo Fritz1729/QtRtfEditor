@@ -25,6 +25,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+
 #include <map>
 #include <sstream>
 
@@ -110,7 +111,7 @@ std::string RtfEscape(const QString& text) {
     std::string result;
     result.reserve(text.size() * 2);
 
-    for (QChar ch : text) {
+    for (const QChar& ch : text) {
         ushort code = ch.unicode();
         switch (static_cast<char>(code)) {
             case '\\':  result += "\\\\"; break;
@@ -388,6 +389,220 @@ static void EmitBorderSide(std::ostringstream& out, const char* sideTag, double 
     EmitBorderSpec(out, width, style, colorIdx);
 }
 
+struct BlockExportContext {
+    std::ostringstream& out;
+    const QTextDocument& document;
+    const QFont& defaultFont;
+    const std::map<std::string, int>& fontMap;
+    const std::vector<QColor>& colorList;
+    const std::vector<QColor>& bgColorList;
+    const std::map<const QTextList*, int>& listMap;
+    int defaultFontIdx;
+    RtfRunFormat carriedOverFormat{};
+    ParaFmtState lastParaFmt{};
+    bool lastParaFmtSet = false;
+    int lastDeff = 0;
+    int lastDeftab = 180;
+    int deffDeftabGroupDepth = 0;
+    bool firstBlock = true;
+
+    void ExportBlock(const QTextBlock& block, bool isTableCell, bool justAfterTable = false);
+};
+
+void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, bool justAfterTable) {
+    QString text = block.text();
+    bool hasText = !text.trimmed().isEmpty();
+    if (!hasText) {
+        if (firstBlock || justAfterTable) {
+            firstBlock = false;
+            return;
+        }
+        firstBlock = false;
+        QTextBlockFormat blockFmt = block.blockFormat();
+        EmitParaFormattingIfNeeded(out, blockFmt, lastParaFmt, lastParaFmtSet);
+        out << "\\par\n";
+        return;
+    }
+    firstBlock = false;
+
+    QTextBlockFormat blockFmt = block.blockFormat();
+    bool inListGroup = false;
+    if (!isTableCell && block.textList()) {
+        const QTextList* list = block.textList();
+        auto listIt = listMap.find(list);
+        if (listIt != listMap.end()) {
+            out << "{\\listid" << listIt->second << "\\listlevel0";
+            inListGroup = true;
+        }
+    }
+
+    EmitParaFormattingIfNeeded(out, blockFmt, lastParaFmt, lastParaFmtSet);
+
+    {
+        int paraDeff = blockFmt.property(UserPropParaDefaultFontIndex).toInt();
+        int paraDeftab = blockFmt.property(UserPropParaDefaultTabStopTwips).toInt();
+        bool deffChanged = (paraDeff != lastDeff);
+        bool deftabChanged = (paraDeftab != lastDeftab);
+        if (deffChanged || deftabChanged) {
+            out << "{";
+            deffDeftabGroupDepth++;
+            if (deffChanged) {
+                out << "\\deff" << paraDeff;
+                lastDeff = paraDeff;
+            }
+            if (deftabChanged) {
+                out << "\\deftab" << paraDeftab;
+                lastDeftab = paraDeftab;
+            }
+        }
+    }
+
+    out << "\n";
+
+    bool hasImage = false;
+    for (QTextBlock::iterator itImg = block.begin(); itImg != block.end(); ++itImg) {
+        QTextFragment frag = itImg.fragment();
+        if (frag.isValid() && frag.charFormat().isImageFormat()) {
+            hasImage = true;
+            break;
+        }
+    }
+
+    if (hasImage) {
+        QTextBlock::iterator itImg = block.begin();
+        while (itImg != block.end()) {
+            QTextFragment frag = itImg.fragment();
+            if (frag.isValid() && frag.charFormat().isImageFormat()) {
+                QTextImageFormat imgFmt = frag.charFormat().toImageFormat();
+                QString name = imgFmt.name();
+                qreal w = imgFmt.width();
+                qreal h = imgFmt.height();
+                if (w > 0 && h > 0) {
+                    std::string pict = EmitImageAsPict(document, name, w, h);
+                    if (!pict.empty()) {
+                        out << pict << "\n";
+                    }
+                }
+            }
+            itImg++;
+        }
+        if (inListGroup) out << '}';
+        out << "\\plain\\par\n";
+        carriedOverFormat.fontIndex = defaultFontIdx;
+    } else {
+        RtfRunFormat prev;
+        RtfRunFormat lastEmitted{};
+        lastEmitted.colorIndex = 0;
+        lastEmitted.bgColorIndex = 0;
+        lastEmitted.fontIndex = carriedOverFormat.fontIndex;
+        bool firstRun = true;
+
+        QTextBlock::iterator it = block.begin();
+        while (it != block.end()) {
+            QTextFragment frag = it.fragment();
+            if (!frag.isValid() || frag.length() == 0) { it++; continue; }
+
+            QTextCharFormat charFmt = frag.charFormat();
+
+            RtfRunFormat cur;
+            qreal ptSize = charFmt.fontPointSize();
+            if (ptSize <= 0) ptSize = defaultFont.pointSizeF();
+            cur.fontSize = static_cast<int>(ptSize * 2);
+
+            QString fam;
+            {
+                QStringList fFams = charFmt.fontFamilies().toStringList();
+                fam = fFams.isEmpty() ? QString() : fFams.first();
+            }
+            if (fam.isEmpty()) fam = defaultFont.family();
+            auto fIt = fontMap.find(fam.toStdString());
+            cur.fontIndex = (fIt != fontMap.end()) ? fIt->second : defaultFontIdx;
+
+            cur.colorIndex = LookupColorIndex(charFmt.foreground().color(), colorList);
+            {
+                QBrush bgBrush = charFmt.background();
+                if (bgBrush.style() != Qt::NoBrush)
+                    cur.bgColorIndex = LookupColorIndex(bgBrush.color(), bgColorList);
+                else
+                    cur.bgColorIndex = 0;
+            }
+
+            cur.bold = charFmt.fontWeight() >= 700;
+            cur.italic = charFmt.fontItalic();
+            cur.strikeOut = charFmt.fontStrikeOut();
+            cur.superscript = charFmt.verticalAlignment() == QTextCharFormat::AlignSuperScript;
+            cur.subscript = charFmt.verticalAlignment() == QTextCharFormat::AlignSubScript;
+            cur.underlineStyle = EffectiveUnderlineStyle(charFmt);
+            cur.capitalization = toCapitalization(charFmt.fontCapitalization());
+            cur.kerning = charFmt.fontKerning();
+            cur.protected_ = charFmt.property(UserPropProtect).toBool();
+            cur.upOffset = charFmt.property(UserPropUpOffset).toInt();
+            cur.dnOffset = charFmt.property(UserPropDnOffset).toInt();
+            cur.langId = charFmt.property(UserPropLangId).toInt();
+            {
+                qreal spacing = charFmt.fontLetterSpacing();
+                if (spacing > 0) {
+                    cur.expnd = lround(spacing * 20.0 / ptSize);
+                }
+            }
+
+            if (firstRun || cur != prev) {
+                if (!firstRun) {
+                    WriteConditionalFormatOff(out, cur, lastEmitted, true);
+                }
+
+                if (firstRun || cur.fontSize != lastEmitted.fontSize)
+                    out << "\\fs" << cur.fontSize << ' ';
+                if (cur.fontIndex != lastEmitted.fontIndex)
+                    out << "\\f" << cur.fontIndex << ' ';
+                if (cur.colorIndex != lastEmitted.colorIndex)
+                    out << "\\cf" << cur.colorIndex << ' ';
+                if (cur.bgColorIndex != lastEmitted.bgColorIndex)
+                    out << "\\cb" << cur.bgColorIndex << ' ';
+                if (cur.bold && !lastEmitted.bold) out << "\\b ";
+                if (cur.italic && !lastEmitted.italic) out << "\\i ";
+                if (cur.strikeOut && !lastEmitted.strikeOut) out << "\\strike ";
+                if (cur.underlineStyle != UnderlineStyle::None && cur.underlineStyle != lastEmitted.underlineStyle)
+                    out << UnderlineStyleTag(cur.underlineStyle) << ' ';
+                if (cur.superscript && !lastEmitted.superscript) out << "\\super ";
+                if (cur.subscript && !lastEmitted.subscript) out << "\\sub ";
+                if (cur.capitalization != Capitalization::None && cur.capitalization != lastEmitted.capitalization) {
+                    if (cur.capitalization == Capitalization::AllCaps) out << "\\caps ";
+                    if (cur.capitalization == Capitalization::SmallCaps) out << "\\scaps ";
+                }
+                if (cur.kerning && !lastEmitted.kerning) out << "\\kerning ";
+                if (cur.expnd != lastEmitted.expnd) out << "\\expnd" << cur.expnd << ' ';
+                if (cur.protected_ && !lastEmitted.protected_) out << "\\protect ";
+                if (cur.upOffset != lastEmitted.upOffset) out << "\\up" << cur.upOffset << ' ';
+                if (cur.dnOffset != lastEmitted.dnOffset) out << "\\dn" << cur.dnOffset << ' ';
+                if (cur.langId != lastEmitted.langId) out << "\\lang" << cur.langId << ' ';
+
+                lastEmitted = cur;
+            }
+
+            out << RtfEscape(frag.text());
+            prev = cur;
+            firstRun = false;
+            it++;
+        }
+
+        if (!firstRun) {
+            bool plainEmitted = WritePlainTextOff(out, lastEmitted);
+            if (plainEmitted) {
+                carriedOverFormat.fontIndex = defaultFontIdx;
+            } else {
+                carriedOverFormat.fontIndex = lastEmitted.fontIndex;
+            }
+        }
+        if (inListGroup) out << '}';
+        out << "\\par";
+        for (int i = 0; i < deffDeftabGroupDepth; i++)
+            out << '}';
+        deffDeftabGroupDepth = 0;
+        out << "\n";
+    }
+}
+
 } // namespace
 
 std::string ExportRtf(const QTextDocument& document) {
@@ -454,12 +669,12 @@ std::string ExportRtf(const QTextDocument& document) {
 
     if (!colorList.empty() || !bgColorList.empty()) {
         out << "{\\colortbl ;";
-        for (const auto& color : colorList) {
+        for (const QColor& color : colorList) {
             out << "\\red" << color.red()
                 << "\\green" << color.green()
                 << "\\blue" << color.blue() << ";";
         }
-        for (const auto& color : bgColorList) {
+        for (const QColor& color : bgColorList) {
             out << "\\red" << color.red()
                 << "\\green" << color.green()
                 << "\\blue" << color.blue() << ";";
@@ -542,212 +757,9 @@ std::string ExportRtf(const QTextDocument& document) {
     // Content export — iterate root frame to handle tables and paragraphs
     // Carry over persistent RTF format state (font, color, bgColor) across blocks.
     // RTF formatting is stream-global — \par does not reset it.
-    RtfRunFormat carriedOverFormat{};
-    bool firstBlock = true;
-    ParaFmtState lastParaFmt{};
-    bool lastParaFmtSet = false;
-
-    auto exportBlock = [&](const QTextBlock& block, bool isTableCell, bool justAfterTable = false) {
-        QString text = block.text();
-        bool hasText = !text.trimmed().isEmpty();
-        if (!hasText) {
-            // Skip the very first empty block — Qt always creates an extra
-            // empty block at the document start that doesn't correspond to any RTF paragraph.
-            // Also skip empty blocks immediately after tables — they are Qt artifacts.
-            if (firstBlock || justAfterTable) {
-                firstBlock = false;
-                return;
-            }
-            firstBlock = false;
-            // Emit paragraph formatting for the empty block, then \par
-            QTextBlockFormat blockFmt = block.blockFormat();
-            EmitParaFormattingIfNeeded(out, blockFmt, lastParaFmt, lastParaFmtSet);
-            out << "\\par\n";
-            return;
-        }
-        firstBlock = false;
-
-        QTextBlockFormat blockFmt = block.blockFormat();
-        bool inListGroup = false;
-        if (!isTableCell && block.textList()) {
-            const QTextList* list = block.textList();
-            auto listIt = listMap.find(list);
-            if (listIt != listMap.end()) {
-                out << "{\\listid" << listIt->second << "\\listlevel0";
-                inListGroup = true;
-            }
-        }
-
-        EmitParaFormattingIfNeeded(out, blockFmt, lastParaFmt, lastParaFmtSet);
-
-        // Emit per-paragraph group-persistent values in scoped groups.
-        // \deffN and \deftabN are group-persistent per the RTF spec — wrapping
-        // each paragraph that differs from the previous value in a group prevents
-        // the control word from leaking into subsequent paragraphs.
-        {
-            int paraDeff = blockFmt.property(UserPropParaDefaultFontIndex).toInt();
-            int paraDeftab = blockFmt.property(UserPropParaDefaultTabStopTwips).toInt();
-            bool deffChanged = (paraDeff != lastDeff);
-            bool deftabChanged = (paraDeftab != lastDeftab);
-            if (deffChanged || deftabChanged) {
-                out << "{";
-                deffDeftabGroupDepth++;
-                if (deffChanged) {
-                    out << "\\deff" << paraDeff;
-                    lastDeff = paraDeff;
-                }
-                if (deftabChanged) {
-                    out << "\\deftab" << paraDeftab;
-                    lastDeftab = paraDeftab;
-                }
-            }
-        }
-
-        out << "\n";
-
-        // Check for images in this block
-        bool hasImage = false;
-        for (QTextBlock::iterator itImg = block.begin(); itImg != block.end(); ++itImg) {
-            QTextFragment frag = itImg.fragment();
-            if (frag.isValid() && frag.charFormat().isImageFormat()) {
-                hasImage = true;
-                break;
-            }
-        }
-
-        if (hasImage) {
-            QTextBlock::iterator itImg = block.begin();
-            while (itImg != block.end()) {
-                QTextFragment frag = itImg.fragment();
-                if (frag.isValid() && frag.charFormat().isImageFormat()) {
-                    QTextImageFormat imgFmt = frag.charFormat().toImageFormat();
-                    QString name = imgFmt.name();
-                    qreal w = imgFmt.width();
-                    qreal h = imgFmt.height();
-                    if (w > 0 && h > 0) {
-                        std::string pict = EmitImageAsPict(document, name, w, h);
-                        if (!pict.empty()) {
-                            out << pict << "\n";
-                        }
-                    }
-                }
-                itImg++;
-            }
-            if (inListGroup) out << '}';
-            out << "\\plain\\par\n";
-            carriedOverFormat.fontIndex = defaultFontIdx; // \plain resets font
-        } else {
-            RtfRunFormat prev;
-            RtfRunFormat lastEmitted{};
-            lastEmitted.colorIndex = 0;
-            lastEmitted.bgColorIndex = 0;
-            lastEmitted.fontIndex = carriedOverFormat.fontIndex;
-            bool firstRun = true;
-
-            QTextBlock::iterator it = block.begin();
-            while (it != block.end()) {
-                QTextFragment frag = it.fragment();
-                if (!frag.isValid() || frag.length() == 0) { it++; continue; }
-
-                QTextCharFormat charFmt = frag.charFormat();
-
-                RtfRunFormat cur;
-                qreal ptSize = charFmt.fontPointSize();
-                if (ptSize <= 0) ptSize = defaultFont.pointSizeF();
-                cur.fontSize = static_cast<int>(ptSize * 2);
-
-                QString fam;
-                {
-                    QStringList fFams = charFmt.fontFamilies().toStringList();
-                    fam = fFams.isEmpty() ? QString() : fFams.first();
-                }
-                if (fam.isEmpty()) fam = defaultFont.family();
-                auto fIt = fontMap.find(fam.toStdString());
-                cur.fontIndex = (fIt != fontMap.end()) ? fIt->second : defaultFontIdx;
-
-                cur.colorIndex = LookupColorIndex(charFmt.foreground().color(), colorList);
-                {
-                    QBrush bgBrush = charFmt.background();
-                    if (bgBrush.style() != Qt::NoBrush)
-                        cur.bgColorIndex = LookupColorIndex(bgBrush.color(), bgColorList);
-                    else
-                        cur.bgColorIndex = 0;
-                }
-
-                cur.bold = charFmt.fontWeight() >= 700;
-                cur.italic = charFmt.fontItalic();
-                cur.strikeOut = charFmt.fontStrikeOut();
-                cur.superscript = charFmt.verticalAlignment() == QTextCharFormat::AlignSuperScript;
-                cur.subscript = charFmt.verticalAlignment() == QTextCharFormat::AlignSubScript;
-                cur.underlineStyle = EffectiveUnderlineStyle(charFmt);
-                cur.capitalization = toCapitalization(charFmt.fontCapitalization());
-                cur.kerning = charFmt.fontKerning();
-                cur.protected_ = charFmt.property(UserPropProtect).toBool();
-                cur.upOffset = charFmt.property(UserPropUpOffset).toInt();
-                cur.dnOffset = charFmt.property(UserPropDnOffset).toInt();
-                cur.langId = charFmt.property(UserPropLangId).toInt();
-                {
-                    qreal spacing = charFmt.fontLetterSpacing();
-                    if (spacing > 0) {
-                        cur.expnd = lround(spacing * 20.0 / ptSize);
-                    }
-                }
-
-                if (firstRun || cur != prev) {
-                    if (!firstRun) {
-                        WriteConditionalFormatOff(out, cur, lastEmitted, true);
-                    }
-
-                    if (firstRun || cur.fontSize != lastEmitted.fontSize)
-                        out << "\\fs" << cur.fontSize << ' ';
-                    if (cur.fontIndex != lastEmitted.fontIndex)
-                        out << "\\f" << cur.fontIndex << ' ';
-                    if (cur.colorIndex != lastEmitted.colorIndex)
-                        out << "\\cf" << cur.colorIndex << ' ';
-                    if (cur.bgColorIndex != lastEmitted.bgColorIndex)
-                        out << "\\cb" << cur.bgColorIndex << ' ';
-                    if (cur.bold && !lastEmitted.bold) out << "\\b ";
-                    if (cur.italic && !lastEmitted.italic) out << "\\i ";
-                    if (cur.strikeOut && !lastEmitted.strikeOut) out << "\\strike ";
-                    if (cur.underlineStyle != UnderlineStyle::None && cur.underlineStyle != lastEmitted.underlineStyle)
-                        out << UnderlineStyleTag(cur.underlineStyle) << ' ';
-                    if (cur.superscript && !lastEmitted.superscript) out << "\\super ";
-                    if (cur.subscript && !lastEmitted.subscript) out << "\\sub ";
-                    if (cur.capitalization != Capitalization::None && cur.capitalization != lastEmitted.capitalization) {
-                        if (cur.capitalization == Capitalization::AllCaps) out << "\\caps ";
-                        if (cur.capitalization == Capitalization::SmallCaps) out << "\\scaps ";
-                    }
-                    if (cur.kerning && !lastEmitted.kerning) out << "\\kerning ";
-                    if (cur.expnd != lastEmitted.expnd) out << "\\expnd" << cur.expnd << ' ';
-                    if (cur.protected_ && !lastEmitted.protected_) out << "\\protect ";
-                    if (cur.upOffset != lastEmitted.upOffset) out << "\\up" << cur.upOffset << ' ';
-                    if (cur.dnOffset != lastEmitted.dnOffset) out << "\\dn" << cur.dnOffset << ' ';
-                    if (cur.langId != lastEmitted.langId) out << "\\lang" << cur.langId << ' ';
-
-                    lastEmitted = cur;
-                }
-
-                out << RtfEscape(frag.text());
-                prev = cur;
-                firstRun = false;
-                it++;
-            }
-
-            if (!firstRun) {
-                bool plainEmitted = WritePlainTextOff(out, lastEmitted);
-                if (plainEmitted) {
-                    carriedOverFormat.fontIndex = defaultFontIdx;
-                } else {
-                    carriedOverFormat.fontIndex = lastEmitted.fontIndex;
-                }
-            }
-            if (inListGroup) out << '}';
-            out << "\\par";
-            for (int i = 0; i < deffDeftabGroupDepth; i++)
-                out << '}';
-            deffDeftabGroupDepth = 0;
-            out << "\n";
-        }
+    BlockExportContext exportCtx{
+        out, document, defaultFont, fontMap, colorList, bgColorList, listMap,
+        defaultFontIdx, {}, {}, false, defaultFontIdx, defaultTabStopTwips, 0, true
     };
 
     QTextFrame* rootFrame = document.rootFrame();
@@ -876,7 +888,7 @@ std::string ExportRtf(const QTextDocument& document) {
                                 out << "\\intbl";
                                 first = false;
                             }
-                            exportBlock(cellBlock, true);
+                              exportCtx.ExportBlock(cellBlock, true);
                         }
                         cellBlock = cellBlock.next();
                     }
@@ -889,7 +901,7 @@ std::string ExportRtf(const QTextDocument& document) {
         } else {
             QTextBlock block = frameIt.currentBlock();
             if (block.isValid()) {
-                exportBlock(block, false, justFinishedTable);
+                exportCtx.ExportBlock(block, false, justFinishedTable);
             }
             justFinishedTable = false;
         }

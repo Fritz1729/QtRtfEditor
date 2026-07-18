@@ -26,7 +26,7 @@ namespace {
 
 static void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
                        const RtfDocument& doc, const QFont& defaultFont) {
-    for (const auto& run : runs) {
+    for (const RtfRun& run : runs) {
         QTextCharFormat charFmt;
 
         if (run.format.fontSize > 0) {
@@ -143,7 +143,7 @@ static void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
     }
     if (!para.tabStops.empty()) {
         QList<QTextOption::Tab> tabs;
-        for (const auto& ts : para.tabStops) {
+        for (const TabStop& ts : para.tabStops) {
             QTextOption::TabType type;
             switch (ts.alignment) {
             case 1: type = QTextOption::LeftTab; break;
@@ -423,7 +423,7 @@ void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
     QTextList* currentList = nullptr;
     std::vector<const RtfTableRowEntry*> tableRows;
 
-    for (const auto& elem : doc.elements) {
+    for (const std::variant<RtfParagraph, RtfTableRowEntry, RtfImage>& elem : doc.elements) {
         std::visit([&](const auto& element) {
             using T = std::decay_t<decltype(element)>;
             if constexpr (std::is_same_v<T, RtfParagraph>) {

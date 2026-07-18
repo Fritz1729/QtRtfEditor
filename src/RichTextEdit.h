@@ -1,17 +1,5 @@
 #pragma once
 
-// Reusable RTF-capable QTextEdit subclass.
-//
-// Supports:
-//   - Loading/saving RTF (Delphi/TRichEdit-compatible)
-//   - Protected text ranges via \protect format — cursor skips
-//     over protected text, preventing any edit within it
-//   - Subclassing (virtual methods) for application-specific
-//     extensions
-//
-// License: Dual (LGPL-3.0-or-later + commercial license).
-// See https://www.qt.io/licensing for details.
-
 #include <QTextEdit>
 #include <QTextCursor>
 #include <QKeyEvent>
@@ -106,7 +94,7 @@ public:
      * @brief Get the default code page for ANSI hex escape decoding.
      * @return Code page number (default 1252).
      */
-    [[nodiscard]] int codePage() const;
+    [[nodiscard]] int CodePage() const;
 
     void keyPressEvent(QKeyEvent* event) override;
 

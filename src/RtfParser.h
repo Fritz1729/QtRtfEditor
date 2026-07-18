@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "RtfCompare.h"
+#include "RtfTypes.h"
 
 namespace Rte {
 

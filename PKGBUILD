@@ -38,7 +38,7 @@ prepare() {
   tar -xzf archive.tar.gz -C "$srcdir" --strip-components=1
   rm archive.tar.gz
 
-  # Remove examples; keep tests/ because src/*.cpp includes RtfCompare.h.
+  # Remove examples; keep tests/ for check() phase.
   rm -rf "${srcdir:?}/examples"
 
   # Replace root CMakeLists.txt with a minimal build-only version.
@@ -108,7 +108,6 @@ target_include_directories(QtRtfEditor
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../tests>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 

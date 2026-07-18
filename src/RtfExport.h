@@ -1,13 +1,5 @@
 #pragma once
 
-// Serializes a QTextDocument as RTF string.
-//
-// The export produces RTF using Delphi/TRichEdit's tag conventions:
-// formatting tags act as persistent mode toggles (e.g., \b turns
-// bold on, \b0 turns it off). This ensures round-trip compatibility
-// when data originates from Delphi applications.
-// For future HTML support, the interface is extensible.
-
 #include <string>
 
 class QTextDocument;

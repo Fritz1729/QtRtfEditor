@@ -1,67 +1,11 @@
 #pragma once
 
-#include <cstdint>
 #include <string>
-#include <variant>
 #include <vector>
-
-#include <QByteArray>
 
 #include "RtfTypes.h"
 
 namespace Rte {
-
-enum class RtfImageFormat : uint8_t {
-    Jpeg,
-    Png,
-    Bmp,
-    Unknown,
-};
-
-struct RtfImage {
-    QByteArray data;
-    RtfImageFormat format = RtfImageFormat::Unknown;
-    int picw = 0;
-    int pich = 0;
-    int picwgoal = 0;
-    int pichgoal = 0;
-    int picscalex = 100;
-    int picscaley = 100;
-    int piccropl = 0;
-    int piccropr = 0;
-    int piccropt = 0;
-    int piccropb = 0;
-
-    // Original hex-encoded binary data from the RTF {\pict ...} group
-    std::string rtfPictHex;
-
-    bool operator==(const RtfImage &) const = default;
-};
-
-struct RtfColorEntry {
-    int red = 0, green = 0, blue = 0;
-    bool operator==(const RtfColorEntry &) const = default;
-};
-
-struct RtfFontEntry {
-    std::string family;
-    int fcharset = 0;
-    bool operator==(const RtfFontEntry &) const = default;
-};
-
-struct RtfDocument {
-    int defaultFontIndex = 0;
-    int defaultFontSize = 0;      // half-points (\fs in header)
-    int defaultLangId = 0;        // \deflangN (0 = not present)
-    int viewKind = 0;             // \viewkindN (0 = not present)
-    int ucByteCount = 1;          // \ucN (default 1)
-    int codePage = 1252;          // \ansicpgN (default 1252)
-    int defaultTabStopTwips = 180; // \deftabN (RTF spec default = 180 twips = 1/8 inch)
-    std::vector<RtfColorEntry> colors;
-    std::vector<RtfFontEntry> fonts;
-    std::vector<std::variant<RtfParagraph, RtfTableRowEntry, RtfImage>> elements;
-    std::vector<std::string> unknownTags;
-};
 
 enum class RtfCompareResult {
     Identical,
@@ -82,18 +26,27 @@ enum class RtfCompareResult {
  * @return       Identical, UnknownTag, or StructuralDiff.
  */
 RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
-                              std::string& reason);
+                               std::string& reason);
 
 /**
  * @brief Compare two raw RTF strings for structural equivalence.
+ * @param rtfA   First RTF string.
+ * @param rtfB   Second RTF string.
+ * @param reason Output parameter for the difference description.
+ * @return       Identical, UnknownTag, or StructuralDiff.
  */
 RtfCompareResult CompareRtf(const std::string& rtfA, const std::string& rtfB,
-                              std::string& reason);
+                               std::string& reason);
 
 /**
  * @brief Compare two images for structural equivalence.
+ * @param idx    Image index in the document (for error reporting).
+ * @param a      First image.
+ * @param b      Second image.
+ * @param reason Output parameter for the difference description.
+ * @return       true if the images are structurally equivalent.
  */
 bool CompareImage(size_t idx, const RtfImage& a, const RtfImage& b,
-                   std::string& reason);
+                    std::string& reason);
 
 } // namespace Rte
