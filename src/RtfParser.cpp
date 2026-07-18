@@ -25,6 +25,7 @@ public:
         _len = rtf.size();
         _literalText.clear();
         _skipLeadingWsTrim = false;
+        _paragraphFlushed = false;
         _iter = 0;
 
         _format = RtfRunFormat{};
@@ -280,16 +281,13 @@ private:
             break;
         case RtfControl::Action::HeaderMetadata:
             if (strcmp(ctrl.keyword, "pard") == 0) {
-                if (_inTableCell) {
-                    finalizeRun();
-                    _para = ParagraphFormatting{};
-                    _pendingTabAlignment = 1;
-                    _listId = 0;
-                    _listLevel = 0;
-                    _listStyle = ListStyle::None;
-                } else {
-                    handleParagraph();
-                }
+                // \pard resets paragraph formatting to defaults without creating
+                // a new paragraph. Formatting applies to the current paragraph.
+                _para = ParagraphFormatting{};
+                _pendingTabAlignment = 1;
+                _listId = 0;
+                _listLevel = 0;
+                _listStyle = ListStyle::None;
                 return;
             }
             if (strcmp(ctrl.keyword, "plain") == 0) {
@@ -339,12 +337,11 @@ private:
         finalizeRun();
         _skipLeadingWsTrim = false;
         flushCurrentParagraph();
-        // Remove trailing empty paragraphs and table rows from elements
-        removeTrailingEmptyElements();
-        // Create paragraph for content that follows
+        // Create paragraph for content that follows.
+        // \par resets tab stops and list state (paragraph-local) but preserves
+        // alignment, indents, and spacing (which persist across paragraphs).
         _currentParagraph = {};
-        // Reset paragraph formatting
-        _para = ParagraphFormatting{};
+        _para.tabStops.clear();
         _pendingTabAlignment = 1;
         _listId = 0;
         _listLevel = 0;
@@ -356,7 +353,10 @@ private:
         case RtfControl::TableCtrlWord::Trowd:
             if (!_inTable) {
                 _inTable = true;
-                flushCurrentParagraph();
+                finalizeRun();
+                if (ParagraphHasNonWhitespaceContent(_currentParagraph)) {
+                    flushCurrentParagraph();
+                }
             }
             _inRow = true;
             _currentCellIndex = 0;
@@ -625,10 +625,13 @@ private:
     }
 
     void flushCurrentParagraph() {
-        if (!ParagraphHasNonWhitespaceContent(_currentParagraph)) {
+        // Skip the initial empty paragraph before any content has been flushed.
+        // Empty paragraphs after the first flush are preserved (blank lines).
+        if (!_paragraphFlushed && !ParagraphHasNonWhitespaceContent(_currentParagraph)) {
             _currentParagraph = {};
             return;
         }
+        _paragraphFlushed = true;
         _currentParagraph.setFormatting(_para);
         _currentParagraph.listId = _listId;
         _currentParagraph.listLevel = _listLevel;
@@ -681,6 +684,7 @@ private:
     size_t _len = 0;
     std::string _literalText;
     bool _skipLeadingWsTrim = false;
+    bool _paragraphFlushed = false;
     size_t _iter = 0;
     int _codePage = 1252;
     RtfRunFormat _format;

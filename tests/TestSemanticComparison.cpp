@@ -154,6 +154,7 @@ private slots:
     void EscapedBackslash();
     void EscapedBackslashWithBraces();
     void EscapedBackslashRoundtrip();
+    void EmptyParagraphsPreserved();
 
     // Whitespace preservation and underline control words
     void WhitespaceAfterToggleOff();
@@ -738,6 +739,20 @@ void TestSemanticComparison::EscapedBackslashRoundtrip() {
     auto doc2 = ParseRtf(rtfA);
     std::string reason;
     QCOMPARE(CompareRtf(doc, doc2, reason), RtfCompareResult::Identical);
+}
+
+void TestSemanticComparison::EmptyParagraphsPreserved() {
+    // RTF with an empty paragraph between two content paragraphs.
+    // The parser must preserve the empty paragraph; both \par tokens
+    // produce distinct paragraphs in the element list.
+    std::string rtf = R"({\rtf1\ansi\deff0 Para1\par\par Para3\par})";
+    auto doc = ParseRtf(rtf);
+    QCOMPARE(doc.elements.size(), 3u);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[1]));
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[2]));
+    const auto& para2 = std::get<RtfParagraph>(doc.elements[1]);
+    QVERIFY(para2.runs.empty());
 }
 
 void TestSemanticComparison::WhitespaceAfterToggleOff() {

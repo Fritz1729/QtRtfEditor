@@ -215,6 +215,90 @@ static std::string EmitImageAsPict(const QTextDocument& doc, const QString& name
     return out.str();
 }
 
+struct ParaFmtState {
+    Qt::Alignment alignment = Qt::AlignLeft;
+    double leftMargin = 0, rightMargin = 0, topMargin = 0, bottomMargin = 0;
+    int indent = 0;
+    int lineHeightType = QTextBlockFormat::SingleHeight;
+    double lineHeight = 0;
+};
+
+static void EmitParaFormatting(std::ostringstream& out, const QTextBlockFormat& blockFmt) {
+    out << AlignmentToRtf(blockFmt.alignment());
+    auto emitIfPositive = [&](double val, const char* tag) {
+        if (val > 0) {
+            int halfPoints = static_cast<int>(val * 2.0);
+            out << "\\" << tag << halfPoints;
+        }
+    };
+    emitIfPositive(blockFmt.leftMargin(), "li");
+    emitIfPositive(static_cast<double>(blockFmt.indent()), "fi");
+    emitIfPositive(blockFmt.rightMargin(), "ri");
+    emitIfPositive(blockFmt.topMargin(), "sb");
+    emitIfPositive(blockFmt.bottomMargin(), "sa");
+    int lhType = blockFmt.lineHeightType();
+    if (lhType == QTextBlockFormat::FixedHeight) {
+        double lhVal = blockFmt.lineHeight();
+        int lhTwips = static_cast<int>(lhVal * 2.0);
+        if (lhTwips > 0) {
+            out << "\\sl" << lhTwips;
+            out << "\\slmult1";
+        }
+    }
+    const QList<QTextOption::Tab> tabs = blockFmt.tabPositions();
+    for (const QTextOption::Tab& tab : tabs) {
+        switch (tab.type) {
+        case QTextOption::LeftTab:
+            out << "\\tx" << static_cast<int>(tab.position * 2.0);
+            break;
+        case QTextOption::RightTab:
+            out << "\\tqr\\tx" << static_cast<int>(tab.position * 2.0);
+            break;
+        case QTextOption::CenterTab:
+            out << "\\tqc\\tx" << static_cast<int>(tab.position * 2.0);
+            break;
+        default:
+            out << "\\tx" << static_cast<int>(tab.position * 2.0);
+            break;
+        }
+    }
+}
+
+static bool NeedsParaReset(const ParaFmtState& last, const QTextBlockFormat& blockFmt) {
+    return blockFmt.alignment() != last.alignment ||
+        blockFmt.leftMargin() != last.leftMargin ||
+        blockFmt.rightMargin() != last.rightMargin ||
+        blockFmt.topMargin() != last.topMargin ||
+        blockFmt.bottomMargin() != last.bottomMargin ||
+        blockFmt.indent() != last.indent ||
+        blockFmt.lineHeightType() != last.lineHeightType ||
+        blockFmt.lineHeight() != last.lineHeight;
+}
+
+static void EmitParaFormattingIfNeeded(std::ostringstream& out, const QTextBlockFormat& blockFmt,
+    ParaFmtState& lastParaFmt, bool& lastParaFmtSet) {
+    bool hasParaFormatting = blockFmt.alignment() != Qt::AlignLeft ||
+        blockFmt.leftMargin() > 0 || blockFmt.indent() > 0 ||
+        blockFmt.rightMargin() > 0 || blockFmt.topMargin() > 0 ||
+        blockFmt.bottomMargin() > 0 ||
+        blockFmt.lineHeightType() == QTextBlockFormat::FixedHeight ||
+        !blockFmt.tabPositions().isEmpty();
+    bool reset = lastParaFmtSet && NeedsParaReset(lastParaFmt, blockFmt);
+    if (hasParaFormatting || reset) {
+        out << "\\pard ";
+        if (hasParaFormatting) EmitParaFormatting(out, blockFmt);
+    }
+    lastParaFmt.alignment = blockFmt.alignment();
+    lastParaFmt.leftMargin = blockFmt.leftMargin();
+    lastParaFmt.rightMargin = blockFmt.rightMargin();
+    lastParaFmt.topMargin = blockFmt.topMargin();
+    lastParaFmt.bottomMargin = blockFmt.bottomMargin();
+    lastParaFmt.indent = blockFmt.indent();
+    lastParaFmt.lineHeightType = blockFmt.lineHeightType();
+    lastParaFmt.lineHeight = blockFmt.lineHeight();
+    lastParaFmtSet = true;
+}
+
 } // namespace
 
 std::string ExportRtf(const QTextDocument& document) {
@@ -375,18 +459,25 @@ std::string ExportRtf(const QTextDocument& document) {
     // RTF formatting is stream-global — \par does not reset it.
     RtfRunFormat carriedOverFormat{};
     bool firstBlock = true;
+    ParaFmtState lastParaFmt{};
+    bool lastParaFmtSet = false;
 
-    auto exportBlock = [&](const QTextBlock& block, bool isTableCell) {
+    auto exportBlock = [&](const QTextBlock& block, bool isTableCell, bool justAfterTable = false) {
         QString text = block.text();
         bool hasText = !text.trimmed().isEmpty();
         if (!hasText) {
             // Skip the very first empty block — Qt always creates an extra
             // empty block at the document start that doesn't correspond to any RTF paragraph.
-            if (firstBlock) {
+            // Also skip empty blocks immediately after tables — they are Qt artifacts.
+            if (firstBlock || justAfterTable) {
                 firstBlock = false;
                 return;
             }
-            out << "\\par ";
+            firstBlock = false;
+            // Emit paragraph formatting for the empty block, then \par
+            QTextBlockFormat blockFmt = block.blockFormat();
+            EmitParaFormattingIfNeeded(out, blockFmt, lastParaFmt, lastParaFmtSet);
+            out << "\\par\n";
             return;
         }
         firstBlock = false;
@@ -402,61 +493,7 @@ std::string ExportRtf(const QTextDocument& document) {
             }
         }
 
-        // Emit \pard if any paragraph formatting is non-default
-        {
-            bool hasParaFormatting = blockFmt.alignment() != Qt::AlignLeft ||
-                blockFmt.leftMargin() > 0 || blockFmt.indent() > 0 ||
-                blockFmt.rightMargin() > 0 || blockFmt.topMargin() > 0 ||
-                blockFmt.bottomMargin() > 0 ||
-                blockFmt.lineHeightType() == QTextBlockFormat::FixedHeight ||
-                !blockFmt.tabPositions().isEmpty();
-            if (hasParaFormatting) out << "\\pard ";
-        }
-
-        out << AlignmentToRtf(blockFmt.alignment());
-
-        auto emitIfPositive = [&](double val, const char* tag) {
-            if (val > 0) {
-                int halfPoints = static_cast<int>(val * 2.0);
-                out << "\\" << tag << halfPoints;
-            }
-        };
-
-        emitIfPositive(blockFmt.leftMargin(), "li");
-        emitIfPositive(static_cast<double>(blockFmt.indent()), "fi");
-        emitIfPositive(blockFmt.rightMargin(), "ri");
-        emitIfPositive(blockFmt.topMargin(), "sb");
-        emitIfPositive(blockFmt.bottomMargin(), "sa");
-
-        int lhType = blockFmt.lineHeightType();
-        if (lhType == QTextBlockFormat::FixedHeight) {
-            double lhVal = blockFmt.lineHeight();
-            int lhTwips = static_cast<int>(lhVal * 2.0);
-            if (lhTwips > 0) {
-                out << "\\sl" << lhTwips;
-                out << "\\slmult1";
-            }
-        }
-
-        {
-            const QList<QTextOption::Tab> tabs = blockFmt.tabPositions();
-            for (const QTextOption::Tab& tab : tabs) {
-                switch (tab.type) {
-                case QTextOption::LeftTab:
-                    out << "\\tx" << static_cast<int>(tab.position * 2.0);
-                    break;
-                case QTextOption::RightTab:
-                    out << "\\tqr\\tx" << static_cast<int>(tab.position * 2.0);
-                    break;
-                case QTextOption::CenterTab:
-                    out << "\\tqc\\tx" << static_cast<int>(tab.position * 2.0);
-                    break;
-                default:
-                    out << "\\tx" << static_cast<int>(tab.position * 2.0);
-                    break;
-                }
-            }
-        }
+        EmitParaFormattingIfNeeded(out, blockFmt, lastParaFmt, lastParaFmtSet);
 
         // Emit per-paragraph group-persistent values in scoped groups.
         // \deffN and \deftabN are group-persistent per the RTF spec — wrapping
@@ -644,6 +681,7 @@ std::string ExportRtf(const QTextDocument& document) {
     };
 
     QTextFrame* rootFrame = document.rootFrame();
+    bool justFinishedTable = false;
     for (QTextFrame::iterator frameIt = rootFrame->begin(); frameIt != rootFrame->end(); ++frameIt) {
         QTextFrame* currentFrame = frameIt.currentFrame();
         QTextTable* table = qobject_cast<QTextTable*>(currentFrame);
@@ -859,11 +897,13 @@ std::string ExportRtf(const QTextDocument& document) {
                 }
                 out << "\\row}";
             }
+            justFinishedTable = true;
         } else {
             QTextBlock block = frameIt.currentBlock();
             if (block.isValid()) {
-                exportBlock(block, false);
+                exportBlock(block, false, justFinishedTable);
             }
+            justFinishedTable = false;
         }
     }
 
