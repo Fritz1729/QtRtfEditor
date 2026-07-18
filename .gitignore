@@ -59,3 +59,8 @@ RTF_COVERAGE_PLAN.md
 
 # Build artifacts
 archive.tar.gz
+
+# QMake artifacts
+.qmake.stash
+*.pro
+diagtest2.cpp
