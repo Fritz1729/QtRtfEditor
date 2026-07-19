@@ -718,7 +718,7 @@ std::string ExportRtf(const QTextDocument& document) {
         } else {
             fonttblOut << "\\fnil";
         }
-        fonttblOut << "\\fcharset0 " << family << ";}";
+        fonttblOut << "\\fcharset" << (lower == "symbol" ? 2 : 0) << " " << family << ";}";
     }
     fonttblOut << "}";
 

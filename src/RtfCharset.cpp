@@ -1,5 +1,6 @@
 #include "RtfCharset.h"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 
@@ -65,9 +66,16 @@ int MapCp1252Byte(int byte) {
     return kCp1252Table[static_cast<std::size_t>(byte - 0x80)];
 }
 
-int MapHexByteToCodepoint(int byte, int fcharset, int codePage) {
+int MapHexByteToCodepoint(int byte, int fcharset, int codePage, const std::string& fontFamily) {
     if (fcharset == 2) {
-        return MapSymbolByte(byte);
+        std::string lower = fontFamily;
+        std::transform(lower.begin(), lower.end(), lower.begin(),
+                        [](unsigned char c) { return std::tolower(c); });
+        if (lower == "symbol") {
+            return MapSymbolByte(byte);
+        }
+        // Font declared as Symbol charset but family name is not "Symbol" —
+        // fall through to codepage-based decoding
     }
     if (byte < 0x80) return byte;
     if (codePage == 1252) {

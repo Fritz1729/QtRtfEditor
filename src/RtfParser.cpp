@@ -913,11 +913,13 @@ private:
                 val = val * 16 + (hc >= '0' && hc <= '9' ? hc - '0' : (hc >= 'a' && hc <= 'f' ? hc - 'a' + 10 : hc - 'A' + 10));
             }
             int fcharset = 0;
+            std::string fontFamily;
             int fi = _format.fontIndex;
             if (fi >= 0 && static_cast<size_t>(fi) < _doc.fonts.size()) {
                 fcharset = _doc.fonts[static_cast<size_t>(fi)].fcharset;
+                fontFamily = _doc.fonts[static_cast<size_t>(fi)].family;
             }
-            AppendUtf8(MapHexByteToCodepoint(val, fcharset, _doc.codePage));
+            AppendUtf8(MapHexByteToCodepoint(val, fcharset, _doc.codePage, fontFamily));
         } else if ((c == 'u' || c == 'U') && _pos + 1 < _len && IsDigit(_rtf[_pos + 1])) {
             // Unicode escape: \uNNN? (only if 'u' is immediately followed by digit)
             ParseUnicodeEscape();
