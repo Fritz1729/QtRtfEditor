@@ -45,6 +45,14 @@ cell padding, row padding, table alignment (left/center/right), row-level border
 
 BMP, PNG, JPEG via `\pict`
 
+### Hyperlinks
+
+URL hyperlinks via `\field` / `HYPERLINK` groups.
+Parsed as `RtfRunFormat::isAnchor` / `anchorHref`, rendered as
+`QTextCharFormat::isAnchor` / `anchorHref`, and serialized back to
+`\field` groups on export. Internal bookmark references
+(`HYPERLINK \bkmk3 Name`) are parsed as `#Name` targets.
+
 ## Partial Support
 
 These features are parsed and preserved but cannot be rendered.
@@ -81,13 +89,12 @@ These features are parsed and preserved through roundtrip, but cannot be rendere
 - **Section & page setup** (`\sectd`, `\sect`, `\sbk*`, `\pgwsxn`, `\pghsxn`, `\marg*`, `\cols*`, `\vertdoc`, `\horzdoc`)
 - **Headers/footers** (`{\header ...}`, `{\footer ...}`)
 - **Footnotes/endnotes** (`{\footnote ...}`, `\ftnstart`, `\endnhere`)
-- **Bookmarks** (`{\*\bkmkstart ...}`, `{\*\bkmkend ...}`) — no `QTextBookmark` in Qt6
 
 ### Word-Specific Extensions
 
 - **Track changes** (`\revtbl`, `\revN`, `\insrsidN`, `\delrsidN`, `\tridxN`)
 - **Styles** (`\stylesheet`, `\sN`, `\snext`, `\sbasedonN`)
-- **Fields** (`\field`, `\*\fldinst`, `\*\fldrslt`, `\date`, `\time`)
+- **Fields** (`\field`, `\*\fldinst`, `\*\fldrslt`) — only `HYPERLINK` fields are supported; `\date`, `\time`, and other field types are not
 - **Index / TOC entries** (`\*{\index ...}`, `\*{\toc ...}`, `\*{\tc ...}`)
 - **Document variables** (`\*\docvar`)
 - **User properties** (`\userprops`, `\propname`, `\staticval`)

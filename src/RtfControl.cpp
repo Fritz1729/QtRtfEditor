@@ -11,6 +11,7 @@ using TabAlign = RtfControl::TabAlign;
 using UlStyle = RtfControl::RtfUlStyle;
 using Caps = RtfControl::RtfCaps;
 using TableCtrlWord = RtfControl::TableCtrlWord;
+using FieldCtrlType = RtfControl::FieldCtrlType;
 
 #define DATA(keyword, action, prop) \
     { keyword, action, { .raw = static_cast<int>(prop) } }
@@ -18,6 +19,8 @@ using TableCtrlWord = RtfControl::TableCtrlWord;
     { keyword, action, { .tabAlign = align } }
 #define DATA_TABLE(keyword, ctrlWord) \
     { keyword, Action::TableControlWord, { .tableCtrlWord = ctrlWord } }
+#define DATA_FIELD(keyword, ctrlType) \
+    { keyword, Action::FieldControl, { .fieldCtrlType = ctrlType } }
 
 constexpr RtfControl rtfControlTableEntries[] = {
     // Character toggles
@@ -203,6 +206,16 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA_TABLE("trbrdrt",   TableCtrlWord::TrBorderTop),
     DATA_TABLE("trbrdrr",   TableCtrlWord::TrBorderRight),
     DATA_TABLE("trbrdrb",   TableCtrlWord::TrBorderBottom),
+
+    // Field controls (\field, \fldinst, \fldrslt)
+    DATA_FIELD("field",     FieldCtrlType::FieldBegin),
+    DATA_FIELD("fldinst",   FieldCtrlType::FldInst),
+    DATA_FIELD("fldrslt",   FieldCtrlType::FldRslt),
+    DATA_FIELD("fldrsltpar", FieldCtrlType::FldRsltPar),
+    DATA_FIELD("fldrsltchr", FieldCtrlType::FldRsltChr),
+    DATA_FIELD("flddirty",  FieldCtrlType::FldDirty),
+    DATA_FIELD("fldedit",   FieldCtrlType::FldEdit),
+    DATA_FIELD("fldlock",   FieldCtrlType::FldLock),
 };
 
 static_assert(std::size(rtfControlTableEntries) == kRtfControlTableSize,

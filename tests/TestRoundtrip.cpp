@@ -40,6 +40,7 @@ private slots:
     void RoundtripDeftab();
     void RoundtripDeffNested();
     void RoundtripDeftabNested();
+    void RoundtripHyperlink();
     void cleanupTestCase();
 
 public:
@@ -231,6 +232,12 @@ void TestRoundtrip::RoundtripDeftabNested() {
     // Export wraps changed values in scoped groups to preserve semantics.
     std::string input = R"({\rtf1\ansi\deff0\deftab180 {\deftab360\pard\plain\deftab360 Mid\par}\pard\plain\deftab180 Outer\par})";
     DoRoundtrip("RoundtripDeftabNested", input);
+}
+
+void TestRoundtrip::RoundtripHyperlink() {
+    // Hyperlink roundtrip: import RTF with field → export → should preserve field
+    std::string input = R"({\rtf1\ansi\deff0{\field{\*\fldinst HYPERLINK "https://example.com"}{\*\fldrslt Click here}}\par})";
+    DoRoundtrip("RoundtripHyperlink", input);
 }
 
 void TestRoundtrip::cleanupTestCase() {

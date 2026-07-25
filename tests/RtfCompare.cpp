@@ -185,6 +185,11 @@ static bool CompareFormatSemantic(const RtfRunFormat& fmtA, const RtfRunFormat& 
     }
     if (ReportIntDiff(loc, "langId", fmtA.langId, fmtB.langId, reason)) return false;
     if (ReportBoolDiff(loc, "protected", fmtA.protected_, fmtB.protected_, reason)) return false;
+    if (ReportBoolDiff(loc, "isAnchor", fmtA.isAnchor, fmtB.isAnchor, reason)) return false;
+    if (fmtA.anchorHref != fmtB.anchorHref) {
+        reason = loc + " anchorHref: '" + fmtA.anchorHref + "' vs '" + fmtB.anchorHref + "'";
+        return false;
+    }
     return true;
 }
 

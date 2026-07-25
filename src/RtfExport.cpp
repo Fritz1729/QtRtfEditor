@@ -490,6 +490,42 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
         out << "\\plain\\par\n";
         carriedOverFormat.fontIndex = defaultFontIdx;
     } else {
+        // Pre-scan fragments to find anchor ranges
+        struct AnchorRange {
+            size_t fragIdxStart;
+            size_t fragIdxEnd; // inclusive
+            std::string url;
+        };
+        std::vector<AnchorRange> anchorRanges;
+        {
+            QTextBlock::iterator scanIt = block.begin();
+            size_t fragIdx = 0;
+            while (scanIt != block.end()) {
+                QTextFragment frag = scanIt.fragment();
+                if (frag.isValid() && frag.length() > 0 && frag.charFormat().isAnchor()) {
+                    QString href = frag.charFormat().anchorHref();
+                    if (!href.isEmpty()) {
+                        bool canExtend = !anchorRanges.empty() &&
+                            anchorRanges.back().url == href.toStdString() &&
+                            anchorRanges.back().fragIdxEnd + 1 == fragIdx;
+                        if (canExtend) {
+                            anchorRanges.back().fragIdxEnd = fragIdx;
+                        } else {
+                            anchorRanges.push_back({fragIdx, fragIdx, href.toStdString()});
+                        }
+                    }
+                }
+                fragIdx++;
+                scanIt++;
+            }
+        }
+        std::map<size_t, int> fragToAnchorRange;
+        for (int r = 0; r < static_cast<int>(anchorRanges.size()); ++r) {
+            for (size_t i = anchorRanges[r].fragIdxStart; i <= anchorRanges[r].fragIdxEnd; ++i) {
+                fragToAnchorRange[i] = r;
+            }
+        }
+
         RtfRunFormat prev;
         RtfRunFormat lastEmitted{};
         lastEmitted.colorIndex = 0;
@@ -497,12 +533,28 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
         lastEmitted.fontIndex = carriedOverFormat.fontIndex;
         bool firstRun = true;
 
-        QTextBlock::iterator it = block.begin();
-        while (it != block.end()) {
-            QTextFragment frag = it.fragment();
-            if (!frag.isValid() || frag.length() == 0) { it++; continue; }
+        // Anchor tracking
+        int currentAnchorRange = -1;
+        bool inAnchor = false;
 
-            QTextCharFormat charFmt = frag.charFormat();
+        QTextBlock::iterator it = block.begin();
+        {
+            size_t fragIdx = 0;
+            while (it != block.end()) {
+                QTextFragment frag = it.fragment();
+                if (frag.isValid() && frag.length() > 0) {
+                    int anchorRange = fragToAnchorRange.count(fragIdx) ? fragToAnchorRange[fragIdx] : -1;
+
+                    // Emit field opening if entering an anchor range
+                    if (anchorRange >= 0 && !inAnchor && anchorRanges[anchorRange].fragIdxStart == fragIdx) {
+                        out << "{\\field{\\*\\fldinst HYPERLINK \"" << anchorRanges[anchorRange].url << "\"}{\\*\\fldrslt";
+                        inAnchor = true;
+                        currentAnchorRange = anchorRange;
+                    }
+                }
+                if (!frag.isValid() || frag.length() == 0) { fragIdx++; it++; continue; }
+
+                QTextCharFormat charFmt = frag.charFormat();
 
             RtfRunFormat cur;
             qreal ptSize = charFmt.fontPointSize();
@@ -583,7 +635,18 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
             out << RtfEscape(frag.text());
             prev = cur;
             firstRun = false;
+
+            // Emit field closing if exiting an anchor range
+            if (inAnchor && currentAnchorRange >= 0 &&
+                fragIdx == anchorRanges[static_cast<size_t>(currentAnchorRange)].fragIdxEnd) {
+                out << "}}";
+                inAnchor = false;
+                currentAnchorRange = -1;
+            }
+
+            fragIdx++;
             it++;
+            }
         }
 
         if (!firstRun) {

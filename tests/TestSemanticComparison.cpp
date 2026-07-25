@@ -168,6 +168,13 @@ private slots:
     void NegativeArgNoSpace();
     void NegativeArgUnicode();
 
+    // Hyperlinks — field parsing and roundtrip
+    void HyperlinkExternalUrl();
+    void HyperlinkInternalBookmark();
+    void HyperlinkIdentical();
+    void HyperlinkDifferentUrl();
+    void HyperlinkWithBold();
+
     // Tables
     void DifferentCellShading();
     void DifferentCellShadingVsNoShading();
@@ -1154,6 +1161,79 @@ void TestSemanticComparison::DeftabNestedGroupReverted() {
     std::string reason;
     QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
     QVERIFY(reason.empty());
+}
+
+void TestSemanticComparison::HyperlinkExternalUrl() {
+    // Parse a field group with HYPERLINK instruction
+    std::string rtf = R"({\rtf1\ansi\deff0{\field{\*\fldinst HYPERLINK "https://example.com"}{\*\fldrslt Click here}}\par})";
+    auto doc = ParseRtf(rtf);
+    QCOMPARE(doc.elements.size(), 1u);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    QVERIFY(para.runs.size() >= 1);
+    // Find the run with "Click here" text and verify it has anchor format
+    bool found = false;
+    for (const auto& run : para.runs) {
+        if (run.text.find("Click here") != std::string::npos) {
+            QVERIFY(run.format.isAnchor);
+            QCOMPARE(run.format.anchorHref, "https://example.com");
+            found = true;
+        }
+    }
+    QVERIFY(found);
+}
+
+void TestSemanticComparison::HyperlinkInternalBookmark() {
+    // Parse a field group with internal bookmark link
+    std::string rtf = R"({\rtf1\ansi\deff0{\field{\*\fldinst HYPERLINK "#MyBookmark"}{\*\fldrslt Go to section}}\par})";
+    auto doc = ParseRtf(rtf);
+    QCOMPARE(doc.elements.size(), 1u);
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    bool found = false;
+    for (const auto& run : para.runs) {
+        if (run.text.find("Go to section") != std::string::npos) {
+            QVERIFY(run.format.isAnchor);
+            QCOMPARE(run.format.anchorHref, "#MyBookmark");
+            found = true;
+        }
+    }
+    QVERIFY(found);
+}
+
+void TestSemanticComparison::HyperlinkIdentical() {
+    // Two RTF with same hyperlink should be identical
+    std::string rtfA = R"({\rtf1\ansi\deff0{\field{\*\fldinst HYPERLINK "https://example.com"}{\*\fldrslt Link text}}\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\field{\*\fldinst HYPERLINK "https://example.com"}{\*\fldrslt Link text}}\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QVERIFY(reason.empty());
+}
+
+void TestSemanticComparison::HyperlinkDifferentUrl() {
+    // Different URLs should be detected as different
+    std::string rtfA = R"({\rtf1\ansi\deff0{\field{\*\fldinst HYPERLINK "https://example.com"}{\*\fldrslt Link}}\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\field{\*\fldinst HYPERLINK "https://other.com"}{\*\fldrslt Link}}\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::HyperlinkWithBold() {
+    // Hyperlink with bold formatting inside fldrslt
+    std::string rtf = R"({\rtf1\ansi\deff0{\field{\*\fldinst HYPERLINK "https://example.com"}{\*\fldrslt{\b Bold link}}}}\par})";
+    auto doc = ParseRtf(rtf);
+    QCOMPARE(doc.elements.size(), 1u);
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    bool found = false;
+    for (const auto& run : para.runs) {
+        if (run.text.find("Bold link") != std::string::npos) {
+            QVERIFY(run.format.isAnchor);
+            QVERIFY(run.format.bold);
+            QCOMPARE(run.format.anchorHref, "https://example.com");
+            found = true;
+        }
+    }
+    QVERIFY(found);
 }
 
 void TestSemanticComparison::cleanupTestCase() {

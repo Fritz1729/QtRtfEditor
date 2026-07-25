@@ -29,7 +29,19 @@ struct RtfControl {
         SetTabAlign,
         TableControlWord,
         GroupPersistent,
+        FieldControl,
         Unknown,
+    };
+
+    enum class FieldCtrlType : uint8_t {
+        FieldBegin,
+        FldInst,
+        FldRslt,
+        FldRsltPar,
+        FldRsltChr,
+        FldDirty,
+        FldEdit,
+        FldLock,
     };
 
     enum class CharProp : uint8_t {
@@ -76,12 +88,13 @@ struct RtfControl {
         RtfCaps caps;
         TabAlign tabAlign;
         TableCtrlWord tableCtrlWord;
+        FieldCtrlType fieldCtrlType;
     };
 
     Value value;
 };
 
-constexpr std::size_t kRtfControlTableSize = 147;
+constexpr std::size_t kRtfControlTableSize = 155;
 
 extern const std::array<RtfControl, kRtfControlTableSize> rtfControlTable;
 

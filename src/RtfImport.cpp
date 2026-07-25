@@ -111,6 +111,10 @@ static void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
         if (run.format.langId != 0) {
             charFmt.setProperty(UserPropLangId, run.format.langId);
         }
+        if (run.format.isAnchor) {
+            charFmt.setAnchor(true);
+            charFmt.setAnchorHref(QString::fromStdString(run.format.anchorHref));
+        }
 
         cursor.insertText(QString::fromUtf8(run.text.data(),
                                               static_cast<int>(run.text.size())),

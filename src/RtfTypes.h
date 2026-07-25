@@ -71,6 +71,8 @@ struct RtfRunFormat {
     int dnOffset = 0;
     int ulColorIndex = 0;
     int langId = 0;
+    bool isAnchor = false;
+    std::string anchorHref;
 
     bool operator==(const RtfRunFormat& other) const = default;
 };

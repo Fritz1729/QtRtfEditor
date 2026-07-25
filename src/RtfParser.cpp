@@ -45,6 +45,8 @@ public:
         _listId = 0;
         _listLevel = 0;
         _listStyle = ListStyle::None;
+        _inFieldRslt = false;
+        _fieldAnchorHref.clear();
 
         Parse();
         FinalizeRun();
@@ -325,6 +327,8 @@ private:
             } else if (strcmp(ctrl.keyword, "deftab") == 0) {
                 if (arg >= 0) _currentDeftab = arg;
             }
+            break;
+        case RtfControl::Action::FieldControl:
             break;
         case RtfControl::Action::Unknown:
             break;
@@ -719,6 +723,10 @@ private:
     // Group nesting depth for document-level save
     int _groupDepth = 0;
 
+    // Field parsing state
+    bool _inFieldRslt = false;
+    std::string _fieldAnchorHref;
+
     // Table state
     bool _inTable = false;
     bool _inRow = false;
@@ -817,6 +825,14 @@ private:
             _inPict = false;
             RestoreState();
             // parsePict consumes the closing '}'
+            return;
+        }
+
+        if (_pos < _len && Matches("\\field")) {
+            _pos += 5;
+            SkipWhitespace();
+            ParseField();
+            // ParseField consumes the closing '}'
             return;
         }
 
@@ -1178,6 +1194,221 @@ private:
             FlushCurrentParagraph();
             _doc.elements.push_back(std::move(img));
         }
+    }
+
+    void ParseField() {
+        // {\field{\*\fldinst HYPERLINK "URL"}{\*\fldrslt display text}}
+        _fieldAnchorHref.clear();
+        _inFieldRslt = false;
+
+        // Push state for field group
+        _formatStack.push_back(_format);
+        _paraStateStack.push_back(_para);
+        _pendingTabAlignmentStack.push_back(_pendingTabAlignment);
+        _deffStack.push_back(_currentDeff);
+        _deftabStack.push_back(_currentDeftab);
+        _ucStack.push_back(_currentUc);
+
+        while (_pos < _len && _rtf[_pos] != '}') {
+            if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+
+            if (_rtf[_pos] == '{') {
+                // Parse sub-group
+                _pos++;
+
+                // Check for star-prefixed sub-group: {\*\word ...}
+                SkipWhitespace();
+                if (_pos + 1 < _len && _rtf[_pos] == '\\' && _rtf[_pos + 1] == '*') {
+                    size_t starPos = _pos;
+                    _pos += 2;
+                    SkipWhitespace();
+                    std::string destWord;
+                    if (_pos < _len && _rtf[_pos] == '\\') {
+                        _pos++;
+                        SkipWhitespace();
+                        if (_pos < _len && IsWordChar(_rtf[_pos])) {
+                            auto [w, a] = ReadControlWord();
+                            destWord = w;
+                        }
+                    }
+                    _pos = starPos;
+
+                    if (destWord == "fldinst") {
+                        ParseFldInst();
+                    } else if (destWord == "fldrslt") {
+                        ParseFldRslt();
+                    } else {
+                        // Unknown destination group — skip it
+                        int depth = 1;
+                        while (_pos < _len && depth > 0) {
+                            if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+                            char c = _rtf[_pos++];
+                            if (c == '{') depth++;
+                            else if (c == '}') depth--;
+                        }
+                    }
+                } else {
+                    // Unknown sub-group — skip it
+                    int depth = 1;
+                    while (_pos < _len && depth > 0) {
+                        if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+                        char c = _rtf[_pos++];
+                        if (c == '{') depth++;
+                        else if (c == '}') depth--;
+                    }
+                }
+            } else if (_rtf[_pos] == '\\') {
+                // Control word at field level — skip
+                ParseControl();
+                while (_pos < _len && _rtf[_pos] != '}' && IsWhitespace(_rtf[_pos])) {
+                    _pos++;
+                }
+            } else {
+                _pos++;
+            }
+        }
+
+        // Consume closing '}'
+        if (_pos < _len && _rtf[_pos] == '}') _pos++;
+
+        // Save accumulated text and anchor state before RestoreState clears _format
+        std::string savedText = _literalText;
+        bool savedIsAnchor = _format.isAnchor;
+        std::string savedHref = _format.anchorHref;
+        _literalText.clear();
+
+        RestoreState();
+
+        // Finalize the accumulated text with anchor format after state restoration
+        if (!savedText.empty()) {
+            RtfRunFormat runFmt = _format;
+            if (savedIsAnchor) {
+                runFmt.isAnchor = true;
+                runFmt.anchorHref = savedHref;
+            }
+            if (_inTableCell) {
+                _currentCellRuns.emplace_back(savedText, runFmt);
+            } else {
+                _currentParagraph.runs.emplace_back(savedText, runFmt);
+            }
+        }
+
+        _inFieldRslt = false;
+        _fieldAnchorHref.clear();
+    }
+
+    void ParseFldInst() {
+        // {\*\fldinst HYPERLINK "URL"}
+        // Collect instruction text to extract HYPERLINK target
+        std::string inst;
+        while (_pos < _len && _rtf[_pos] != '}') {
+            if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+            if (_rtf[_pos] == '\\') {
+                // Collect escaped characters and control words
+                size_t start = _pos;
+                _pos++;
+                if (_pos < _len) {
+                    char c = _rtf[_pos];
+                    if (c == '\\') { _pos++; inst += '\\'; }
+                    else if (c == '{') { _pos++; inst += '{'; }
+                    else if (c == '}') { _pos++; inst += '}'; }
+                    else if (c == '_') {
+                        // RTF escape: \_ produces literal space
+                        _pos++;
+                        inst += ' ';
+                    }
+                    else {
+                        // Control word in instruction — read it
+                        auto [w, _] = ReadControlWord();
+                        inst += w;
+                    }
+                }
+            } else {
+                inst += _rtf[_pos++];
+            }
+        }
+        // Consume closing '}'
+        if (_pos < _len && _rtf[_pos] == '}') _pos++;
+
+        // Parse HYPERLINK "URL" from instruction
+        // Also handle HYPERLINK \\bkmk3 Name (internal bookmark reference)
+        std::string lowerInst;
+        lowerInst.reserve(inst.size());
+        for (char c : inst) lowerInst += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+        size_t hyperlinkPos = lowerInst.find("hyperlink");
+        if (hyperlinkPos != std::string::npos) {
+            size_t afterHyperlink = hyperlinkPos + 9;
+            // Skip whitespace
+            while (afterHyperlink < inst.size() && inst[afterHyperlink] == ' ') afterHyperlink++;
+            if (afterHyperlink < inst.size()) {
+                if (inst[afterHyperlink] == '"') {
+                    // Quoted URL: HYPERLINK "https://..."
+                    size_t start = afterHyperlink + 1;
+                    size_t end = inst.find('"', start);
+                    if (end != std::string::npos) {
+                        std::string rawUrl = inst.substr(start, end - start);
+                        // Unescape RTF escapes in URL
+                        _fieldAnchorHref = UnescapeRtfString(rawUrl);
+                    }
+                } else if (inst[afterHyperlink] == '\\') {
+                    // Internal bookmark: HYPERLINK \bkmk3 Name
+                    // For now, treat \bkmk as bookmark reference
+                    size_t skip = afterHyperlink + 1;
+                    while (skip < inst.size() && IsWordChar(inst[skip])) skip++;
+                    while (skip < inst.size() && (inst[skip] == ' ' || inst[skip] == '_')) skip++;
+                    _fieldAnchorHref = std::string("#") + inst.substr(skip);
+                } else {
+                    // Unquoted URL — rare but possible
+                    size_t start = afterHyperlink;
+                    size_t end = start;
+                    while (end < inst.size() && inst[end] != ' ' && inst[end] != '\t') end++;
+                    _fieldAnchorHref = inst.substr(start, end - start);
+                }
+            }
+        }
+    }
+
+    void ParseFldRslt() {
+        // {\*\fldrslt display text}
+        // Parse content as normal text, but apply anchor format to all runs
+        _inFieldRslt = true;
+        if (!_fieldAnchorHref.empty()) {
+            _format.isAnchor = true;
+            _format.anchorHref = _fieldAnchorHref;
+        }
+
+        // Parse content normally
+        Parse();
+
+        // Consume closing '}'
+        if (_pos < _len && _rtf[_pos] == '}') _pos++;
+
+        // Format restored by ParseField before RestoreState call
+        _inFieldRslt = false;
+    }
+
+    static std::string UnescapeRtfString(const std::string& s) {
+        std::string result;
+        result.reserve(s.size());
+        size_t i = 0;
+        while (i < s.size()) {
+            if (s[i] == '\\' && i + 1 < s.size()) {
+                char next = s[i + 1];
+                if (next == '\\' || next == '{' || next == '}') {
+                    result += next;
+                    i += 2;
+                } else if (next == '_') {
+                    result += ' ';
+                    i += 2;
+                } else {
+                    result += s[i++];
+                }
+            } else {
+                result += s[i++];
+            }
+        }
+        return result;
     }
 
     void ParseListtable() {
