@@ -31,6 +31,7 @@ prepare() {
     --exclude='.qtrtfeditor_recent.txt' \
     --exclude='.opencode' \
     --exclude='RTF_COVERAGE_PLAN.md' \
+    --exclude='documentation' \
     -C "$repo_root" .
 
   # Extract into a directory outside the repo to avoid name collision with src/.
@@ -44,10 +45,11 @@ prepare() {
   # Replace root CMakeLists.txt with a minimal build-only version.
   # Also replace src/CMakeLists.txt with the library-specific version
   # (the seed tarball contains the root project file there).
-  cat > "${srcdir}/CMakeLists.txt" << 'CMAKE'
+  _cmake_ver=$(grep 'VERSION' "$repo_root/CMakeLists.txt" | grep -v 'cmake_minimum_required' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
+  cat > "${srcdir}/CMakeLists.txt" << CMAKE
 cmake_minimum_required(VERSION 3.16)
 project(QtRtfEditor
-     VERSION 0.1.2
+     VERSION ${_cmake_ver}
     DESCRIPTION "Reusable RTF-capable QTextEdit subclass"
     HOMEPAGE_URL https://github.com/Fritz1729/QtRtfEditor
     LANGUAGES CXX

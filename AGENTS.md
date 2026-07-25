@@ -10,34 +10,14 @@ Out-of-source into `build/`. Demo: `build/examples/demo/demo`.
 **Windows/MSVC:** multi-config generator — always pass `--config Release` to `cmake --build` and `-C Release` to `ctest`, or tests won't find binaries.
 
 ## Structure
-- **`src/`** — `QtRtfEditor` static library:
-  - `RichTextEdit.{h,cpp}` — `Rte::RichTextEdit`, `QTextEdit` subclass, RTF/HTML I/O, `\protect` cursor-skip.
-  - `RtfExport.{h,cpp}` — Manual RTF generator (Delphi/TRichEdit-compatible).
-  - `RtfImport.{h,cpp}` — RTF parser.
-  - `RtfParser.{h,cpp}` — Token-level RTF tokenizer.
-  - `RtfControl.{h,cpp}` — Control word handling.
-  - `RtfCharset.{h,cpp}` — Character set mapping (symbol, CP1252, hex byte to codepoint).
-  - `RtfTypes.h` — Shared types and enums.
-- **`tests/`** — Three executables:
-  - `test_protected_ranges` — Protection API.
-  - `test_rtf_structural` — Atomic tests for `CompareRtf()` (shared `RtfCompare.{h,cpp}`).
-  - `test_roundtrip` — Data-driven test over `tests/TestData/*.rtf`.
-- **`src/cmake/`** — CMake package config template for `find_package()` support.
+- **`src/`** — `QtRtfEditor` static library. See [documentation](documentation/).
+- **`tests/`** — Three executables: `test_protected_ranges`, `test_rtf_structural`, `test_roundtrip`. See [Tests](documentation/tests.md).
 - **`examples/demo/`** — Minimal GUI demo.
+- **`documentation/`** — Architecture docs. Not packaged.
 
-## Testing quirks
-- **`test_rtf_structural`:** `ParseRtf()` can hang on certain control words (`\colortbl`, etc.). Tests use a 3-second timeout via detached threads.
-- **`test_roundtrip`:** Test data in `tests/TestData/` is copied to `build/testdata/` via `POST_BUILD` custom command.
-
-## Out of Scope
-Do NOT implement these — they have no Qt equivalent and no reason to emulate:
-
-| Category | RTF tags | Reason |
-|---|---|---|
-| Windows | `\object`, `\objdata`, `\objalias`, `\objclass`, EMF, WMF | Windows COM / metafiles |
-| Document mgmt | `\info`, `\revtbl`, `\stylesheet`, `\field`, `\*{\toc}`, `\password` | App-level / Word-specific |
-| Language | `\fscript`, `\rtl`, complex script shaping | Requires external shaping library |
-| Page layout | `\sectd`, `\sbk*`, `\marg*`, `\cols*`, comments | QTextDocument is a flow model |
+## References
+- **Supported / unsupported features:** [Supported Features](documentation/supported_features.md) — do NOT implement "Out of Scope" items.
+- **Testing quirks:** `ParseRtf()` can hang on `\colortbl` etc. — tests use 3-second timeout.
 
 ## Code Style
 - **Coding rules are owned by the user.** The agent applies them but never adds to the list.
