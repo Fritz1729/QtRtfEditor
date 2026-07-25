@@ -161,6 +161,13 @@ private slots:
     void UlNone();
     void SemanticUlSynonyms();
 
+    // Parser fixes — \ucN skip chars, star groups, negative args
+    void UcSkipChars();
+    void UcSkipCharsGroupScoped();
+    void StarGroupSkippedSilently();
+    void NegativeArgNoSpace();
+    void NegativeArgUnicode();
+
     // Tables
     void DifferentCellShading();
     void DifferentCellShadingVsNoShading();
@@ -810,6 +817,74 @@ void TestSemanticComparison::SemanticUlSynonyms() {
     std::string rtfUlNone = R"({\rtf1\ansi\deff0{\ul Text}\ulnone\par})";
     std::string reason;
     QCOMPARE(CompareRtf(rtfUl0, rtfUlNone, reason), RtfCompareResult::Identical);
+}
+
+void TestSemanticComparison::UcSkipChars() {
+    // \uc2\u252 ?? — the two fallback bytes after \u252 should be skipped
+    // without being treated as content. \u252 is ì (Latin small i with grave).
+    // The fallback "???" here is 2 bytes that should be consumed.
+    auto doc = ParseRtf(R"({\rtf1\ansi\deff0\uc2\u252 AB\par})");
+    QCOMPARE(doc.elements.size(), 1u);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    // The fallback bytes "AB" should have been skipped — no content after the char
+    // Only the Unicode char should be in the text, no "AB"
+    for (const auto& run : para.runs) {
+        QVERIFY(run.text.find("AB") == std::string::npos);
+    }
+}
+
+void TestSemanticComparison::UcSkipCharsGroupScoped() {
+    // \uc is group-persistent: inner group \uc1 overrides outer \uc2
+    // \u252 AB — \uc2 skips "AB" (2 bytes)
+    // \u33C — \uc1 skips "C" (1 byte)
+    std::string rtfA = R"({\rtf1\ansi\deff0\uc2\u252 AB {\uc1\u33C\par})";
+    auto docA = ParseRtf(rtfA);
+    // "AB" should be skipped (2 bytes), "C" should be skipped (1 byte)
+    // Only the two Unicode chars should appear
+    QCOMPARE(docA.elements.size(), 1u);
+    const auto& para = std::get<RtfParagraph>(docA.elements[0]);
+    for (const auto& run : para.runs) {
+        QVERIFY(run.text.find("AB") == std::string::npos);
+        QVERIFY(run.text.find("C") == std::string::npos);
+    }
+}
+
+void TestSemanticComparison::StarGroupSkippedSilently() {
+    // Unknown star-prefixed groups like {\*\unknownword ...} should be
+    // silently skipped — not recorded as unknown tags
+    auto doc = ParseRtf(R"({\rtf1\ansi\deff0{\*\unknownword garbage} Text\par})");
+    QVERIFY(doc.unknownTags.empty());
+    QCOMPARE(doc.elements.size(), 1u);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    for (const auto& run : para.runs) {
+        if (run.text.find("Text") != std::string::npos) return;
+    }
+    QFAIL("Text content not found");
+}
+
+void TestSemanticComparison::NegativeArgNoSpace() {
+    // \li-500 should be parsed as negative indent (-500 twips)
+    auto doc = ParseRtf(R"({\rtf1\ansi\deff0\li-500 Text\par})");
+    QCOMPARE(doc.elements.size(), 1u);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    QCOMPARE(para.leftIndent, -500);
+}
+
+void TestSemanticComparison::NegativeArgUnicode() {
+    // \u-500 should normalize to 65036 (0xFE0C) via 65536-500
+    auto doc = ParseRtf(R"({\rtf1\ansi\deff0\uc0\u-500 Text\par})");
+    QCOMPARE(doc.elements.size(), 1u);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    // \uc0 means no fallback bytes to skip, so "Text" is content
+    bool found = false;
+    for (const auto& run : para.runs) {
+        if (run.text.find("Text") != std::string::npos) found = true;
+    }
+    QVERIFY(found);
 }
 
 void TestSemanticComparison::DifferentTableRowCount() {

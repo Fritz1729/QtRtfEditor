@@ -297,7 +297,8 @@ private:
                 return;
             }
             if (strcmp(ctrl.keyword, "uc") == 0) {
-                _doc.ucByteCount = (arg >= 0) ? arg : 1;
+                _currentUc = (arg >= 0) ? arg : 1;
+                _doc.ucByteCount = _currentUc;
                 return;
             }
             if (strcmp(ctrl.keyword, "deflang") == 0) {
@@ -695,6 +696,8 @@ private:
     int _currentDeff = 0;
     std::vector<int> _deftabStack;
     int _currentDeftab = 180;  // RTF spec default = 180 twips (1/8 inch)
+    std::vector<int> _ucStack;
+    int _currentUc = 1;  // RTF spec default = 1 fallback byte after \uXXXX
     int _listId = 0;
     int _listLevel = 0;
     ListStyle _listStyle = ListStyle::None;
@@ -763,6 +766,7 @@ private:
         _pendingTabAlignmentStack.push_back(_pendingTabAlignment);
         _deffStack.push_back(_currentDeff);
         _deftabStack.push_back(_currentDeftab);
+        _ucStack.push_back(_currentUc);
 
         // Check for known table groups
         SkipWhitespace();
@@ -816,6 +820,38 @@ private:
             return;
         }
 
+        // Check for star-prefixed (destination) group: {\*\word ...}
+        // RTF spec: unknown destinations starting with \* are silently ignored
+        if (_pos + 1 < _len && _rtf[_pos] == '\\' && _rtf[_pos + 1] == '*') {
+            // Skip whitespace after \* and read the destination word
+            size_t starPos = _pos;
+            _pos += 2; // skip \*
+            SkipWhitespace();
+            std::string destWord;
+            if (_pos < _len && _rtf[_pos] == '\\') {
+                _pos++; // skip the \ before the control word
+                SkipWhitespace();
+                if (_pos < _len && IsWordChar(_rtf[_pos])) {
+                    auto [w, a] = ReadControlWord();
+                    destWord = w;
+                }
+            }
+            _pos = starPos; // restore position
+
+            // If unknown destination, skip the entire group silently
+            if (!destWord.empty() && !FindControl(destWord.c_str())) {
+                RestoreState();
+                int depth = 1;
+                while (_pos < _len && depth > 0) {
+                    if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+                    char c = _rtf[_pos++];
+                    if (c == '{') depth++;
+                    else if (c == '}') depth--;
+                }
+                return;
+            }
+        }
+
         // Unknown group — parse contents normally
         Parse();
 
@@ -853,6 +889,10 @@ private:
                 _doc.defaultTabStopTwips = _currentDeftab;
             _currentDeftab = _deftabStack.back();
             _deftabStack.pop_back();
+        }
+        if (!_ucStack.empty()) {
+            _currentUc = _ucStack.back();
+            _ucStack.pop_back();
         }
         if (_groupDepth > 0) _groupDepth--;
     }
@@ -920,7 +960,7 @@ private:
                 fontFamily = _doc.fonts[static_cast<size_t>(fi)].family;
             }
             AppendUtf8(MapHexByteToCodepoint(val, fcharset, _doc.codePage, fontFamily));
-        } else if ((c == 'u' || c == 'U') && _pos + 1 < _len && IsDigit(_rtf[_pos + 1])) {
+        } else if ((c == 'u' || c == 'U') && _pos + 1 < _len && (IsDigit(_rtf[_pos + 1]) || _rtf[_pos + 1] == '-')) {
             // Unicode escape: \uNNN? (only if 'u' is immediately followed by digit)
             ParseUnicodeEscape();
         } else {
@@ -931,6 +971,20 @@ private:
     void ParseControlWord() {
         auto [word, arg] = ReadControlWord();
         bool hasArg = arg >= 0;
+
+        // Handle negative arguments: \word-NNN (no space between - and digits)
+        // RTF spec: minus sign must be followed immediately by one or more digits
+        if (!hasArg && _pos + 1 < _len && _rtf[_pos] == '-' && IsDigit(_rtf[_pos + 1])) {
+            _pos++; // skip '-'
+            arg = 0;
+            while (_pos < _len && IsDigit(_rtf[_pos])) {
+                arg = arg * 10 + (_rtf[_pos] - '0');
+                _pos++;
+            }
+            arg = -arg;
+            hasArg = true;
+        }
+
         ConsumeControlDelimiter(arg, hasArg);
         if (word.empty()) return;
         ProcessControlWord(word, arg);
@@ -938,14 +992,21 @@ private:
 
     void ParseUnicodeEscape() {
         _pos++; // skip 'u'
+        bool negative = false;
+        if (_pos < _len && _rtf[_pos] == '-') {
+            negative = true;
+            _pos++;
+        }
         int val = 0;
         while (_pos < _len && IsDigit(_rtf[_pos])) {
             val = val * 10 + (_rtf[_pos] - '0');
             _pos++;
         }
+        if (negative) val = -val;
 
         // Convert UTF-16 to UTF-8
         int cp = val;
+        if (cp < 0) cp += 65536;  // normalize negative UTF-16 values
         if (cp >= 0xD800 && cp <= 0xDBFF) {
             // High surrogate — expect low surrogate
             if (_pos + 1 < _len &&
@@ -961,8 +1022,9 @@ private:
         }
         AppendUtf8(cp);
 
-        // Skip '?' delimiter
-        if (_pos < _len && _rtf[_pos] == '?') {
+        // Skip \ucN fallback bytes (alternate ANSI encoding after \uXXXX)
+        // RTF spec: \ucN sets how many bytes follow \uNNNN for backward compat
+        for (int i = 0; i < _currentUc && _pos < _len; ++i) {
             _pos++;
         }
     }
@@ -1238,6 +1300,8 @@ private:
     void ProcessControlWord(const std::string& word, int arg) {
         // Table group markers (should have been caught in parseGroup)
         if (word == "colortbl" || word == "fonttbl") return;
+        // Star prefix: only meaningful as part of destination {\*\word}
+        if (word == "*") return;
 
         // Special typographic characters (RE 2.0)
         if (word == "bullet") { AppendUtf8(0x2022); return; }
