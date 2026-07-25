@@ -21,4 +21,5 @@ QtRtfEditor is a reusable RTF-capable `QTextEdit` subclass. It provides bidirect
 | [Import](rtf_import.md) | `RtfImport` — converts parsed RTF to QTextDocument |
 | [Export](rtf_export.md) | `RtfExport` — generates RTF from QTextDocument |
 | [Tests](tests.md) | Test suite architecture and data-driven tests |
+| [Usage Guide](usage.md) | CMake integration, example code, and signals |
 

@@ -22,6 +22,7 @@ so Delphi applications can re-import the data correctly.
 - **Dual licensing**: LGPL-3.0-or-later or commercial license.
 
 For detailed feature coverage, see [Documentation](documentation/README.md).
+For integration and usage examples, see [Usage Guide](documentation/usage.md).
 
 ## Quick Start
 
@@ -38,66 +39,11 @@ cd build
 ctest --output-on-failure
 ```
 
-## Integration in CMake Projects
-
-```cmake
-# CMakeLists.txt of your project
-include(FetchContent)
-FetchContent_Declare(QtRtfEditor
-    GIT_REPOSITORY https://github.com/Fritz1729/QtRtfEditor.git
-     GIT_TAG        v0.1.1
-)
-FetchContent_MakeAvailable(QtRtfEditor)
-
-# Link target
-target_link_libraries(MyTarget
-    PRIVATE QtRtfEditor::QtRtfEditor
-)
-```
-
-Alternatively, after `make install`:
-
-```cmake
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
-find_package(QtRtfEditor REQUIRED)
-target_link_libraries(MyTarget PRIVATE QtRtfEditor::QtRtfEditor)
-```
-
-## Example Code
-
-```cpp
-#include <RichTextEdit/RichTextEdit.h>
-
-Rte::RichTextEdit editor;
-
-// Load RTF
-std::string rtf = R"({\rtf1\ansi{\b Bold}{\b0 normal}})";
-editor.Load(rtf, Rte::FormatMode::Rtf);
-
-// Set protection — cursor skips this range
-editor.SetProtection(0, 4);
-
-// Save RTF
-std::string saved = editor.Save(Rte::FormatMode::Rtf);
-```
-
-## Signals
-
-```cpp
-Rte::RichTextEdit editor;
-
-// React to clicks on protected text
-QObject::connect(&editor, &Rte::RichTextEdit::protectedRegionClicked,
-    [](std::size_t start, std::size_t end, const QString& text) {
-        // User clicked protected text — handle navigation, tooltip, etc.
-    });
-```
-
 ## Credits
 
 Development relied heavily on:
 
-- **Local LLM** usage (main model: Qwen 3.6 27B)
+- **Local LLM** usage (main model: [Qwen 3.6 27B](https://www.qwencloud.com/models/qwen3.6-27b))
 - **[OpenCode](https://opencode.ai)** as a harness
 
 The following more mature projects provided valuable reference material:
