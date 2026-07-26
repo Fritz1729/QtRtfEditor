@@ -11,6 +11,7 @@ Character and paragraph formatting, Unicode, tables, and images are fully suppor
 ### Character Formatting
 
 bold, italic, underline (solid, dotted, dashed, dash-dot, dash-dot-dot, thick),
+double underline (`\uldb` renders as solid but roundtrips correctly),
 strikethrough, font family, font size, text color, background color,
 superscript/subscript, capitalization (all caps, small caps), character expansion
 (`\expndN`, `\expndtwN`), kerning (`\kerning` / `\kerning0`)
@@ -62,18 +63,26 @@ These features are parsed and preserved but cannot be rendered.
 | Cell shading | `\clshdn` | No Qt cell background API |
 | Merged cells | `\clmrg` | No Qt merged cell support |
 
-## No Qt Equivalent
+## Rendered with Approximation
+
+These features are rendered visually (using the closest Qt equivalent) and preserved through roundtrip with the original RTF tag intact.
+
+| Feature | RTF Tag | Qt Approximation |
+|---------|---------|------------------|
+| Thick underline | `\ulth` | Wave underline |
+| Double underline | `\uldb` | Solid underline |
+| Positional superscript/subscript | `\upN`, `\dnN` | Boolean toggle |
+| Underline color | `\ulcN` | No Qt API — color stored as user property for roundtrip |
+| Line-spacing multiplier | `\slmultN` | No Qt API — multiplier stored as block property for roundtrip |
+
+## Stored but Not Rendered
 
 These features are parsed and preserved through roundtrip, but cannot be rendered because Qt lacks the corresponding API.
 
 | Feature | RTF Tag | Reason |
 |---------|---------|--------|
 | Highlight | `\highlightN` | No reliable RGB mapping per RTF spec |
-| Double underline | `\uldb` | Qt has no double-underline variant |
-| Underline color | `\ulcN` | Qt 6.11 has no `setFontUnderlineColor()` |
 | Language ID | `\langN`, `\chlangN`, `\langfeN` | Qt 6.11 has no `setFontLanguageId()` |
-| Positional superscript/subscript | `\upN`, `\dnN` | Qt only supports toggle |
-| Line-spacing multiplier | `\slmultN` | Qt only supports fixed height |
 
 ## Out of Scope
 
@@ -130,7 +139,7 @@ no extra grouping is emitted.
 
 | File | Purpose |
 |------|---------|
-| `RtfControl.cpp` | 147-entry control word table |
+| `RtfControl.cpp` | Control word dispatch table |
 | `RtfParser.cpp` | Recursive descent tokenizer and group handling |
 | `RtfImport.cpp` | RtfDocument -> QTextDocument conversion |
 | `RtfExport.cpp` | QTextDocument -> RTF serialization |

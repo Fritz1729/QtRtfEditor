@@ -63,6 +63,9 @@ target_link_libraries(test_roundtrip
 
 add_test(NAME test_roundtrip COMMAND test_roundtrip)
 
+set_tests_properties(test_protected_ranges test_rtf_structural test_roundtrip
+    PROPERTIES TIMEOUT 60)
+
 add_custom_command(TARGET test_roundtrip POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/TestData

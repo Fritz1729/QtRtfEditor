@@ -44,7 +44,7 @@ Atomic unit tests for `CompareRtf()`. Each test constructs two `RtfDocument` str
 
 Linked against: `QtRtfEditor::QtRtfEditor`, `Qt6::Test`.
 
-**Note:** `ParseRtf()` can hang on certain control words (`\colortbl`, etc.). Tests use a 3-second timeout via detached threads.
+**Note:** `CompareRtf()` uses a 1-second timeout via detached threads to catch parser hangs. CTest enforces a 60-second global timeout per test executable.
 
 ### test_roundtrip
 
@@ -63,7 +63,7 @@ Data-driven test that iterates over `tests/TestData/*.rtf` files. For each file:
 | `RtfCompare.cpp` | Structural comparison implementation |
 | `RtfCompare.h` | `CompareRtf()`, `CompareImage()` declarations |
 
-Test data in `tests/TestData/` is copied to `build/testdata/` via a POST_BUILD custom command.
+Test data in `tests/TestData/` is copied to the test binary's directory under `testdata/` via a POST_BUILD custom command.
 
 ## RtfCompare
 

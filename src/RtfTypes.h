@@ -24,6 +24,9 @@ static constexpr const char* UserPropMetaViewKind = "rtf_meta_viewKind";
 static constexpr const char* UserPropMetaUcByteCount = "rtf_meta_ucByteCount";
 static constexpr const char* UserPropMetaDefaultTabStopTwips = "rtf_meta_defaultTabStopTwips";
 static constexpr int UserPropBlockPntextRtf = 1010;
+static constexpr int UserPropUlStyle = 1011;
+static constexpr int UserPropUlColorIndex = 1012;
+static constexpr int UserPropSlMult = 1013;
 
 enum class UnderlineStyle : uint8_t {
     None,

@@ -1,51 +1,8 @@
 #include <QtTest>
-#include <future>
-#include <chrono>
 #include "RtfCompare.h"
 #include "RtfParser.h"
 
 using namespace Rte;
-
-// ParseRtf() may hang on certain control words (\colortbl, etc.).
-// These helpers run the operation in a detached background thread
-// and time out after 3 seconds.
-
-struct CompareResult {
-    RtfCompareResult result = RtfCompareResult::StructuralDiff;
-    std::string reason;
-    bool ok = false;
-};
-
-static CompareResult SafeCompareRtf(const std::string& rtfA, const std::string& rtfB) {
-    CompareResult r;
-    try {
-        std::string reason;
-        r.result = CompareRtf(rtfA, rtfB, reason);
-        r.reason = reason;
-        r.ok = true;
-    } catch (...) {
-        r.ok = false;
-    }
-    return r;
-}
-
-static CompareResult CompareWithTimeout(const std::string& rtfA, const std::string& rtfB, int sec) {
-    std::promise<CompareResult> promise;
-    std::future<CompareResult> future = promise.get_future();
-
-    std::thread t([&]() {
-        CompareResult r = SafeCompareRtf(rtfA, rtfB);
-        promise.set_value(r);
-    });
-    t.detach();
-
-    std::future_status status = future.wait_for(std::chrono::seconds(sec));
-    if (status != std::future_status::ready) {
-        return CompareResult{};
-    }
-    return future.get();
-}
-
 
 class TestSemanticComparison : public QObject {
     Q_OBJECT
@@ -123,6 +80,8 @@ private slots:
     void DifferentExpnd();
     void DifferentUnderlineDashDot();
     void DifferentUnderlineDashDotDot();
+    void UnderlineStyleIdentical();
+    void UnderlineAllStylesDistinct();
 
     // RE 2.0 — Semantic identity (must NOT flag as different)
     void CbSemantic();
@@ -207,14 +166,12 @@ private slots:
 
     // \highlight structural preservation
     void DifferentHighlight();
+    void SemanticHighlight();
 
     // Negative \fi (hanging indent)
     void NegativeFirstLineIndent();
 
     void cleanupTestCase();
-
-private:
-    int _timeout = 0;
 };
 
 void TestSemanticComparison::IdenticalRtf() {
@@ -273,13 +230,9 @@ void TestSemanticComparison::SemanticColor() {
     std::string rtfB = R"({\rtf1\ansi\deff0
 {\colortbl ;\red0\green255\blue0;\red255\green0\blue0;}
 \cf2 Red\par})";
-    CompareResult r = CompareWithTimeout(rtfA, rtfB, 3);
-    if (!r.ok) {
-        _timeout++;
-        QFAIL("parser timed out — feature not yet implemented");
-    }
-    QCOMPARE(r.result, RtfCompareResult::Identical);
-    QVERIFY(r.reason.empty());
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QVERIFY(reason.empty());
 }
 
 void TestSemanticComparison::SemanticFont() {
@@ -571,6 +524,37 @@ void TestSemanticComparison::DifferentUnderlineDashDotDot() {
     QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
 }
 
+void TestSemanticComparison::UnderlineStyleIdentical() {
+    std::string rtfDashDot = R"({\rtf1\ansi\deff0{\uldashd DashDot}\ul0\par})";
+    std::string rtfDashDotDot = R"({\rtf1\ansi\deff0{\uldashdd DashDotDot}\ul0\par})";
+    std::string rtfDbl = R"({\rtf1\ansi\deff0{\uldb Double}\ul0\par})";
+    std::string rtfThick = R"({\rtf1\ansi\deff0{\ulth Thick}\ul0\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfDashDot, rtfDashDot, reason), RtfCompareResult::Identical);
+    QCOMPARE(CompareRtf(rtfDashDotDot, rtfDashDotDot, reason), RtfCompareResult::Identical);
+    QCOMPARE(CompareRtf(rtfDbl, rtfDbl, reason), RtfCompareResult::Identical);
+    QCOMPARE(CompareRtf(rtfThick, rtfThick, reason), RtfCompareResult::Identical);
+}
+
+void TestSemanticComparison::UnderlineAllStylesDistinct() {
+    std::string rtfSolid = R"({\rtf1\ansi\deff0{\ul Solid}\ul0\par})";
+    std::string rtfDotted = R"({\rtf1\ansi\deff0{\uld Dotted}\ul0\par})";
+    std::string rtfDashed = R"({\rtf1\ansi\deff0{\uldash Dashed}\ul0\par})";
+    std::string rtfDashDot = R"({\rtf1\ansi\deff0{\uldashd DashDot}\ul0\par})";
+    std::string rtfDashDotDot = R"({\rtf1\ansi\deff0{\uldashdd DashDotDot}\ul0\par})";
+    std::string rtfDbl = R"({\rtf1\ansi\deff0{\uldb Double}\ul0\par})";
+    std::string rtfThick = R"({\rtf1\ansi\deff0{\ulth Thick}\ul0\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfSolid, rtfDotted, reason), RtfCompareResult::StructuralDiff);
+    QCOMPARE(CompareRtf(rtfSolid, rtfDashed, reason), RtfCompareResult::StructuralDiff);
+    QCOMPARE(CompareRtf(rtfSolid, rtfDashDot, reason), RtfCompareResult::StructuralDiff);
+    QCOMPARE(CompareRtf(rtfSolid, rtfDashDotDot, reason), RtfCompareResult::StructuralDiff);
+    QCOMPARE(CompareRtf(rtfSolid, rtfDbl, reason), RtfCompareResult::StructuralDiff);
+    QCOMPARE(CompareRtf(rtfSolid, rtfThick, reason), RtfCompareResult::StructuralDiff);
+    QCOMPARE(CompareRtf(rtfDotted, rtfDashed, reason), RtfCompareResult::StructuralDiff);
+    QCOMPARE(CompareRtf(rtfDashDot, rtfDbl, reason), RtfCompareResult::StructuralDiff);
+}
+
 void TestSemanticComparison::CbSemantic() {
     std::string rtfA = R"({\rtf1\ansi\deff0
 {\colortbl ;\red128\green64\blue0;}
@@ -578,13 +562,9 @@ void TestSemanticComparison::CbSemantic() {
     std::string rtfB = R"({\rtf1\ansi\deff0
 {\colortbl ;\red0\green0\blue0;\red128\green64\blue0;}
 \cb2 Orange\par})";
-    CompareResult r = CompareWithTimeout(rtfA, rtfB, 3);
-    if (!r.ok) {
-        _timeout++;
-        QFAIL("parser timed out — feature not yet implemented");
-    }
-    QCOMPARE(r.result, RtfCompareResult::Identical);
-    QVERIFY(r.reason.empty());
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QVERIFY(reason.empty());
 }
 
 void TestSemanticComparison::DifferentImageCount() {
@@ -759,9 +739,8 @@ void TestSemanticComparison::EscapedBackslashRoundtrip() {
     std::string rtfA = R"({\rtf1\ansi\deff0 Path: C:\\Users\\test\par})";
     auto doc = ParseRtf(rtfA);
     QVERIFY(doc.elements.size() >= 1);
-    auto doc2 = ParseRtf(rtfA);
     std::string reason;
-    QCOMPARE(CompareRtf(doc, doc2, reason), RtfCompareResult::Identical);
+    QCOMPARE(CompareRtf(rtfA, rtfA, reason), RtfCompareResult::Identical);
 }
 
 void TestSemanticComparison::EmptyParagraphsPreserved() {
@@ -1254,11 +1233,29 @@ void TestSemanticComparison::DifferentPntext() {
 }
 
 void TestSemanticComparison::DifferentHighlight() {
-    std::string rtfA = R"({\rtf1\ansi\deff0{\highlight3 Highlighted}\par})";
-    std::string rtfB = R"({\rtf1\ansi\deff0{\highlight1 Highlighted}\par})";
+    // Different highlight colors
+    std::string rtfA = R"({\rtf1\ansi\deff0
+{\colortbl ;\red255\green0\blue0;}
+{\highlight1 Highlighted}\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0
+{\colortbl ;\red0\green255\blue0;}
+{\highlight1 Highlighted}\par})";
     std::string reason;
     QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
     QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::SemanticHighlight() {
+    // Different colortbl indices → same resolved highlight color
+    std::string rtfA = R"({\rtf1\ansi\deff0
+{\colortbl ;\red255\green0\blue0;}
+{\highlight1 Highlighted}\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0
+{\colortbl ;\red0\green255\blue0;\red255\green0\blue0;}
+{\highlight2 Highlighted}\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QVERIFY(reason.empty());
 }
 
 void TestSemanticComparison::NegativeFirstLineIndent() {
@@ -1270,9 +1267,6 @@ void TestSemanticComparison::NegativeFirstLineIndent() {
 }
 
 void TestSemanticComparison::cleanupTestCase() {
-    qDebug() << "======================================";
-    qDebug().noquote() << "Results: " << _timeout << " timeouts";
-    qDebug().noquote() << "======================================";
 }
 
 QTEST_MAIN(TestSemanticComparison)

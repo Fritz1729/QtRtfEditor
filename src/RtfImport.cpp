@@ -79,6 +79,13 @@ static void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
             } else {
                 charFmt.setUnderlineStyle(qtUnderlineStyleFor(run.format.underlineStyle));
             }
+            charFmt.setProperty(UserPropUlStyle, static_cast<int>(run.format.underlineStyle));
+        }
+        if (run.format.ulColorIndex > 0 &&
+            run.format.ulColorIndex < static_cast<int>(doc.colors.size())) {
+            const auto& col = doc.colors[run.format.ulColorIndex];
+            charFmt.setProperty(UserPropUlColorIndex,
+                                QString("%1,%2,%3").arg(col.red).arg(col.green).arg(col.blue));
         }
 
         if (run.format.capitalization == Capitalization::AllCaps) {
@@ -192,6 +199,9 @@ static void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
         curFmt.setProperty(UserPropParaDefaultTabStopTwips, para.defaultTabStopTwips);
         if (!para.pntextRtf.empty()) {
             curFmt.setProperty(UserPropBlockPntextRtf, QString::fromLatin1(para.pntextRtf.c_str()));
+        }
+        if (para.slMult != 1) {
+            curFmt.setProperty(UserPropSlMult, para.slMult);
         }
         cursor.setBlockFormat(curFmt);
     }

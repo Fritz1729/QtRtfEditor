@@ -65,7 +65,7 @@ union Value {
 
 ### Control Table
 
-The table has 147 entries (`kRtfControlTableSize = 147`). A `static_assert` in the .cpp file verifies the count matches at compile time.
+A `static_assert` in the .cpp file verifies the entry count matches `kRtfControlTableSize` in the header at compile time.
 
 ## Control Word Coverage
 
@@ -78,10 +78,10 @@ The table has 147 entries (`kRtfControlTableSize = 147`). A `static_assert` in t
 | `\ul` / `\ul0` / `\ulnone` | SetUlStyle | Full roundtrip |
 | `\uld` | SetUlStyle::Dotted | Full roundtrip |
 | `\uldash` | SetUlStyle::Dashed | Full roundtrip |
-| `\uldashd` | SetUlStyle::DashDot | Parser + compare only (lossy Qt mapping) |
-| `\uldashdd` | SetUlStyle::DashDotDot | Parser + compare only (lossy Qt mapping) |
-| `\uldb` | SetUlStyle::Double | Parser + export only (no Qt equivalent) |
-| `\ulth` | SetUlStyle::Thick | Parser + export only (no Qt equivalent) |
+| `\uldashd` | SetUlStyle::DashDot | Full roundtrip (renders as DashDotLine) |
+| `\uldashdd` | SetUlStyle::DashDotDot | Full roundtrip (renders as DashDotDotLine) |
+| `\uldb` | SetUlStyle::Double | Full roundtrip (renders as solid underline) |
+| `\ulth` | SetUlStyle::Thick | Full roundtrip (renders as wave underline) |
 | `\sub` / `\sub0` | ToggleCharProp::Subscript | Full roundtrip |
 | `\super` / `\super0` | ToggleCharProp::Superscript | Full roundtrip |
 | `\strike` / `\strike0` | ToggleCharProp::Strike | Full roundtrip |
@@ -91,13 +91,14 @@ The table has 147 entries (`kRtfControlTableSize = 147`). A `static_assert` in t
 | `\fsN` | SetCharProp::FontSize | Full roundtrip |
 | `\cfN` | SetCharProp::ColorIndex | Full roundtrip |
 | `\cbN` | SetCharProp::BgColorIndex | Full roundtrip |
-| `\upN` | SetCharProp::UpOffset | Parser + compare only (no Qt API) |
-| `\dnN` | SetCharProp::DnOffset | Parser + compare only (no Qt API) |
-| `\expndN` | SetCharProp::Expnd | Full roundtrip |
+| `\upN` | SetCharProp::UpOffset | Full roundtrip (stored as user property, Qt renders as boolean) |
+| `\dnN` | SetCharProp::DnOffset | Full roundtrip (stored as user property, Qt renders as boolean) |
+| `\expndN` / `\expndtwN` | SetCharProp::Expnd | Full roundtrip |
 | `\caps` / `\caps0` | SetCapitalization::AllCaps | Full roundtrip |
 | `\scaps` / `\scaps0` | SetCapitalization::SmallCaps | Full roundtrip |
-| `\ulcN` | SetCharProp::UlColorIndex | Parser + compare only (no Qt API) |
-| `\langN` | SetCharProp::LangId | Parser + compare only (no Qt API in 6.11) |
+| `\ulcN` | SetCharProp::UlColorIndex | Full roundtrip (stored as RGB user property, no Qt rendering API) |
+| `\highlightN` | SetCharProp::HighlightIndex | Parser + export (stored as user property, no Qt rendering API) |
+| `\langN` | SetCharProp::LangId | Parser + export (stored as user property, no Qt rendering API in 6.11) |
 
 ### Paragraph Formatting (fully implemented: parser + import + export)
 
@@ -110,7 +111,7 @@ The table has 147 entries (`kRtfControlTableSize = 147`). A `static_assert` in t
 | `\sbN` | SetParaProp::SpaceBefore | Full roundtrip |
 | `\saN` | SetParaProp::SpaceAfter | Full roundtrip |
 | `\slN` | SetParaProp::LineHeight | Full roundtrip |
-| `\slmultN` | SetParaProp::SlMult | Parser only (Qt only supports fixed height) |
+| `\slmultN` | SetParaProp::SlMult | Full roundtrip (stored as block user property, no Qt rendering API) |
 | `\txN` | SetParaProp::TabStop | Full roundtrip |
 | `\par` | EmitParagraph | Full roundtrip |
 | `\pard` | HeaderMetadata (reset) | Full roundtrip |
@@ -231,11 +232,10 @@ The table has 147 entries (`kRtfControlTableSize = 147`). A `static_assert` in t
 
 | Control Word | Reason |
 |--------------|--------|
-| `\highlightN` | No reliable RGB mapping per RTF spec |
 | `\v` | Cannot hide text while preserving layout in Qt |
 | `\rtlch` / `\ltrch` | No BIDI library |
 | `\sectd` | No Qt section/page layout API |
-| `\field` | Word-specific field codes |
+| `\field` | Word-specific field codes (except `HYPERLINK`) |
 | `\stylesheet` | Word style system |
 | `\object` | Windows COM embedding |
 | `\password` | No password support |
@@ -246,4 +246,4 @@ The table has 147 entries (`kRtfControlTableSize = 147`). A `static_assert` in t
 | File | Purpose |
 |------|---------|
 | `RtfControl.h` | RtfControl struct, enum declarations, table size constant |
-| `RtfControl.cpp` | 147-entry control word table, static_assert |
+| `RtfControl.cpp` | Control word table, static_assert verifies count |

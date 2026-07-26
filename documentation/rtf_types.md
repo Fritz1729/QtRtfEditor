@@ -157,6 +157,11 @@ Qt user property IDs used to store RTF metadata in `QTextDocument`:
 | `UserPropLangId` | 1006 | Language ID (\langN) |
 | `UserPropParaDefaultFontIndex` | 1007 | Per-paragraph \deffN |
 | `UserPropParaDefaultTabStopTwips` | 1008 | Per-paragraph \deftabN |
+| `UserPropHighlightIndex` | 1009 | Highlight color index |
+| `UserPropBlockPntextRtf` | 1010 | Original \pntext RTF fragment |
+| `UserPropUlStyle` | 1011 | Original underline style enum |
+| `UserPropUlColorIndex` | 1012 | Underline color (stored as "R,G,B" string) |
+| `UserPropSlMult` | 1013 | Line-spacing multiplier (\slmultN) |
 
 ## Helper Functions
 

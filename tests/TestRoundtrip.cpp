@@ -5,6 +5,9 @@
 #include <QFile>
 #include <QApplication>
 #include <QVector>
+#include <chrono>
+#include <future>
+#include <optional>
 #include <stdexcept>
 #include "RtfCompare.h"
 #include "RtfParser.h"
@@ -14,13 +17,6 @@ using namespace Rte;
 static const char* const kSkippedFiles[] = {
     "cell-shading.rtf",            // \clshdn — Qt has no cell-level background API
     "tables-merged.rtf",           // \clmrg — merged cells out of scope
-    "line-spacing.rtf",          // \slmultN — Qt only supports FixedHeight, not multiplier
-    "positional-supsub.rtf",     // \upN/\dnN — Qt only supports boolean super/subscript
-    "underline-styles.rtf",      // \uldb — no double underline in Qt UnderlineStyle enum
-    "ul-dashdot.rtf",            // \uldashd — DashDotLine has no Qt roundtrip (toUnderlineStyle loss)
-    "ul-dashdotdot.rtf",         // \uldashdd — DashDotDotLine has no Qt roundtrip
-    "underline-color.rtf",       // \ulcN — Qt has no setFontUnderlineColor()
-    "language-id.rtf",           // \langN — Qt 6.11 has no setFontLanguageId()
     nullptr
 };
 
@@ -30,6 +26,14 @@ static bool IsSkipped(const QString& filename) {
     }
     return false;
 }
+
+struct RoundtripResult {
+    bool unsupported = false;
+    bool outputUnsupported = false;
+    bool passed = false;
+    bool exception = false;
+    std::string reason;
+};
 
 class TestRoundtrip : public QObject {
     Q_OBJECT
@@ -44,6 +48,8 @@ public:
 private:
     void RunFromCustomDir(const QString& dirPath);
     void DoRoundtrip(const QString& name, const std::string& rtf);
+    std::optional<RoundtripResult> RunRoundtripWithTimeout(const std::string& original,
+                                                            const QString& filename);
 
     int _pass = 0;
     int _fail = 0;
@@ -77,6 +83,32 @@ static std::string ReadFile(const std::string& path) {
         throw std::runtime_error(file.errorString().toStdString().c_str());
     }
     return file.readAll().toStdString();
+}
+
+static RoundtripResult RunRoundtrip(const std::string& original) {
+    RoundtripResult r;
+    try {
+        Rte::RichTextEdit editor;
+        editor.Load(original, Rte::FormatMode::Rtf);
+        std::string saved = editor.Save(Rte::FormatMode::Rtf);
+
+        RtfDocument doc = ParseRtf(saved);
+        if (!doc.unknownTags.empty()) {
+            for (const auto& tag : doc.unknownTags) {
+                qDebug() << "  UNKNOWN TAG:" << QString::fromStdString(tag);
+            }
+            r.outputUnsupported = true;
+            return r;
+        }
+
+        std::string reason;
+        RtfCompareResult result = CompareRtf(original, saved, reason);
+        r.passed = (result == RtfCompareResult::Identical);
+        r.reason = std::move(reason);
+    } catch (const std::exception& e) {
+        r.exception = true;
+    }
+    return r;
 }
 
 static void ReportCase(const QString& filename, const char* result) {
@@ -131,37 +163,34 @@ void TestRoundtrip::RunFromCustomDir(const QString& dirPath) {
             continue;
         }
 
-        // Load/save in main thread
-        try {
-            Rte::RichTextEdit editor;
-            editor.Load(original, Rte::FormatMode::Rtf);
-            std::string saved = editor.Save(Rte::FormatMode::Rtf);
-
-            // Check output for unsupported features too
-            if (HasUnknownTags(saved)) {
-                ReportCase(filename, "FAIL (output has unsupported features)");
-                _fail++;
-                continue;
-            }
-
-            // Both parse cleanly — compare
-            std::string reason;
-            RtfCompareResult result = CompareRtf(original, saved, reason);
-            bool passed = (result == RtfCompareResult::Identical);
-
-            ReportCase(filename, passed ? "PASS" : "FAIL");
-
-            if (!passed) {
-                qDebug() << "File:" << filename << ":" << QString::fromStdString(reason);
-            }
-
-            if (passed) _pass++;
-            else _fail++;
-        } catch (const std::exception& e) {
-            ReportCase(filename, "EXCEPTION");
-            qWarning() << "File:" << filename << "crashed:" << e.what();
-            _exception++;
+        std::optional<RoundtripResult> optResult = RunRoundtripWithTimeout(original, filename);
+        if (!optResult) {
+            ReportCase(filename, "TIMEOUT");
+            qCritical() << "File:" << filename << "timed out (1s)";
+            QFAIL(("Roundtrip timed out for " + filename.toStdString()).c_str());
         }
+        RoundtripResult r = *optResult;
+
+        if (r.outputUnsupported) {
+            ReportCase(filename, "FAIL (output has unsupported features)");
+            _fail++;
+            continue;
+        }
+
+        if (r.exception) {
+            ReportCase(filename, "EXCEPTION");
+            _exception++;
+            continue;
+        }
+
+        ReportCase(filename, r.passed ? "PASS" : "FAIL");
+
+        if (!r.passed) {
+            qDebug() << "File:" << filename << ":" << QString::fromStdString(r.reason);
+        }
+
+        if (r.passed) _pass++;
+        else _fail++;
     }
 
     QVERIFY(_fail == 0);
@@ -174,6 +203,22 @@ void TestRoundtrip::cleanupTestCase() {
                         << " skipped, " << _exception
                         << " exceptions";
     qDebug().noquote() << "======================================";
+}
+
+std::optional<RoundtripResult> TestRoundtrip::RunRoundtripWithTimeout(
+        const std::string& original, const QString& filename) {
+    std::promise<RoundtripResult> promise;
+    std::future<RoundtripResult> future = promise.get_future();
+
+    std::thread t([original, pPromise = std::move(promise)]() mutable {
+        pPromise.set_value(RunRoundtrip(original));
+    });
+    t.detach();
+
+    if (future.wait_for(std::chrono::seconds(1)) != std::future_status::ready) {
+        return std::nullopt;
+    }
+    return future.get();
 }
 
 static int CustomMain(int argc, char **argv) {

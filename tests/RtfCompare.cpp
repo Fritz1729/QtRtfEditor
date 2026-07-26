@@ -2,6 +2,8 @@
 #include "RtfParser.h"
 
 #include <algorithm>
+#include <chrono>
+#include <future>
 #include <QFont>
 #include <string>
 #include <vector>
@@ -184,7 +186,7 @@ static bool CompareFormatSemantic(const RtfRunFormat& fmtA, const RtfRunFormat& 
         if (ReportResolvedColorDiff(loc, "ulColorIndex", fmtA.ulColorIndex, fmtB.ulColorIndex, docA, docB, reason)) return false;
     }
     if (fmtA.highlightIndex != 0 || fmtB.highlightIndex != 0) {
-        if (ReportIntDiff(loc, "highlightIndex", fmtA.highlightIndex, fmtB.highlightIndex, reason)) return false;
+        if (ReportResolvedColorDiff(loc, "highlightIndex", fmtA.highlightIndex, fmtB.highlightIndex, docA, docB, reason)) return false;
     }
     if (ReportIntDiff(loc, "langId", fmtA.langId, fmtB.langId, reason)) return false;
     if (ReportBoolDiff(loc, "protected", fmtA.protected_, fmtB.protected_, reason)) return false;
@@ -241,8 +243,8 @@ static RtfCompareResult CompareRunsSemantic(const std::vector<RtfRun>& runsA,
     return RtfCompareResult::Identical;
 }
 
-RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
-                                std::string& reason) {
+static RtfCompareResult DoCompareDocuments(const RtfDocument& a, const RtfDocument& b,
+                                                std::string& reason) {
     // Check for unknown tags
     if (!a.unknownTags.empty()) {
         reason = "Unknown tag in input: " + a.unknownTags.back();
@@ -530,11 +532,32 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
     return RtfCompareResult::Identical;
 }
 
-RtfCompareResult CompareRtf(const std::string& rtfA, const std::string& rtfB,
-                               std::string& reason) {
+static std::pair<RtfCompareResult, std::string> DoCompareParse(
+        const std::string& rtfA, const std::string& rtfB) {
+    std::string localReason;
     RtfDocument docA = ParseRtf(rtfA);
     RtfDocument docB = ParseRtf(rtfB);
-    return CompareRtf(docA, docB, reason);
+    RtfCompareResult result = DoCompareDocuments(docA, docB, localReason);
+    return {result, std::move(localReason)};
+}
+
+RtfCompareResult CompareRtf(const std::string& rtfA, const std::string& rtfB,
+                                  std::string& reason) {
+    std::promise<std::pair<RtfCompareResult, std::string>> promise;
+    std::future<std::pair<RtfCompareResult, std::string>> future = promise.get_future();
+
+    std::thread t([rtfA, rtfB, pPromise = std::move(promise)]() mutable {
+        pPromise.set_value(DoCompareParse(rtfA, rtfB));
+    });
+    t.detach();
+
+    if (future.wait_for(std::chrono::seconds(1)) != std::future_status::ready) {
+        reason = "timeout (1s)";
+        return RtfCompareResult::StructuralDiff;
+    }
+    auto [result, localReason] = future.get();
+    reason = std::move(localReason);
+    return result;
 }
 
 static const char* ImageFormatName(RtfImageFormat fmt) {

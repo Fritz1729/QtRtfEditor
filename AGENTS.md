@@ -17,7 +17,7 @@ Out-of-source into `build/`. Demo: `build/examples/demo/demo`.
 
 ## References
 - **Supported / unsupported features:** [Supported Features](documentation/supported_features.md) — do NOT implement "Out of Scope" items.
-- **Testing quirks:** `ParseRtf()` can hang on `\colortbl` etc. — tests use 3-second timeout.
+- **Testing timeouts:** `CompareRtf()` and roundtrip file processing use 1-second per-operation timeouts. CTest enforces a 60-second global timeout per test executable.
 
 ## Code Style
 - **Coding rules are owned by the user.** The agent applies them but never adds to the list.

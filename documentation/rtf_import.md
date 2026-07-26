@@ -61,6 +61,7 @@ ImportRtf()
 | `upOffset` | `setProperty(UserPropUpOffset, N)` | Stored as user property |
 | `dnOffset` | `setProperty(UserPropDnOffset, N)` | Stored as user property |
 | `langId` | `setProperty(UserPropLangId, N)` | Stored as user property |
+| `ulColorIndex` | `setProperty(UserPropUlColorIndex, "R,G,B")` | Resolved RGB string for roundtrip |
 
 ## Paragraph Formatting
 
@@ -75,7 +76,8 @@ ImportRtf()
 | `spaceBefore` | `setTopMargin(val / 2.0)` | Twips to points |
 | `spaceAfter` | `setBottomMargin(val / 2.0)` | Twips to points |
 | `lineHeight` | `setLineHeight(val / 2.0, FixedHeight)` | Twips to points |
-| `tabStops` | `setTabPositions(...)` | Position only (alignment lossy) |
+| `slMult` | `setProperty(UserPropSlMult, N)` | Stored as block user property for roundtrip |
+| `tabStops` | `setTabPositions(...)` | Center/Right preserved; Decimal mapped to Left (lossy) |
 
 ## List Handling
 

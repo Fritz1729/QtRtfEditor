@@ -39,6 +39,8 @@ static const char* UnderlineStyleTag(UnderlineStyle style) {
         case UnderlineStyle::Solid:      return "\\ul";
         case UnderlineStyle::Dotted:     return "\\uld";
         case UnderlineStyle::Dashed:     return "\\uldash";
+        case UnderlineStyle::DashDot:    return "\\uldashd";
+        case UnderlineStyle::DashDotDot: return "\\uldashdd";
         case UnderlineStyle::Double:     return "\\uldb";
         case UnderlineStyle::Thick:      return "\\ulth";
     }
@@ -64,6 +66,7 @@ static void WriteConditionalFormatOff(std::ostringstream& out, const RtfRunForma
     if (!cur.protected_ && lastEmitted.protected_) out << "\\protect0" << space;
     if (cur.upOffset == 0 && lastEmitted.upOffset != 0) out << "\\up0" << space;
     if (cur.dnOffset == 0 && lastEmitted.dnOffset != 0) out << "\\dn0" << space;
+    if (cur.ulColorIndex == 0 && lastEmitted.ulColorIndex != 0) out << "\\ulc0" << space;
 }
 
 static void WriteFormatOff(std::ostringstream& out, const RtfRunFormat& fmt, const RtfRunFormat& lastEmitted, bool trailingSpace) {
@@ -83,7 +86,7 @@ static bool IsFormatActive(const RtfRunFormat& fmt) {
         fmt.underlineStyle != UnderlineStyle::None || fmt.strikeOut ||
         fmt.capitalization != Capitalization::None || fmt.kerning || fmt.protected_ ||
         fmt.upOffset != 0 || fmt.dnOffset != 0 || fmt.langId != 0 ||
-        fmt.highlightIndex != 0;
+        fmt.highlightIndex != 0 || fmt.ulColorIndex != 0;
 }
 
 static bool WritePlainTextOff(std::ostringstream& out, const RtfRunFormat& fmt) {
@@ -95,6 +98,9 @@ static bool WritePlainTextOff(std::ostringstream& out, const RtfRunFormat& fmt) 
 }
 
 static UnderlineStyle EffectiveUnderlineStyle(const QTextCharFormat& fmt) {
+    if (fmt.property(UserPropUlStyle).isValid()) {
+        return static_cast<UnderlineStyle>(fmt.property(UserPropUlStyle).toInt());
+    }
     UnderlineStyle style = toUnderlineStyle(fmt.underlineStyle());
     if (style != UnderlineStyle::None) return style;
     if (fmt.fontUnderline()) return UnderlineStyle::Solid;
@@ -256,8 +262,10 @@ static void EmitParaFormatting(std::ostringstream& out, const QTextBlockFormat& 
         double lhVal = blockFmt.lineHeight();
         int lhTwips = static_cast<int>(lhVal * 2.0);
         if (lhTwips > 0) {
+            int slMult = blockFmt.property(UserPropSlMult).toInt();
+            if (slMult <= 0) slMult = 1;
             out << "\\sl" << lhTwips;
-            out << "\\slmult1";
+            out << "\\slmult" << slMult;
         }
     }
     const QList<QTextOption::Tab> tabs = blockFmt.tabPositions();
@@ -330,6 +338,15 @@ static int LookupColorIndex(const QColor& col, const std::vector<QColor>& list) 
         if (idx >= 0) return idx + 1;
     }
     return 0;
+}
+
+static QColor ParseUlColor(const QTextCharFormat& fmt) {
+    QString s = fmt.property(UserPropUlColorIndex).toString();
+    if (s.isEmpty()) return {};
+    QStringList p = s.split(',');
+    if (p.size() == 3)
+        return QColor(p[0].toInt(), p[1].toInt(), p[2].toInt());
+    return {};
 }
 
 static void CollectBorderColor(const QBrush& brush, std::vector<QColor>& colorList) {
@@ -600,6 +617,11 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
             cur.langId = charFmt.property(UserPropLangId).toInt();
             cur.highlightIndex = charFmt.property(UserPropHighlightIndex).toInt();
             {
+                QColor ulCol = ParseUlColor(charFmt);
+                if (ulCol.isValid())
+                    cur.ulColorIndex = LookupColorIndex(ulCol, colorList);
+            }
+            {
                 qreal spacing = charFmt.fontLetterSpacing();
                 if (spacing > 0) {
                     cur.expnd = lround(spacing * 20.0 / ptSize);
@@ -637,6 +659,7 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
                 if (cur.dnOffset != lastEmitted.dnOffset) out << "\\dn" << cur.dnOffset << ' ';
                 if (cur.langId != lastEmitted.langId) out << "\\lang" << cur.langId << ' ';
                 if (cur.highlightIndex != lastEmitted.highlightIndex) out << "\\highlight" << cur.highlightIndex << ' ';
+                if (cur.ulColorIndex != lastEmitted.ulColorIndex) out << "\\ulc" << cur.ulColorIndex << ' ';
 
                 lastEmitted = cur;
             }
@@ -729,6 +752,11 @@ std::string ExportRtf(const QTextDocument& document) {
                     QBrush bgBrush = frag.charFormat().background();
                     if (bgBrush.style() != Qt::NoBrush)
                         CollectColor(bgBrush.color(), bgColorList);
+                }
+                {
+                    QColor ulCol = ParseUlColor(frag.charFormat());
+                    if (ulCol.isValid())
+                        CollectColor(ulCol, colorList);
                 }
                 it++;
             }

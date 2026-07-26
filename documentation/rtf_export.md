@@ -111,6 +111,8 @@ The exporter tracks `lastEmitted` format state. For each fragment, it emits only
 | Protected turned on/off | `\protect` / `\protect0` |
 | Up/dn offset changed | `\upN` / `\up0`, `\dnN` / `\dn0` |
 | Language changed | `\langN` |
+| Highlight changed | `\highlightN` |
+| Underline color changed | `\ulcN` / `\ulc0` |
 
 ### Plain Reset
 
@@ -163,4 +165,4 @@ Format detection uses `rtfImageFormat` document property. Blip tag mapping: jpg 
 | File | Purpose |
 |------|---------|
 | `RtfExport.h` | `ExportRtf()`, `ExportHtml()` declarations |
-| `RtfExport.cpp` | Manual RTF generation, font/color collection, table/image export (919 lines) |
+| `RtfExport.cpp` | Manual RTF generation, font/color collection, table/image export |
