@@ -5,7 +5,6 @@
 #include <QKeyEvent>
 #include <QMimeData>
 #include <QMouseEvent>
-#include <string>
 
 // Symbol export macro (DLL/shared builds)
 #ifndef RTE_EXPORT

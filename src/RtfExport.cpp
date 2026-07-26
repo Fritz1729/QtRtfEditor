@@ -107,14 +107,14 @@ static UnderlineStyle EffectiveUnderlineStyle(const QTextCharFormat& fmt) {
     return UnderlineStyle::None;
 }
 
-int FindColorIndex(const std::vector<QColor>& colorList, const QColor& color) {
+static int FindColorIndex(const std::vector<QColor>& colorList, const QColor& color) {
     for (int i = 0; i < static_cast<int>(colorList.size()); ++i) {
         if (colorList[i] == color) return i;
     }
     return -1;
 }
 
-std::string RtfEscape(const QString& text) {
+static std::string RtfEscape(const QString& text) {
     std::string result;
     result.reserve(text.size() * 2);
 
@@ -139,7 +139,7 @@ std::string RtfEscape(const QString& text) {
     return result;
 }
 
-std::string AlignmentToRtf(Qt::Alignment alignment) {
+static std::string AlignmentToRtf(Qt::Alignment alignment) {
     if (alignment & Qt::AlignRight) return "\\qr";
     if (alignment & Qt::AlignHCenter) return "\\qc";
     if (alignment & Qt::AlignJustify) return "\\qj";
@@ -222,30 +222,9 @@ static std::string EmitImageAsPict(const QTextDocument& doc, const QString& name
     return out.str();
 }
 
-struct ParaFmtState {
-    Qt::Alignment alignment = Qt::AlignLeft;
-    double leftMargin = 0, rightMargin = 0, topMargin = 0, bottomMargin = 0;
-    int indent = 0;
-    int lineHeightType = QTextBlockFormat::SingleHeight;
-    double lineHeight = 0;
-
-    static ParaFmtState From(const QTextBlockFormat& bf) {
-        ParaFmtState s{};
-        s.alignment = bf.alignment();
-        s.leftMargin = bf.leftMargin();
-        s.rightMargin = bf.rightMargin();
-        s.topMargin = bf.topMargin();
-        s.bottomMargin = bf.bottomMargin();
-        s.indent = bf.indent();
-        s.lineHeightType = bf.lineHeightType();
-        s.lineHeight = bf.lineHeight();
-        return s;
-    }
-};
-
 static void EmitTwipsTag(std::ostringstream& out, double val, const char* tag) {
     if (val > 0) {
-        int twips = lround(val * 2.0);
+        int twips = PointsToHalfPtTwips(val);
         out << "\\" << tag << twips;
     }
 }
@@ -260,7 +239,7 @@ static void EmitParaFormatting(std::ostringstream& out, const QTextBlockFormat& 
     int lhType = blockFmt.lineHeightType();
     if (lhType == QTextBlockFormat::FixedHeight) {
         double lhVal = blockFmt.lineHeight();
-        int lhTwips = static_cast<int>(lhVal * 2.0);
+        int lhTwips = PointsToHalfPtTwips(lhVal);
         if (lhTwips > 0) {
             int slMult = blockFmt.property(UserPropSlMult).toInt();
             if (slMult <= 0) slMult = 1;
@@ -270,36 +249,37 @@ static void EmitParaFormatting(std::ostringstream& out, const QTextBlockFormat& 
     }
     const QList<QTextOption::Tab> tabs = blockFmt.tabPositions();
     for (const QTextOption::Tab& tab : tabs) {
+        const int twips = PointsToHalfPtTwips(tab.position);
         switch (tab.type) {
         case QTextOption::LeftTab:
-            out << "\\tx" << static_cast<int>(tab.position * 2.0);
+            out << "\\tx" << twips;
             break;
         case QTextOption::RightTab:
-            out << "\\tqr\\tx" << static_cast<int>(tab.position * 2.0);
+            out << "\\tqr\\tx" << twips;
             break;
         case QTextOption::CenterTab:
-            out << "\\tqc\\tx" << static_cast<int>(tab.position * 2.0);
+            out << "\\tqc\\tx" << twips;
             break;
         default:
-            out << "\\tx" << static_cast<int>(tab.position * 2.0);
+            out << "\\tx" << twips;
             break;
         }
     }
 }
 
-static bool NeedsParaReset(const ParaFmtState& last, const QTextBlockFormat& blockFmt) {
-    return blockFmt.alignment() != last.alignment ||
-        blockFmt.leftMargin() != last.leftMargin ||
-        blockFmt.rightMargin() != last.rightMargin ||
-        blockFmt.topMargin() != last.topMargin ||
-        blockFmt.bottomMargin() != last.bottomMargin ||
-        blockFmt.indent() != last.indent ||
-        blockFmt.lineHeightType() != last.lineHeightType ||
-        blockFmt.lineHeight() != last.lineHeight;
+static bool NeedsParaReset(const QTextBlockFormat& last, const QTextBlockFormat& blockFmt) {
+    return blockFmt.alignment() != last.alignment() ||
+        blockFmt.leftMargin() != last.leftMargin() ||
+        blockFmt.rightMargin() != last.rightMargin() ||
+        blockFmt.topMargin() != last.topMargin() ||
+        blockFmt.bottomMargin() != last.bottomMargin() ||
+        blockFmt.indent() != last.indent() ||
+        blockFmt.lineHeightType() != last.lineHeightType() ||
+        blockFmt.lineHeight() != last.lineHeight();
 }
 
 static void EmitParaFormattingIfNeeded(std::ostringstream& out, const QTextBlockFormat& blockFmt,
-    ParaFmtState& lastParaFmt, bool& lastParaFmtSet) {
+    QTextBlockFormat& lastParaFmt, bool& lastParaFmtSet) {
     bool hasParaFormatting = blockFmt.alignment() != Qt::AlignLeft ||
         blockFmt.leftMargin() > 0 || blockFmt.indent() > 0 ||
         blockFmt.rightMargin() > 0 || blockFmt.topMargin() > 0 ||
@@ -311,7 +291,7 @@ static void EmitParaFormattingIfNeeded(std::ostringstream& out, const QTextBlock
         out << "\\pard ";
         if (hasParaFormatting) EmitParaFormatting(out, blockFmt);
     }
-    lastParaFmt = ParaFmtState::From(blockFmt);
+    lastParaFmt = blockFmt;
     lastParaFmtSet = true;
 }
 
@@ -333,11 +313,8 @@ static void CollectColor(const QColor& col, std::vector<QColor>& list) {
 }
 
 static int LookupColorIndex(const QColor& col, const std::vector<QColor>& list) {
-    if (col.isValid() && col.alpha() == 255) {
-        int idx = FindColorIndex(list, col);
-        if (idx >= 0) return idx + 1;
-    }
-    return 0;
+    if (!col.isValid() || col.alpha() != 255) return 0;
+    return FindColorIndex(list, col) + 1;
 }
 
 static QColor ParseUlColor(const QTextCharFormat& fmt) {
@@ -391,7 +368,7 @@ static CellBorderInfo ReadCellBorder(const QTextTableCellFormat& cf, const std::
 
 static void EmitBorderSpec(std::ostringstream& out, double width, QTextFrameFormat::BorderStyle style, int colorIdx) {
     if (width <= 0.0) return;
-    int halfPts = lround(width * 2.0);
+    int halfPts = PointsToHalfPtTwips(width);
     switch (style) {
         case QTextFrameFormat::BorderStyle_Solid:  out << "\\brdrs"; break;
         case QTextFrameFormat::BorderStyle_Dashed:  out << "\\brdrd"; break;
@@ -417,7 +394,7 @@ struct BlockExportContext {
     const std::map<const QTextList*, int>& listMap;
     int defaultFontIdx;
     RtfRunFormat carriedOverFormat{};
-    ParaFmtState lastParaFmt{};
+    QTextBlockFormat lastParaFmt{};
     bool lastParaFmtSet = false;
     int lastDeff = 0;
     int lastDeftab = 180;
@@ -859,7 +836,7 @@ std::string ExportRtf(const QTextDocument& document) {
     // RTF formatting is stream-global — \par does not reset it.
     BlockExportContext exportCtx{
         out, document, defaultFont, fontMap, colorList, bgColorList, listMap,
-        defaultFontIdx, {}, {}, false, defaultFontIdx, defaultTabStopTwips, 0, true
+        defaultFontIdx, {}, QTextBlockFormat{}, false, defaultFontIdx, defaultTabStopTwips, 0, true
     };
 
     QTextFrame* rootFrame = document.rootFrame();
@@ -879,7 +856,7 @@ std::string ExportRtf(const QTextDocument& document) {
             int cumulative = 0;
             for (int c = 0; c < colCount; ++c) {
                 double width = constraints[c].value(QTextLength::FixedLength);
-                int widthTwips = static_cast<int>(width * 20.0);
+                int widthTwips = PointsToTwips(width);
                 cumulative += widthTwips;
                 cellxPositions.push_back(cumulative);
             }

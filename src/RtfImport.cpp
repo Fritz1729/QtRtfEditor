@@ -135,26 +135,26 @@ static void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
 }
 
 static void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
-                            const RtfDocument& doc, const QFont& defaultFont,
-                            int& prevListId, int& prevListLevel,
-                            bool& inList, QTextList*& currentList) {
+                             const RtfDocument& doc, const QFont& defaultFont,
+                             int& prevListId, int& prevListLevel,
+                             bool& inList, QTextList*& currentList) {
     QTextBlockFormat blockFmt;
     blockFmt.setAlignment(RtfAlignmentToQt(para.alignment));
     if (para.leftIndent > 0 || para.firstLineIndent > 0) {
-        blockFmt.setLeftMargin(static_cast<double>(para.leftIndent) / 2.0);
-        blockFmt.setIndent(para.firstLineIndent > 0 ? static_cast<int>(para.firstLineIndent / 2.0) : 0);
+        blockFmt.setLeftMargin(MarginTwipsToPoints(para.leftIndent));
+        blockFmt.setIndent(para.firstLineIndent > 0 ? static_cast<int>(MarginTwipsToPoints(para.firstLineIndent)) : 0);
     }
     if (para.rightIndent > 0) {
-        blockFmt.setRightMargin(static_cast<double>(para.rightIndent) / 2.0);
+        blockFmt.setRightMargin(MarginTwipsToPoints(para.rightIndent));
     }
     if (para.spaceBefore > 0) {
-        blockFmt.setTopMargin(static_cast<double>(para.spaceBefore) / 2.0);
+        blockFmt.setTopMargin(MarginTwipsToPoints(para.spaceBefore));
     }
     if (para.spaceAfter > 0) {
-        blockFmt.setBottomMargin(static_cast<double>(para.spaceAfter) / 2.0);
+        blockFmt.setBottomMargin(MarginTwipsToPoints(para.spaceAfter));
     }
     if (para.lineHeight > 0) {
-        blockFmt.setLineHeight(static_cast<double>(para.lineHeight) / 2.0,
+        blockFmt.setLineHeight(MarginTwipsToPoints(para.lineHeight),
                                 QTextBlockFormat::FixedHeight);
     }
     if (!para.tabStops.empty()) {
@@ -168,7 +168,7 @@ static void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
             case 3: type = QTextOption::LeftTab; break;
             default: type = QTextOption::LeftTab; break;
             }
-            tabs << QTextOption::Tab(static_cast<double>(ts.position) / 2.0, type);
+            tabs << QTextOption::Tab(MarginTwipsToPoints(ts.position), type);
         }
         blockFmt.setTabPositions(tabs);
     }
@@ -178,7 +178,7 @@ static void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
         QTextListFormat listFmt;
         listFmt.setStyle(RtfListStyleToQt(para.listStyle));
         if (para.listIndent > 0) {
-            listFmt.setIndent(static_cast<int>(para.listIndent / 2.0));
+            listFmt.setIndent(static_cast<int>(MarginTwipsToPoints(para.listIndent)));
         }
         currentList = cursor.insertList(listFmt);
         inList = true;
@@ -279,7 +279,7 @@ static QColor ResolveBorderColor(int colorIdx, const RtfDocument& doc) {
 static void ApplyBorderToCellFormat(QTextTableCellFormat& cellFmt, int side,
                                      int width, BorderStyle style, int colorIdx, const RtfDocument& doc) {
     if (width <= 0) return;
-    double borderPt = width / 2.0;
+    double borderPt = MarginTwipsToPoints(width);
     QTextFrameFormat::BorderStyle qtStyle = QTextFrameFormat::BorderStyle_None;
     switch (style) {
         case BorderStyle::Dashed: qtStyle = QTextFrameFormat::BorderStyle_Dashed; break;
@@ -313,11 +313,11 @@ static void ApplyBorderToCellFormat(QTextTableCellFormat& cellFmt, int side,
 }
 
 static double ComputeEffectivePadding(int cellPad, int rowPad) {
-    return (cellPad > 0 || rowPad > 0) ? std::max(cellPad, rowPad) / 2.0 : 0.0;
+    return (cellPad > 0 || rowPad > 0) ? MarginTwipsToPoints(std::max(cellPad, rowPad)) : 0.0;
 }
 
 static void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEntry*>& tableRows,
-                             const RtfDocument& doc, const QFont& defaultFont) {
+                              const RtfDocument& doc, const QFont& defaultFont) {
     if (tableRows.empty()) return;
 
     // Use first row's cellxPositions for column widths
@@ -346,7 +346,7 @@ static void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEnt
         int width = (c == 0) ? tableRows[0]->cellxPositions[0] :
             tableRows[0]->cellxPositions[c] - tableRows[0]->cellxPositions[c - 1];
         constraints.append(QTextLength(QTextLength::FixedLength,
-            static_cast<double>(width) / 20.0));
+            TwipsToHalfPt(width)));
     }
     tableFmt.setColumnWidthConstraints(constraints);
 

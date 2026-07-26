@@ -170,8 +170,6 @@ private slots:
 
     // Negative \fi (hanging indent)
     void NegativeFirstLineIndent();
-
-    void cleanupTestCase();
 };
 
 void TestSemanticComparison::IdenticalRtf() {
@@ -1264,9 +1262,6 @@ void TestSemanticComparison::NegativeFirstLineIndent() {
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
     QCOMPARE(para.firstLineIndent, -200);
-}
-
-void TestSemanticComparison::cleanupTestCase() {
 }
 
 QTEST_MAIN(TestSemanticComparison)

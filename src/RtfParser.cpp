@@ -61,6 +61,10 @@ public:
 private:
     static constexpr size_t kMaxIter = 10'000'000;
 
+    void CheckIter() {
+        if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+    }
+
     const RtfControl* FindControl(const char* word) const {
         for (const RtfControl& ctrl : rtfControlTable) {
             if (strcmp(word, ctrl.keyword) == 0) return &ctrl;
@@ -770,7 +774,7 @@ private:
 
     void Parse() {
         while (_pos < _len) {
-            if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+            CheckIter();
             char c = _rtf[_pos];
             if (c == '{') {
                 ParseGroup();
@@ -907,7 +911,7 @@ private:
                 RestoreState();
                 int depth = 1;
                 while (_pos < _len && depth > 0) {
-                    if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+                    CheckIter();
                     char c = _rtf[_pos++];
                     if (c == '{') depth++;
                     else if (c == '}') depth--;
@@ -1101,7 +1105,7 @@ private:
         // {\colortbl ;\red255\green0\blue0;\red0\green128\blue0;}
         // Each ';' separates a color entry. First entry is "auto" (may be empty).
         while (_pos < _len && _rtf[_pos] != '}') {
-            if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+            CheckIter();
             SkipWhitespace();
 
             int r = 0, g = 0, b = 0;
@@ -1141,7 +1145,7 @@ private:
         //        {\f1\fswiss\fcharset0 Arial;}}
         // Each font entry is a group containing \fN and the family name
         while (_pos < _len && _rtf[_pos] != '}') {
-            if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+            CheckIter();
             if (_rtf[_pos] == '{') {
                 // Font entry group
                 _pos++;
@@ -1202,7 +1206,7 @@ private:
         _pictPiccropb = 0;
 
         while (_pos < _len && _rtf[_pos] != '}') {
-            if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+            CheckIter();
             if (_rtf[_pos] == '\\') {
                 ParsePictControl();
                 // Skip whitespace after control words
@@ -1262,7 +1266,7 @@ private:
         _ucStack.push_back(_currentUc);
 
         while (_pos < _len && _rtf[_pos] != '}') {
-            if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+            CheckIter();
 
             if (_rtf[_pos] == '{') {
                 // Parse sub-group
@@ -1293,7 +1297,7 @@ private:
                         // Unknown destination group — skip it
                         int depth = 1;
                         while (_pos < _len && depth > 0) {
-                            if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+            CheckIter();
                             char c = _rtf[_pos++];
                             if (c == '{') depth++;
                             else if (c == '}') depth--;
@@ -1303,7 +1307,7 @@ private:
                     // Unknown sub-group — skip it
                     int depth = 1;
                     while (_pos < _len && depth > 0) {
-                        if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+                        CheckIter();
                         char c = _rtf[_pos++];
                         if (c == '{') depth++;
                         else if (c == '}') depth--;
@@ -1354,7 +1358,7 @@ private:
         // Collect instruction text to extract HYPERLINK target
         std::string inst;
         while (_pos < _len && _rtf[_pos] != '}') {
-            if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+            CheckIter();
             if (_rtf[_pos] == '\\') {
                 // Collect escaped characters and control words
                 size_t start = _pos;
@@ -1465,7 +1469,7 @@ private:
 
     void ParseListtable() {
         while (_pos < _len && _rtf[_pos] != '}') {
-            if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+            CheckIter();
             if (_rtf[_pos] == '{') {
                 _pos++;
                 while (_pos < _len && _rtf[_pos] != '}') {
@@ -1617,16 +1621,10 @@ private:
     void FinalizeRun() {
         if (_literalText.empty()) return;
 
-        std::string trimmed = _literalText;
-
-        // Delimiter spaces are now consumed by the tokenizer, so
-        // _literalText only contains actual content. Don't trim.
-        _skipLeadingWsTrim = false;
-
         if (_inTableCell) {
-            _currentCellRuns.emplace_back(trimmed, _format);
+            _currentCellRuns.emplace_back(_literalText, _format);
         } else {
-            _currentParagraph.runs.emplace_back(trimmed, _format);
+            _currentParagraph.runs.emplace_back(_literalText, _format);
         }
         _literalText.clear();
     }

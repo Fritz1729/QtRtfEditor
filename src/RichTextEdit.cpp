@@ -87,7 +87,6 @@ int RichTextEdit::CodePage() const {
     return _codePage;
 }
 
-
 bool RichTextEdit::RangeHasProtected(int start, int end) const {
     if (start >= end) {
         return false;

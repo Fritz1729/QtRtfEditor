@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <variant>
@@ -12,21 +13,21 @@
 
 namespace Rte {
 
-static constexpr int UserPropProtect = 1000;
-static constexpr int UserPropUpOffset = 1004;
-static constexpr int UserPropDnOffset = 1005;
-static constexpr int UserPropLangId = 1006;
-static constexpr int UserPropParaDefaultFontIndex = 1007;
-static constexpr int UserPropParaDefaultTabStopTwips = 1008;
-static constexpr int UserPropHighlightIndex = 1009;
-static constexpr const char* UserPropMetaDefaultLangId = "rtf_meta_defaultLangId";
-static constexpr const char* UserPropMetaViewKind = "rtf_meta_viewKind";
-static constexpr const char* UserPropMetaUcByteCount = "rtf_meta_ucByteCount";
-static constexpr const char* UserPropMetaDefaultTabStopTwips = "rtf_meta_defaultTabStopTwips";
-static constexpr int UserPropBlockPntextRtf = 1010;
-static constexpr int UserPropUlStyle = 1011;
-static constexpr int UserPropUlColorIndex = 1012;
-static constexpr int UserPropSlMult = 1013;
+constexpr int UserPropProtect = 1000;
+constexpr int UserPropUpOffset = 1004;
+constexpr int UserPropDnOffset = 1005;
+constexpr int UserPropLangId = 1006;
+constexpr int UserPropParaDefaultFontIndex = 1007;
+constexpr int UserPropParaDefaultTabStopTwips = 1008;
+constexpr int UserPropHighlightIndex = 1009;
+constexpr const char* UserPropMetaDefaultLangId = "rtf_meta_defaultLangId";
+constexpr const char* UserPropMetaViewKind = "rtf_meta_viewKind";
+constexpr const char* UserPropMetaUcByteCount = "rtf_meta_ucByteCount";
+constexpr const char* UserPropMetaDefaultTabStopTwips = "rtf_meta_defaultTabStopTwips";
+constexpr int UserPropBlockPntextRtf = 1010;
+constexpr int UserPropUlStyle = 1011;
+constexpr int UserPropUlColorIndex = 1012;
+constexpr int UserPropSlMult = 1013;
 
 enum class UnderlineStyle : uint8_t {
     None,
@@ -323,5 +324,10 @@ inline ListStyle QtListStyleToRtf(QTextListFormat::Style style) {
         default:                                   return ListStyle::None;
     }
 }
+
+inline double TwipsToHalfPt(double twips) { return twips / 20.0; }
+inline double MarginTwipsToPoints(double twips) { return twips / 2.0; }
+inline int PointsToTwips(double pts) { return lround(pts * 20.0); }
+inline int PointsToHalfPtTwips(double pts) { return lround(pts * 2.0); }
 
 } // namespace Rte
