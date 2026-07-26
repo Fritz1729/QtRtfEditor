@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include <cstddef>
 #include <cstdint>
 
 namespace Rte {
@@ -32,17 +31,6 @@ struct RtfControl {
         FieldControl,
         SpecialChar,
         Unknown,
-    };
-
-    enum class FieldCtrlType : uint8_t {
-        FieldBegin,
-        FldInst,
-        FldRslt,
-        FldRsltPar,
-        FldRsltChr,
-        FldDirty,
-        FldEdit,
-        FldLock,
     };
 
     enum class CharProp : uint8_t {
@@ -89,15 +77,16 @@ struct RtfControl {
         RtfCaps caps;
         TabAlign tabAlign;
         TableCtrlWord tableCtrlWord;
-        FieldCtrlType fieldCtrlType;
         uint32_t specialChar;
     };
 
     Value value;
 };
 
-constexpr std::size_t kRtfControlTableSize = 166;
-
-extern const std::array<RtfControl, kRtfControlTableSize> rtfControlTable;
+/**
+ * @brief Look up a control by keyword. O(1) via static unordered_map.
+ * @return Pointer to the control entry, or nullptr if not found.
+ */
+const RtfControl* FindControl(const char* keyword);
 
 } // namespace Rte

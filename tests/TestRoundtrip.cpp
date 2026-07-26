@@ -5,12 +5,11 @@
 #include <QFile>
 #include <QApplication>
 #include <QVector>
-#include <chrono>
-#include <future>
 #include <optional>
 #include <stdexcept>
 #include "RtfCompare.h"
 #include "RtfParser.h"
+#include "TestUtils.h"
 
 using namespace Rte;
 
@@ -207,18 +206,9 @@ void TestRoundtrip::cleanupTestCase() {
 
 std::optional<RoundtripResult> TestRoundtrip::RunRoundtripWithTimeout(
         const std::string& original, const QString& filename) {
-    std::promise<RoundtripResult> promise;
-    std::future<RoundtripResult> future = promise.get_future();
-
-    std::thread t([original, pPromise = std::move(promise)]() mutable {
-        pPromise.set_value(RunRoundtrip(original));
-    });
-    t.detach();
-
-    if (future.wait_for(std::chrono::seconds(1)) != std::future_status::ready) {
-        return std::nullopt;
-    }
-    return future.get();
+    return RunWithTimeout([original]() {
+        return RunRoundtrip(original);
+    }, std::chrono::seconds(1));
 }
 
 static int CustomMain(int argc, char **argv) {

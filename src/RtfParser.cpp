@@ -78,10 +78,7 @@ private:
     }
 
     const RtfControl* FindControl(const char* word) const {
-        for (const RtfControl& ctrl : rtfControlTable) {
-            if (strcmp(word, ctrl.keyword) == 0) return &ctrl;
-        }
-        return nullptr;
+        return Rte::FindControl(word);
     }
 
     void Dispatch(const RtfControl& ctrl, int arg) {

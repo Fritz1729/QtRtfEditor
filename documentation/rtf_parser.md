@@ -45,7 +45,7 @@ Known table groups are detected by prefix matching after `{`:
 
 ### Control Word Dispatch
 
-The parser uses `FindControl()` (linear scan of `rtfControlTable`) to look up each control word, then calls `Dispatch()` which switches on the `Action` enum:
+The parser uses `FindControl()` (O(1) lookup via static `std::unordered_map`) to look up each control word, then calls `Dispatch()` which switches on the `Action` enum:
 
 | Action | Handler |
 |--------|---------|

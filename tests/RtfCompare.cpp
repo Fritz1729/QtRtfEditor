@@ -1,9 +1,8 @@
 #include "RtfCompare.h"
 #include "RtfParser.h"
+#include "TestUtils.h"
 
 #include <algorithm>
-#include <chrono>
-#include <future>
 #include <QFont>
 #include <string>
 #include <vector>
@@ -534,22 +533,17 @@ static std::pair<RtfCompareResult, std::string> DoCompareParse(
 }
 
 RtfCompareResult CompareRtf(const std::string& rtfA, const std::string& rtfB,
-                                  std::string& reason) {
-    std::promise<std::pair<RtfCompareResult, std::string>> promise;
-    std::future<std::pair<RtfCompareResult, std::string>> future = promise.get_future();
-
-    std::thread t([rtfA, rtfB, pPromise = std::move(promise)]() mutable {
-        pPromise.set_value(DoCompareParse(rtfA, rtfB));
-    });
-    t.detach();
-
-    if (future.wait_for(std::chrono::seconds(1)) != std::future_status::ready) {
+                              std::string& reason) {
+    auto result = RunWithTimeout([rtfA, rtfB]() {
+        return DoCompareParse(rtfA, rtfB);
+    }, std::chrono::seconds(1));
+    if (!result) {
         reason = "timeout (1s)";
         return RtfCompareResult::StructuralDiff;
     }
-    auto [result, localReason] = future.get();
+    auto [compareResult, localReason] = *result;
     reason = std::move(localReason);
-    return result;
+    return compareResult;
 }
 
 static const char* ImageFormatName(RtfImageFormat fmt) {

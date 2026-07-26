@@ -214,8 +214,7 @@ void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
 }
 
 void BuildImage(QTextCursor& cursor, const RtfImage& img,
-                        QTextDocument* document) {
-    static int imgCounter = 0;
+                        QTextDocument* document, int& imgCounter) {
     cursor.insertBlock();
 
     // Determine image size in pixels
@@ -240,7 +239,7 @@ void BuildImage(QTextCursor& cursor, const RtfImage& img,
     heightPx *= img.picscaley / 100.0;
 
     // Register image as resource
-    imgCounter++;
+    ++imgCounter;
     const char* ext = "";
     switch (img.format) {
         case Rte::RtfImageFormat::Jpeg: ext = "jpg"; break;
@@ -443,6 +442,7 @@ void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
     document->setDefaultFont(defaultFont);
 
     QTextCursor cursor(document);
+    int imgCounter = 0;
     int prevListId = 0;
     int prevListLevel = -1;
     bool inList = false;
@@ -460,7 +460,7 @@ void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
                 tableRows.push_back(&element);
             } else if constexpr (std::is_same_v<T, RtfImage>) {
                 FlushTableRows(cursor, tableRows, doc, defaultFont);
-                BuildImage(cursor, element, document);
+                BuildImage(cursor, element, document, imgCounter);
             }
         }, elem);
     }

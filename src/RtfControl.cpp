@@ -1,5 +1,8 @@
 #include "RtfControl.h"
 
+#include <string>
+#include <unordered_map>
+
 namespace Rte {
 
 using Action = RtfControl::Action;
@@ -11,7 +14,6 @@ using TabAlign = RtfControl::TabAlign;
 using UlStyle = RtfControl::RtfUlStyle;
 using Caps = RtfControl::RtfCaps;
 using TableCtrlWord = RtfControl::TableCtrlWord;
-using FieldCtrlType = RtfControl::FieldCtrlType;
 
 #define DATA(keyword, action, prop) \
     { keyword, action, { .raw = static_cast<int>(prop) } }
@@ -19,10 +21,10 @@ using FieldCtrlType = RtfControl::FieldCtrlType;
     { keyword, action, { .tabAlign = align } }
 #define DATA_TABLE(keyword, ctrlWord) \
     { keyword, Action::TableControlWord, { .tableCtrlWord = ctrlWord } }
-#define DATA_FIELD(keyword, ctrlType) \
-    { keyword, Action::FieldControl, { .fieldCtrlType = ctrlType } }
 #define DATA_SPECIAL(keyword, cp) \
     { keyword, Action::SpecialChar, { .specialChar = cp } }
+#define DATA_FIELD(keyword) \
+    { keyword, Action::FieldControl, { .raw = 0 } }
 
 constexpr RtfControl rtfControlTableEntries[] = {
     // Character toggles
@@ -212,15 +214,15 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA_TABLE("trbrdrr",   TableCtrlWord::TrBorderRight),
     DATA_TABLE("trbrdrb",   TableCtrlWord::TrBorderBottom),
 
-    // Field controls (\field, \fldinst, \fldrslt)
-    DATA_FIELD("field",     FieldCtrlType::FieldBegin),
-    DATA_FIELD("fldinst",   FieldCtrlType::FldInst),
-    DATA_FIELD("fldrslt",   FieldCtrlType::FldRslt),
-    DATA_FIELD("fldrsltpar", FieldCtrlType::FldRsltPar),
-    DATA_FIELD("fldrsltchr", FieldCtrlType::FldRsltChr),
-    DATA_FIELD("flddirty",  FieldCtrlType::FldDirty),
-    DATA_FIELD("fldedit",   FieldCtrlType::FldEdit),
-    DATA_FIELD("fldlock",   FieldCtrlType::FldLock),
+    // Field controls — recognized in table, handled via string matching in ParseGroup
+    DATA_FIELD("field"),
+    DATA_FIELD("fldinst"),
+    DATA_FIELD("fldrslt"),
+    DATA_FIELD("fldrsltpar"),
+    DATA_FIELD("fldrsltchr"),
+    DATA_FIELD("flddirty"),
+    DATA_FIELD("fldedit"),
+    DATA_FIELD("fldlock"),
 
     // Special typographic characters (RE 2.0)
     DATA_SPECIAL("bullet",     0x2022),
@@ -233,10 +235,25 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA_SPECIAL("tab",        0x0009),
 };
 
-static_assert(std::size(rtfControlTableEntries) == kRtfControlTableSize,
-    "rtfControlTable entry count does not match kRtfControlTableSize in RtfControl.h");
+const std::array rtfControlTable = std::to_array(rtfControlTableEntries);
 
-const std::array<RtfControl, std::size(rtfControlTableEntries)> rtfControlTable =
-    std::to_array(rtfControlTableEntries);
+namespace {
+
+std::unordered_map<std::string, const RtfControl*> BuildControlMap() {
+    std::unordered_map<std::string, const RtfControl*> map;
+    map.reserve(rtfControlTable.size());
+    for (const RtfControl& ctrl : rtfControlTable) {
+        map[ctrl.keyword] = &ctrl;
+    }
+    return map;
+}
+
+} // namespace
+
+const RtfControl* FindControl(const char* keyword) {
+    static const auto& controlMap = BuildControlMap();
+    auto it = controlMap.find(keyword);
+    return (it != controlMap.end()) ? it->second : nullptr;
+}
 
 } // namespace Rte
