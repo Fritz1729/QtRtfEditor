@@ -33,10 +33,14 @@ The parser is implemented as `RtfParserImpl`, a private class. It uses a single-
 
 ### Group Handling
 
-Known table groups are detected by prefix matching after `{`:
+Known table groups are detected by prefix matching after `{`, along with special handling for `\field` and `\pntext` groups and star-prefixed destinations:
 
 | Group | Method | Behavior |
 |-------|--------|----------|
+| `\field` | `ParseField()` | Parse `HYPERLINK` field with `fldinst`/`fldrslt` sub-groups |
+| `\pntext` | Inline handler | Capture raw RTF fragment for roundtrip, parse content with `inPntext` flag |
+| `\*` (star) | `SkipGroup()` | Unknown star-prefixed destinations silently skipped per RTF spec |
+
 | `\colortbl` | `ParseColortbl()` | Parse `;\redN\greenN\blueN;` entries |
 | `\fonttbl` | `ParseFonttbl()` | Parse `{\fN\fcharsetN Family;}` entries |
 | `\pict` | `ParsePict()` | Extract hex-encoded image data and metadata |
@@ -73,6 +77,7 @@ The parser maintains several stacks for group-persistent state:
 | `_pendingTabAlignmentStack` | Tab alignment state |
 | `_deffStack` | Group-persistent `\deffN` |
 | `_deftabStack` | Group-persistent `\deftabN` |
+| `_ucStack` | Group-persistent `\ucN` |
 
 ### Table Parsing
 
@@ -104,7 +109,7 @@ Hex data is collected as literal characters (0-9, A-F, a-f), then decoded via `Q
 
 ### Unicode Escapes
 
-`\uNNN?` is handled with UTF-16 surrogate pair support: if the first value is a high surrogate (0xD800-0xDBFF), the parser reads a second `\uNNN` as the low surrogate and combines them into a single codepoint above U+FFFF.
+`\uNNN?` is handled with UTF-16 surrogate pair support: if the first value is a high surrogate (0xD800-0xDBFF), the parser reads a second `\uNNN` as the low surrogate and combines them into a single codepoint above U+FFFF. After emitting the codepoint, the parser skips `\ucN` fallback bytes (alternate ANSI encoding for backward compatibility).
 
 ### Special Handling
 
@@ -116,6 +121,10 @@ Hex data is collected as literal characters (0-9, A-F, a-f), then decoded via `Q
 | Paragraph flush | Initial empty paragraphs are suppressed; subsequent empties are preserved |
 | Trailing empty elements | `RemoveTrailingEmptyElements()` strips at end of parse |
 | Iteration limit | `kMaxIter = 10'000'000` prevents infinite loops |
+| Hyperlinks | `\field` groups with `HYPERLINK` in `fldinst`; extracts URL or `#Name` bookmark target |
+| List markers | `\pntext` group parsed with `inPntext` flag; raw RTF fragment captured in `RtfParagraph::pntextRtf` |
+| Star destinations | Unknown `{\*\word ...}` groups silently skipped via `SkipGroup()` |
+| Negative arguments | Control word arguments parsed with sign handling for negative values |
 
 ## Key Files
 

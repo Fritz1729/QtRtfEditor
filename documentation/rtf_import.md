@@ -62,6 +62,9 @@ ImportRtf()
 | `dnOffset` | `setProperty(UserPropDnOffset, N)` | Stored as user property |
 | `langId` | `setProperty(UserPropLangId, N)` | Stored as user property |
 | `ulColorIndex` | `setProperty(UserPropUlColorIndex, "R,G,B")` | Resolved RGB string for roundtrip |
+| `isAnchor` | `setAnchor(true)` | Hyperlink rendering |
+| `anchorHref` | `setAnchorHref(...)` | Hyperlink URL or `#Name` bookmark |
+| `highlightIndex` | `setProperty(UserPropHighlightIndex, N)` | Stored as user property |
 
 ## Paragraph Formatting
 
@@ -88,6 +91,10 @@ Lists are handled by tracking list state across paragraphs:
 3. If `listId == 0`, exit list context
 
 List style is mapped via `RtfListStyleToQt()` (Disc, Circle, Square, Decimal, LowerAlpha, LowerRoman).
+
+## Pntext Handling
+
+Runs with `inPntext = true` are skipped during body insertion — they represent structural list markers, not paragraph content. The raw `\pntext` RTF fragment from `RtfParagraph::pntextRtf` is stored as a block property (`UserPropBlockPntextRtf`) for roundtrip preservation.
 
 ## Table Handling
 

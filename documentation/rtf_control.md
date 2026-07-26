@@ -132,6 +132,15 @@ A `static_assert` in the .cpp file verifies the entry count matches `kRtfControl
 | `\listidN` | SetCharProp::ListId | Full roundtrip |
 | `\listlevelN` | SetParaProp::ListLevel | Full roundtrip |
 | `\listtable` | HeaderControl | Parser only (parsed, not exported) |
+| `\pntext` | HeaderControl | Full roundtrip (raw RTF fragment preserved) |
+
+### Hyperlinks
+
+| Control Word | Action | Status |
+|--------------|--------|--------|
+| `\field` | HeaderControl | Parser only (HYPERLINK fields only) |
+| `\*\fldinst` | HeaderControl | Parser only (extracts HYPERLINK target) |
+| `\*\fldrslt` | HeaderControl | Parser only (field result) |
 
 ### Group-Persistent
 
@@ -235,7 +244,7 @@ A `static_assert` in the .cpp file verifies the entry count matches `kRtfControl
 | `\v` | Cannot hide text while preserving layout in Qt |
 | `\rtlch` / `\ltrch` | No BIDI library |
 | `\sectd` | No Qt section/page layout API |
-| `\field` | Word-specific field codes (except `HYPERLINK`) |
+| `\field` | Word-specific field codes (`HYPERLINK` fields are supported) |
 | `\stylesheet` | Word style system |
 | `\object` | Windows COM embedding |
 | `\password` | No password support |

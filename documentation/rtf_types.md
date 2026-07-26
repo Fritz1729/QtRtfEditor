@@ -41,6 +41,7 @@ RtfParagraph : ParagraphFormatting {
     listLevel,                // list level (\listlevelN)
     listStyle,                // ListStyle enum
     listIndent,               // indent for list items
+    pntextRtf,                // original \pntext RTF fragment for roundtrip preservation
 };
 ```
 
@@ -93,6 +94,10 @@ RtfRunFormat {
     upOffset, dnOffset,       // \upN, \dnN (positional offset)
     ulColorIndex,             // \ulcN (underline color)
     langId,                   // \langN
+    highlightIndex,           // \highlightN
+    isAnchor,                 // hyperlink flag
+    anchorHref,               // hyperlink URL string (std::string)
+    inPntext,                 // inside \pntext group (list marker text)
 };
 ```
 
@@ -144,6 +149,7 @@ RtfFontEntry  { family (string), fcharset (int) };
 | `ListStyle` | None, Disc, Bullet, Box, Check, Number, Letter, Roman |
 | `BorderStyle` | None, Solid, Dashed |
 | `RtfImageFormat` | Jpeg, Png, Bmp, Unknown |
+| `TableSide` | Side_Left, Side_Top, Side_Right, Side_Bottom, Side_Undefined |
 
 ## User Properties
 

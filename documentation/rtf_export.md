@@ -82,12 +82,13 @@ Font family type hints: Arial -> `\fswiss`, Times New Roman -> `\froman`, Courie
 
 `BlockExportContext::ExportBlock()` serializes a single paragraph:
 
-1. Handle list group: `{\\listidN\\listlevel0 ...}`
-2. Emit `\pard` if paragraph formatting changed from last block
-3. Emit paragraph formatting: alignment, indents, spacing, line height, tab stops
-4. Handle group-persistent `\deffN` / `\deftabN` with scoped groups
-5. For each fragment, emit format changes as deltas from last-emitted format
-6. Emit `\par` (with group closers if deff/deftab groups were opened)
+1. Emit `\pntext` group from block property (`UserPropBlockPntextRtf`) if present
+2. Handle list group: `{\\listidN\\listlevel0 ...}`
+3. Emit `\pard` if paragraph formatting changed from last block
+4. Emit paragraph formatting: alignment, indents, spacing, line height, tab stops
+5. Handle group-persistent `\deffN` / `\deftabN` with scoped groups
+6. Scan fragments for anchor ranges, then emit format deltas with `\field` wrapping for hyperlinks
+7. Emit `\par` (with group closers if deff/deftab or field groups were opened)
 
 ### Format Delta Emission
 
@@ -117,6 +118,10 @@ The exporter tracks `lastEmitted` format state. For each fragment, it emits only
 ### Plain Reset
 
 When a paragraph ends with active formatting, the exporter emits `\plain` to reset all character formatting. This carries over the font index to the next paragraph (`carriedOverFormat.fontIndex`).
+
+## Hyperlink Export
+
+Before iterating fragments, the exporter scans the block for anchor ranges — contiguous fragments with `isAnchor() == true` sharing the same URL. Adjacent fragments with the same href are merged into a single range. During fragment iteration, entering an anchor range emits `{\\field{\\*\\fldinst HYPERLINK "URL"}{\\*\\fldrslt`, and exiting the range closes both `fldrslt` and `field` groups. Bookmark targets (`#Name`) are serialized as-is.
 
 ## Table Export
 
