@@ -183,6 +183,9 @@ static bool CompareFormatSemantic(const RtfRunFormat& fmtA, const RtfRunFormat& 
     if (fmtA.ulColorIndex != 0 || fmtB.ulColorIndex != 0) {
         if (ReportResolvedColorDiff(loc, "ulColorIndex", fmtA.ulColorIndex, fmtB.ulColorIndex, docA, docB, reason)) return false;
     }
+    if (fmtA.highlightIndex != 0 || fmtB.highlightIndex != 0) {
+        if (ReportIntDiff(loc, "highlightIndex", fmtA.highlightIndex, fmtB.highlightIndex, reason)) return false;
+    }
     if (ReportIntDiff(loc, "langId", fmtA.langId, fmtB.langId, reason)) return false;
     if (ReportBoolDiff(loc, "protected", fmtA.protected_, fmtB.protected_, reason)) return false;
     if (ReportBoolDiff(loc, "isAnchor", fmtA.isAnchor, fmtB.isAnchor, reason)) return false;
@@ -206,8 +209,7 @@ static RtfCompareResult CompareRunsSemantic(const std::vector<RtfRun>& runsA,
         return RtfCompareResult::StructuralDiff;
     }
 
-    // Walk both run lists, compare formats at each boundary.
-    // endA/endB track the absolute end position of each current run.
+    // Walk both run lists, compare formats at each boundary
     size_t idxA = 0, idxB = 0;
     size_t charPos = 0;
     size_t endA = runsA.empty() ? 0 : runsA[0].text.length();
@@ -490,6 +492,24 @@ RtfCompareResult CompareRtf(const RtfDocument& a, const RtfDocument& b,
                                  "/" + std::to_string(paraB.tabStops[t].alignment) + ")";
                         return RtfCompareResult::StructuralDiff;
                     }
+                }
+
+                // Compare pntext structural metadata
+                if (paraA.pntextRtf != paraB.pntextRtf) {
+                    if (!paraA.pntextRtf.empty() && paraB.pntextRtf.empty()) {
+                        reason = "Paragraph " + std::to_string(paraIdx) +
+                                 " \\pntext present in A but missing in B";
+                        return RtfCompareResult::StructuralDiff;
+                    }
+                    if (paraA.pntextRtf.empty() && !paraB.pntextRtf.empty()) {
+                        reason = "Paragraph " + std::to_string(paraIdx) +
+                                 " \\pntext missing in A but present in B";
+                        return RtfCompareResult::StructuralDiff;
+                    }
+                    reason = "Paragraph " + std::to_string(paraIdx) +
+                             " \\pntext content differs: '" + paraA.pntextRtf +
+                             "' vs '" + paraB.pntextRtf + "'";
+                    return RtfCompareResult::StructuralDiff;
                 }
 
                 if (CompareRunsSemantic(paraA.runs, paraB.runs, a, b,

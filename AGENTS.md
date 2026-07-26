@@ -2,7 +2,7 @@
 
 ## Build & Test
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build
+cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j$(nproc)
 ctest --output-on-failure --test-dir build -C Release
 ```
 Out-of-source into `build/`. Demo: `build/examples/demo/demo`.
@@ -61,7 +61,8 @@ Out-of-source into `build/`. Demo: `build/examples/demo/demo`.
 - **AI-assisted commits** — add a footer: `Co-developed-with: opencode (${MODEL})`
 
 ## Working Practices
-- **Never commit or push without explicit user approval.**
-- Before committing, show `git diff --stat`, summarize changes, present the commit message, and ask for review. Never push without approval.
-- Never change the user's design decisions without consultation.
+- **Do not commit or push without explicit user approval.**
+- Before committing, show `git diff --stat`, summarize changes, present the commit message, and ask for review. Do not push without approval.
+- Do not change the user's design decisions without consultation.
 - Report when design decisions hinder your work.
+- **Test-driven development:** before implementing a fix or feature, write the test first. Add [semantic comparison tests](documentation/tests.md#test-rtf-structural) to verify structural equivalence, and [roundtrip tests](documentation/tests.md#test-roundtrip) to verify that load-save cycles preserve document semantics.

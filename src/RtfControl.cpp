@@ -53,6 +53,8 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("expndtw",    Action::SetCharProp,      CharSetProp::Expnd),
     DATA("ulc",        Action::SetCharProp,      CharSetProp::UlColorIndex),
     DATA("ulc0",       Action::SetCharProp,      CharSetProp::UlColorIndex),
+    DATA("highlight",  Action::SetCharProp,      CharSetProp::HighlightIndex),
+    DATA("highlight0", Action::SetCharProp,      CharSetProp::HighlightIndex),
     DATA("lang",       Action::SetCharProp,      CharSetProp::LangId),
     DATA("chlang",     Action::SetCharProp,      CharSetProp::LangId),
     DATA("langfe",     Action::SetCharProp,      CharSetProp::LangId),
@@ -98,6 +100,7 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("liststyletype", Action::HeaderControl, 0),
     DATA("liststyle", Action::HeaderControl,   0),
     DATA("listname", Action::HeaderControl,    0),
+    DATA("pntext",   Action::HeaderControl,    0),
 
     // Underline styles
     DATA("uld",        Action::SetUlStyle, UlStyle::UlDotted),

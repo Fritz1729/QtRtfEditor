@@ -82,7 +82,8 @@ static bool IsFormatActive(const RtfRunFormat& fmt) {
         fmt.colorIndex > 0 || fmt.bgColorIndex > 0 ||
         fmt.underlineStyle != UnderlineStyle::None || fmt.strikeOut ||
         fmt.capitalization != Capitalization::None || fmt.kerning || fmt.protected_ ||
-        fmt.upOffset != 0 || fmt.dnOffset != 0 || fmt.langId != 0;
+        fmt.upOffset != 0 || fmt.dnOffset != 0 || fmt.langId != 0 ||
+        fmt.highlightIndex != 0;
 }
 
 static bool WritePlainTextOff(std::ostringstream& out, const RtfRunFormat& fmt) {
@@ -410,9 +411,7 @@ struct BlockExportContext {
 };
 
 void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, bool justAfterTable) {
-    QString text = block.text();
-    bool hasText = !text.trimmed().isEmpty();
-    if (!hasText) {
+    if (block.text().isEmpty()) {
         if (firstBlock || justAfterTable) {
             firstBlock = false;
             return;
@@ -437,6 +436,14 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
     }
 
     EmitParaFormattingIfNeeded(out, blockFmt, lastParaFmt, lastParaFmtSet);
+
+    // Emit \pntext group if the block has pntext content stored
+    {
+        QString pntext = blockFmt.property(UserPropBlockPntextRtf).toString();
+        if (!pntext.isEmpty()) {
+            out << "{\\pntext" << qPrintable(pntext) << "}";
+        }
+    }
 
     {
         int paraDeff = blockFmt.property(UserPropParaDefaultFontIndex).toInt();
@@ -591,6 +598,7 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
             cur.upOffset = charFmt.property(UserPropUpOffset).toInt();
             cur.dnOffset = charFmt.property(UserPropDnOffset).toInt();
             cur.langId = charFmt.property(UserPropLangId).toInt();
+            cur.highlightIndex = charFmt.property(UserPropHighlightIndex).toInt();
             {
                 qreal spacing = charFmt.fontLetterSpacing();
                 if (spacing > 0) {
@@ -628,6 +636,7 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
                 if (cur.upOffset != lastEmitted.upOffset) out << "\\up" << cur.upOffset << ' ';
                 if (cur.dnOffset != lastEmitted.dnOffset) out << "\\dn" << cur.dnOffset << ' ';
                 if (cur.langId != lastEmitted.langId) out << "\\lang" << cur.langId << ' ';
+                if (cur.highlightIndex != lastEmitted.highlightIndex) out << "\\highlight" << cur.highlightIndex << ' ';
 
                 lastEmitted = cur;
             }
@@ -946,7 +955,7 @@ std::string ExportRtf(const QTextDocument& document) {
                     int cellEndPos = cell.lastPosition();
                     bool first = true;
                     while (cellBlock.isValid() && cellBlock.position() < cellEndPos) {
-                        if (!cellBlock.text().trimmed().isEmpty()) {
+                        if (!cellBlock.text().isEmpty()) {
                             if (first) {
                                 out << "\\intbl";
                                 first = false;

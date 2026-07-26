@@ -142,6 +142,10 @@ private:
                 FinalizeRun();
                 _format.ulColorIndex = arg;
                 break;
+            case RtfControl::CharSetProp::HighlightIndex:
+                FinalizeRun();
+                _format.highlightIndex = arg;
+                break;
             case RtfControl::CharSetProp::LangId:
                 FinalizeRun();
                 _format.langId = arg;
@@ -639,19 +643,41 @@ private:
         _currentParagraph = {};
     }
 
+    static bool ParagraphIsEmpty(const RtfParagraph& p) {
+        for (const RtfRun& r : p.runs) {
+            if (!r.text.empty()) return false;
+        }
+        return true;
+    }
+
     static bool ParagraphHasNonWhitespaceContent(const RtfParagraph& p) {
         for (const RtfRun& r : p.runs) {
-            QString text(QString::fromUtf8(r.text.data(), static_cast<int>(r.text.size())));
-            if (!text.trimmed().isEmpty()) return true;
+            if (!r.text.empty()) {
+                for (char c : r.text) {
+                    if (!std::isspace(static_cast<unsigned char>(c))) return true;
+                }
+            }
         }
         return false;
+    }
+
+    static bool TableRowIsEmpty(const RtfTableRowEntry& r) {
+        for (const auto& [runs, _] : r.cells) {
+            for (const RtfRun& run : runs) {
+                if (!run.text.empty()) return false;
+            }
+        }
+        return true;
     }
 
     static bool ParagraphHasNonWhitespaceContent(const RtfTableRowEntry& r) {
         for (const auto& [runs, _] : r.cells) {
             for (const RtfRun& run : runs) {
-                QString text(QString::fromUtf8(run.text.data(), static_cast<int>(run.text.size())));
-                if (!text.trimmed().isEmpty()) return true;
+                if (!run.text.empty()) {
+                    for (char c : run.text) {
+                        if (!std::isspace(static_cast<unsigned char>(c))) return true;
+                    }
+                }
             }
         }
         return false;
@@ -661,8 +687,8 @@ private:
         while (!_doc.elements.empty()) {
             bool hasText = std::visit([](const auto& elem) -> bool {
                 using T = std::decay_t<decltype(elem)>;
-                if constexpr (std::is_same_v<T, RtfParagraph>) return ParagraphHasNonWhitespaceContent(elem);
-                else if constexpr (std::is_same_v<T, RtfTableRowEntry>) return ParagraphHasNonWhitespaceContent(elem);
+                if constexpr (std::is_same_v<T, RtfParagraph>) return !ParagraphIsEmpty(elem);
+                else if constexpr (std::is_same_v<T, RtfTableRowEntry>) return !TableRowIsEmpty(elem);
                 else return true;
             }, _doc.elements.back());
             if (!hasText) {
@@ -690,6 +716,7 @@ private:
     bool _inFonttbl = false;
     bool _inPict = false;
     bool _inListtable = false;
+    bool _inPntext = false;
     std::map<int, ListStyle> _listIdToStyle;
     std::vector<ParagraphFormatting> _paraStateStack;
     std::vector<int> _pendingTabAlignmentStack;
@@ -833,6 +860,27 @@ private:
             SkipWhitespace();
             ParseField();
             // ParseField consumes the closing '}'
+            return;
+        }
+
+        if (_pos < _len && Matches("\\pntext")) {
+            // Capture raw RTF fragment for roundtrip preservation, then parse content normally
+            _pos += 7; // consume \pntext
+            while (_pos < _len && IsDigit(_rtf[_pos])) _pos++;
+            SkipWhitespace();
+            size_t fragStart = _pos;
+            _inPntext = true;
+            _format.inPntext = true;
+            Parse();
+            // Finalize pending pntext content as a run with inPntext=true
+            // before RestoreState() clears the flag
+            FinalizeRun();
+            _format.inPntext = false;
+            _inPntext = false;
+            std::string frag = _rtf.substr(fragStart, static_cast<size_t>(_pos - fragStart));
+            _currentParagraph.pntextRtf = frag;
+            // Consume closing '}'
+            if (_pos < _len && _rtf[_pos] == '}') _pos++;
             return;
         }
 
@@ -1002,7 +1050,11 @@ private:
         }
 
         ConsumeControlDelimiter(arg, hasArg);
-        if (word.empty()) return;
+        if (word.empty()) {
+            // Consume lone \* — RTF star modifier, no-op when not followed by a control word
+            if (_pos < _len && _rtf[_pos] == '*') _pos++;
+            return;
+        }
         ProcessControlWord(word, arg);
     }
 

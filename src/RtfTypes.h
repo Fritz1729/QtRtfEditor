@@ -18,10 +18,12 @@ static constexpr int UserPropDnOffset = 1005;
 static constexpr int UserPropLangId = 1006;
 static constexpr int UserPropParaDefaultFontIndex = 1007;
 static constexpr int UserPropParaDefaultTabStopTwips = 1008;
+static constexpr int UserPropHighlightIndex = 1009;
 static constexpr const char* UserPropMetaDefaultLangId = "rtf_meta_defaultLangId";
 static constexpr const char* UserPropMetaViewKind = "rtf_meta_viewKind";
 static constexpr const char* UserPropMetaUcByteCount = "rtf_meta_ucByteCount";
 static constexpr const char* UserPropMetaDefaultTabStopTwips = "rtf_meta_defaultTabStopTwips";
+static constexpr int UserPropBlockPntextRtf = 1010;
 
 enum class UnderlineStyle : uint8_t {
     None,
@@ -70,9 +72,11 @@ struct RtfRunFormat {
     int upOffset = 0;
     int dnOffset = 0;
     int ulColorIndex = 0;
+    int highlightIndex = 0;
     int langId = 0;
     bool isAnchor = false;
     std::string anchorHref;
+    bool inPntext = false;
 
     bool operator==(const RtfRunFormat& other) const = default;
 };
@@ -165,6 +169,9 @@ struct RtfParagraph : ParagraphFormatting {
     int listLevel = 0;
     ListStyle listStyle = ListStyle::None;
     int listIndent = 0;
+    // Original \pntext RTF fragment for structural roundtrip preservation.
+    // Empty when the paragraph has no \pntext group.
+    std::string pntextRtf;
 
     RtfParagraph() = default;
     explicit RtfParagraph(ParagraphFormatting fmt) : ParagraphFormatting(fmt) {}

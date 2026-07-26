@@ -27,6 +27,8 @@ namespace {
 static void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
                        const RtfDocument& doc, const QFont& defaultFont) {
     for (const RtfRun& run : runs) {
+        // Skip \pntext runs — content is structural list marker, not paragraph body
+        if (run.format.inPntext) continue;
         QTextCharFormat charFmt;
 
         if (run.format.fontSize > 0) {
@@ -111,6 +113,9 @@ static void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
         if (run.format.langId != 0) {
             charFmt.setProperty(UserPropLangId, run.format.langId);
         }
+        if (run.format.highlightIndex != 0) {
+            charFmt.setProperty(UserPropHighlightIndex, run.format.highlightIndex);
+        }
         if (run.format.isAnchor) {
             charFmt.setAnchor(true);
             charFmt.setAnchorHref(QString::fromStdString(run.format.anchorHref));
@@ -185,6 +190,9 @@ static void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
         QTextBlockFormat curFmt = cursor.blockFormat();
         curFmt.setProperty(UserPropParaDefaultFontIndex, para.defaultFontIndex);
         curFmt.setProperty(UserPropParaDefaultTabStopTwips, para.defaultTabStopTwips);
+        if (!para.pntextRtf.empty()) {
+            curFmt.setProperty(UserPropBlockPntextRtf, QString::fromLatin1(para.pntextRtf.c_str()));
+        }
         cursor.setBlockFormat(curFmt);
     }
     prevListId = para.listId;

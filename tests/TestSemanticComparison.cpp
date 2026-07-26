@@ -202,6 +202,15 @@ private slots:
     void RowBorderVsCellBorderDifferent();
     void DifferentBorderStyle();
 
+    // \pntext structural preservation
+    void DifferentPntext();
+
+    // \highlight structural preservation
+    void DifferentHighlight();
+
+    // Negative \fi (hanging indent)
+    void NegativeFirstLineIndent();
+
     void cleanupTestCase();
 
 private:
@@ -1234,6 +1243,30 @@ void TestSemanticComparison::HyperlinkWithBold() {
         }
     }
     QVERIFY(found);
+}
+
+void TestSemanticComparison::DifferentPntext() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\pntext\f0\'b7\tab}Bullet\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0 Bullet\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::DifferentHighlight() {
+    std::string rtfA = R"({\rtf1\ansi\deff0{\highlight3 Highlighted}\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\highlight1 Highlighted}\par})";
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
+void TestSemanticComparison::NegativeFirstLineIndent() {
+    auto doc = ParseRtf(R"({\rtf1\ansi\deff0\fi-200 Text\par})");
+    QCOMPARE(doc.elements.size(), 1u);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    QCOMPARE(para.firstLineIndent, -200);
 }
 
 void TestSemanticComparison::cleanupTestCase() {
