@@ -10,9 +10,9 @@
 namespace Rte {
 
 static RtfColorEntry ResolveColorFromTable(int idx, const RtfDocument& doc, bool* hasValue) {
-    *hasValue = idx >= 0 && idx < static_cast<int>(doc.colors.size());
-    if (*hasValue) return doc.colors[idx];
-    return {0, 0, 0};
+    const RtfColorEntry* col = ResolveColorEntry(idx, doc);
+    *hasValue = (col != nullptr);
+    return col ? *col : RtfColorEntry{0, 0, 0};
 }
 
 struct TableGroup {
@@ -58,30 +58,6 @@ static bool CompareField(size_t paraIdx, size_t runIdx, const char* name,
         return true;
     }
     return false;
-}
-
-static TableCellBorders NormalizeCellBorders(const TableCellBorders& cellBorders, const TableCellBorders& rowBorders) {
-    TableCellBorders normalized = cellBorders;
-    auto fillFromRow = [&](int& cellVal, int& cellColor, BorderStyle& cellStyle, int rowVal, int rowColor, BorderStyle rowStyle) {
-        if (cellVal <= 0 && cellStyle == BorderStyle::None) {
-            cellVal = rowVal;
-            cellColor = rowColor;
-            cellStyle = rowStyle;
-        }
-    };
-    fillFromRow(normalized.leftWidth, normalized.leftColor, normalized.leftStyle,
-                rowBorders.leftWidth, rowBorders.leftColor, rowBorders.leftStyle);
-    fillFromRow(normalized.topWidth, normalized.topColor, normalized.topStyle,
-                rowBorders.topWidth, rowBorders.topColor, rowBorders.topStyle);
-    fillFromRow(normalized.rightWidth, normalized.rightColor, normalized.rightStyle,
-                rowBorders.rightWidth, rowBorders.rightColor, rowBorders.rightStyle);
-    fillFromRow(normalized.bottomWidth, normalized.bottomColor, normalized.bottomStyle,
-                rowBorders.bottomWidth, rowBorders.bottomColor, rowBorders.bottomStyle);
-    return normalized;
-}
-
-static int EffectiveCellPadding(int cellPad, int rowPad) {
-    return (cellPad > 0 || rowPad > 0) ? std::max(cellPad, rowPad) : 0;
 }
 
 static std::string BuildRunLocation(const std::string& kind, size_t locIdx,

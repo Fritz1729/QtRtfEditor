@@ -152,6 +152,19 @@ struct TableCellBorders {
     bool operator==(const TableCellBorders& other) const = default;
 };
 
+struct TableCellBorderMember {
+    int TableCellBorders::*width;
+    BorderStyle TableCellBorders::*style;
+    int TableCellBorders::*color;
+};
+
+constexpr std::array<TableCellBorderMember, 4> kBorderMembers = {{
+    { &TableCellBorders::leftWidth,  &TableCellBorders::leftStyle,  &TableCellBorders::leftColor },
+    { &TableCellBorders::topWidth,   &TableCellBorders::topStyle,   &TableCellBorders::topColor },
+    { &TableCellBorders::rightWidth, &TableCellBorders::rightStyle, &TableCellBorders::rightColor },
+    { &TableCellBorders::bottomWidth,&TableCellBorders::bottomStyle,&TableCellBorders::bottomColor },
+}};
+
 struct TableCellFormat {
     int width = 0;
     int vertAlign = 0;
@@ -226,6 +239,10 @@ struct RtfColorEntry {
     bool operator==(const RtfColorEntry &) const = default;
 };
 
+inline int EffectiveCellPadding(int cellPad, int rowPad) {
+    return (cellPad > 0 || rowPad > 0) ? std::max(cellPad, rowPad) : 0;
+}
+
 struct RtfFontEntry {
     std::string family;
     int fcharset = 0;
@@ -245,6 +262,34 @@ struct RtfDocument {
     std::vector<std::variant<RtfParagraph, RtfTableRowEntry, RtfImage>> elements;
     std::vector<std::string> unknownTags;
 };
+
+inline const RtfColorEntry* ResolveColorEntry(int idx, const RtfDocument& doc) {
+    if (idx >= 0 && idx < static_cast<int>(doc.colors.size()))
+        return &doc.colors[idx];
+    return nullptr;
+}
+
+inline TableCellBorders NormalizeCellBorders(const TableCellBorders& cellBorders,
+                                                const TableCellBorders& rowBorders) {
+    TableCellBorders normalized = cellBorders;
+    auto FillFromRow = [&normalized](int& cellVal, int& cellColor, BorderStyle& cellStyle,
+                                     int rowVal, int rowColor, BorderStyle rowStyle) {
+        if (cellVal <= 0 && cellStyle == BorderStyle::None) {
+            cellVal = rowVal;
+            cellColor = rowColor;
+            cellStyle = rowStyle;
+        }
+    };
+    FillFromRow(normalized.leftWidth, normalized.leftColor, normalized.leftStyle,
+                rowBorders.leftWidth, rowBorders.leftColor, rowBorders.leftStyle);
+    FillFromRow(normalized.topWidth, normalized.topColor, normalized.topStyle,
+                rowBorders.topWidth, rowBorders.topColor, rowBorders.topStyle);
+    FillFromRow(normalized.rightWidth, normalized.rightColor, normalized.rightStyle,
+                rowBorders.rightWidth, rowBorders.rightColor, rowBorders.rightStyle);
+    FillFromRow(normalized.bottomWidth, normalized.bottomColor, normalized.bottomStyle,
+                rowBorders.bottomWidth, rowBorders.bottomColor, rowBorders.bottomStyle);
+    return normalized;
+}
 
 inline std::string AlignmentToString(int align) {
     switch (align) {

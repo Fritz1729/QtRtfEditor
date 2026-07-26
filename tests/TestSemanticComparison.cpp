@@ -9,6 +9,18 @@ using namespace Rte;
 
 namespace {
 
+void AssertRtfIdentical(const std::string& rtfA, const std::string& rtfB) {
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    QVERIFY(reason.empty());
+}
+
+void AssertRtfDifferent(const std::string& rtfA, const std::string& rtfB) {
+    std::string reason;
+    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    QVERIFY(!reason.empty());
+}
+
 QByteArray EncodeImage(int r, int g, int b, const char* format) {
     QByteArray data;
     QImage img(1, 1, QImage::Format_RGB32);
@@ -200,49 +212,37 @@ private slots:
 void TestSemanticComparison::IdenticalRtf() {
     std::string rtfA = R"({\rtf1\ansi\deff0 Hello\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Hello\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::IdenticalItalic() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\i Italic}\i0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\i Italic}\i0\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::IdenticalUnderline() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\ul Underlined}\ul0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\ul Underlined}\ul0\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentText() {
     std::string rtfA = R"({\rtf1\ansi\deff0 Hello\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 World\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentFormatting() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\b Bold}\b0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Bold\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentParagraphCount() {
     std::string rtfA = R"({\rtf1\ansi\deff0 One\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 One\par Two\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::SemanticColor() {
@@ -253,9 +253,7 @@ void TestSemanticComparison::SemanticColor() {
     std::string rtfB = R"({\rtf1\ansi\deff0
 {\colortbl ;\red0\green255\blue0;\red255\green0\blue0;}
 \cf2 Red\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::SemanticFont() {
@@ -267,152 +265,121 @@ void TestSemanticComparison::SemanticFont() {
 {\fonttbl{\f0\froman\fcharset0 Times;}
          {\f1\fswiss\fcharset0 Arial;}}
 \f1 Arial\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentAlignment() {
     std::string rtfA = R"({\rtf1\ansi\deff0\ql Left\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\qc Left\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentIndent() {
     std::string rtfA = R"({\rtf1\ansi\deff0\li500 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\li200 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentFirstLineIndent() {
     std::string rtfA = R"({\rtf1\ansi\deff0\fi500 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\fi200 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentSuperscript() {
     std::string rtfA = R"({\rtf1\ansi\deff0 H\super 2\super0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 H 2\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentSubscript() {
     std::string rtfA = R"({\rtf1\ansi\deff0 H\sub 2\sub0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 H 2\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentFontSize() {
     std::string rtfA = R"({\rtf1\ansi\deff0\f0\fs24 Small\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\f0\fs48 Large\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentItalic() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\i Italic}\i0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Italic\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentUnderline() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\ul Underlined}\ul0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Underlined\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentTab() {
     std::string rtfA = R"({\rtf1\ansi\deff0 One\tab Two\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 One  Two\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentTabStops() {
     std::string rtfA = R"({\rtf1\ansi\deff0\tx1000\tqc\tx2000\tx3000\tqr Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\tx1000\tx2000\tx3000\tx4000\tqc Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::TabAlignDecimalVsCenter() {
     std::string rtfA = R"({\rtf1\ansi\deff0\tqd\tx1000 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\tqc\tx1000 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::TabAlignDecimalVsRight() {
     std::string rtfA = R"({\rtf1\ansi\deff0\tqd\tx1000 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\tqr\tx1000 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::TabAlignDecimalVsLeft() {
     std::string rtfA = R"({\rtf1\ansi\deff0\tqd\tx1000 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\tx1000 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentJustification() {
     std::string rtfA = R"({\rtf1\ansi\deff0\ql Left\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\qj Justified\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentListStyle() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylenum\liststyletype3}}{\listid1\listlevel0 Item one\par}{\listid1\listlevel0 Item two\par}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylebulletsimple}}{\listid1\listlevel0 Item one\par}{\listid1\listlevel0 Item two\par}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentListIndent() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylenum\liststyletype3}}{\listid1\listlevel0\li200 Item one\par}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylenum\liststyletype3}}{\listid1\listlevel0\li400 Item one\par}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentListLevel() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylenum\liststyletype3}}{\listid1\listlevel0 Item\par}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylenum\liststyletype3}}{\listid1\listlevel1 Item\par}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentUlColor() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\colortbl ;\red255\green0\blue0;}{\ul\ulc1 Colored}\ul0\ulc0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\colortbl ;\red0\green255\blue0;}{\ul\ulc1 Colored}\ul0\ulc0\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentLangId() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\lang1033 English}\lang0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\lang1031 German}\lang0\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::ConsecutiveUlColorIndex() {
@@ -522,9 +489,7 @@ void TestSemanticComparison::ConsecutiveHighlightIndexWithText() {
 void TestSemanticComparison::DifferentStrike() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\strike Strike}\strike0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Strike\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentCb() {
@@ -534,121 +499,103 @@ void TestSemanticComparison::DifferentCb() {
     std::string rtfB = R"({\rtf1\ansi\deff0
 {\colortbl ;\red255\green0\blue0;\red0\green255\blue0;}
 \cb2 Green-bg\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentRightIndent() {
     std::string rtfA = R"({\rtf1\ansi\deff0\ri500 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\ri0 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentSpaceBefore() {
     std::string rtfA = R"({\rtf1\ansi\deff0\sb100 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\sb0 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentSpaceAfter() {
     std::string rtfA = R"({\rtf1\ansi\deff0\sa200 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\sa0 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentLineHeight() {
     std::string rtfA = R"({\rtf1\ansi\deff0\sl400 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\sl0 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::SlMultDifferent() {
     std::string rtfA = R"({\rtf1\ansi\deff0\slmult2 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\slmult1 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentCaps() {
     std::string rtfA = R"({\rtf1\ansi\deff0\caps Caps\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Caps\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentScaps() {
     std::string rtfA = R"({\rtf1\ansi\deff0\scaps SmallCaps\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 SmallCaps\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentUnderlineStyle() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\ul Underlined}\ul0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\uldash Dashed}\ul0\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentUnderlineThick() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\ul Underlined}\ul0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\ulth Thick}\ul0\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentUnderlineDbl() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\ul Underlined}\ul0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\uldb Double}\ul0\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentUp() {
     std::string rtfA = R"({\rtf1\ansi\deff0\up12 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\up6 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentDn() {
     std::string rtfA = R"({\rtf1\ansi\deff0\dn12 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\dn6 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentKerning() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\kerning Kerned}\kerning0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Kerned\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentExpnd() {
     std::string rtfA = R"({\rtf1\ansi\deff0\expnd20 Expanded\expnd0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Expanded\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentUnderlineDashDot() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\ul Underlined}\ul0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\uldashd DashDot}\ul0\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentUnderlineDashDotDot() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\ul Underlined}\ul0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\uldashdd DashDotDot}\ul0\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::UnderlineStyleIdentical() {
@@ -656,11 +603,10 @@ void TestSemanticComparison::UnderlineStyleIdentical() {
     std::string rtfDashDotDot = R"({\rtf1\ansi\deff0{\uldashdd DashDotDot}\ul0\par})";
     std::string rtfDbl = R"({\rtf1\ansi\deff0{\uldb Double}\ul0\par})";
     std::string rtfThick = R"({\rtf1\ansi\deff0{\ulth Thick}\ul0\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfDashDot, rtfDashDot, reason), RtfCompareResult::Identical);
-    QCOMPARE(CompareRtf(rtfDashDotDot, rtfDashDotDot, reason), RtfCompareResult::Identical);
-    QCOMPARE(CompareRtf(rtfDbl, rtfDbl, reason), RtfCompareResult::Identical);
-    QCOMPARE(CompareRtf(rtfThick, rtfThick, reason), RtfCompareResult::Identical);
+    AssertRtfIdentical(rtfDashDot, rtfDashDot);
+    AssertRtfIdentical(rtfDashDotDot, rtfDashDotDot);
+    AssertRtfIdentical(rtfDbl, rtfDbl);
+    AssertRtfIdentical(rtfThick, rtfThick);
 }
 
 void TestSemanticComparison::UnderlineAllStylesDistinct() {
@@ -671,15 +617,14 @@ void TestSemanticComparison::UnderlineAllStylesDistinct() {
     std::string rtfDashDotDot = R"({\rtf1\ansi\deff0{\uldashdd DashDotDot}\ul0\par})";
     std::string rtfDbl = R"({\rtf1\ansi\deff0{\uldb Double}\ul0\par})";
     std::string rtfThick = R"({\rtf1\ansi\deff0{\ulth Thick}\ul0\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfSolid, rtfDotted, reason), RtfCompareResult::StructuralDiff);
-    QCOMPARE(CompareRtf(rtfSolid, rtfDashed, reason), RtfCompareResult::StructuralDiff);
-    QCOMPARE(CompareRtf(rtfSolid, rtfDashDot, reason), RtfCompareResult::StructuralDiff);
-    QCOMPARE(CompareRtf(rtfSolid, rtfDashDotDot, reason), RtfCompareResult::StructuralDiff);
-    QCOMPARE(CompareRtf(rtfSolid, rtfDbl, reason), RtfCompareResult::StructuralDiff);
-    QCOMPARE(CompareRtf(rtfSolid, rtfThick, reason), RtfCompareResult::StructuralDiff);
-    QCOMPARE(CompareRtf(rtfDotted, rtfDashed, reason), RtfCompareResult::StructuralDiff);
-    QCOMPARE(CompareRtf(rtfDashDot, rtfDbl, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfSolid, rtfDotted);
+    AssertRtfDifferent(rtfSolid, rtfDashed);
+    AssertRtfDifferent(rtfSolid, rtfDashDot);
+    AssertRtfDifferent(rtfSolid, rtfDashDotDot);
+    AssertRtfDifferent(rtfSolid, rtfDbl);
+    AssertRtfDifferent(rtfSolid, rtfThick);
+    AssertRtfDifferent(rtfDotted, rtfDashed);
+    AssertRtfDifferent(rtfDashDot, rtfDbl);
 }
 
 void TestSemanticComparison::CbSemantic() {
@@ -689,9 +634,7 @@ void TestSemanticComparison::CbSemantic() {
     std::string rtfB = R"({\rtf1\ansi\deff0
 {\colortbl ;\red0\green0\blue0;\red128\green64\blue0;}
 \cb2 Orange\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentImageCount() {
@@ -711,8 +654,7 @@ void TestSemanticComparison::DifferentImageCount() {
     rtfB += QString::fromLatin1(png2.toHex().data()).toStdString();
     rtfB += R"(}\par})";
 
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentImageFormat() {
@@ -729,8 +671,7 @@ void TestSemanticComparison::DifferentImageFormat() {
     rtfB += QString::fromLatin1(bmpData.toHex().data()).toStdString();
     rtfB += R"(}\par})";
 
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentImageData() {
@@ -747,8 +688,7 @@ void TestSemanticComparison::DifferentImageData() {
     rtfB += QString::fromLatin1(png2.toHex().data()).toStdString();
     rtfB += R"(}\par})";
 
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::SemanticImageData() {
@@ -766,31 +706,26 @@ void TestSemanticComparison::SemanticImageData() {
     rtfB += hex;
     rtfB += R"(}\par})";
 
-    std::string reason;
     // Same image data → Identical (dimensions are not compared semantically)
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentProtect() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\protect Protected}\protect0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Protected\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::EmptyDocs() {
     std::string rtfA = R"({\rtf1\ansi\deff0})";
     std::string rtfB = R"({\rtf1\ansi\deff0})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::HeaderOnly() {
     std::string rtfA = R"({\rtf1\ansi\deff0})";
     std::string rtfB = R"({\rtf1\ansi\deff0\rtf1\ansi})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::UnknownTags() {
@@ -804,7 +739,6 @@ void TestSemanticComparison::UnknownTags() {
 void TestSemanticComparison::EscapedBackslash() {
     // \\ produces a literal backslash character
     std::string rtfA = R"({\rtf1\ansi\deff0 Path: C:\\Users\\test\par})";
-    std::string reason;
     auto doc = ParseRtf(rtfA);
     QVERIFY(doc.elements.size() >= 1);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
@@ -822,7 +756,6 @@ void TestSemanticComparison::EscapedBackslash() {
 void TestSemanticComparison::EscapedBackslashWithBraces() {
     // \\{ and \\} produce literal \{ and \} (not backslash + group delimiter)
     std::string rtfA = R"({\rtf1\ansi\deff0 Set: K[x]\\{0\\}\par})";
-    std::string reason;
     auto doc = ParseRtf(rtfA);
     QVERIFY(doc.elements.size() >= 1);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
@@ -842,8 +775,7 @@ void TestSemanticComparison::EscapedBackslashRoundtrip() {
     std::string rtfA = R"({\rtf1\ansi\deff0 Path: C:\\Users\\test\par})";
     auto doc = ParseRtf(rtfA);
     QVERIFY(doc.elements.size() >= 1);
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfA, reason), RtfCompareResult::Identical);
+    AssertRtfIdentical(rtfA, rtfA);
 }
 
 void TestSemanticComparison::EmptyParagraphsPreserved() {
@@ -913,8 +845,7 @@ void TestSemanticComparison::SemanticUlSynonyms() {
     // \ul ... \ul0 and \ul ... \ulnone must be semantically identical
     std::string rtfUl0 = R"({\rtf1\ansi\deff0{\ul Text}\ul0\par})";
     std::string rtfUlNone = R"({\rtf1\ansi\deff0{\ul Text}\ulnone\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfUl0, rtfUlNone, reason), RtfCompareResult::Identical);
+    AssertRtfIdentical(rtfUl0, rtfUlNone);
 }
 
 void TestSemanticComparison::UcSkipChars() {
@@ -988,81 +919,61 @@ void TestSemanticComparison::NegativeArgUnicode() {
 void TestSemanticComparison::DifferentTableRowCount() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \intbl B\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \intbl B\cell \row}{\trowd \cellx2000 \cellx4000 \intbl C\cell \intbl D\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentTableColCount() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \intbl A\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \intbl B\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentTableCellText() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \intbl B\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl X\cell \intbl Y\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentTableCellWidth() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \intbl B\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx3000 \cellx6000 \intbl A\cell \intbl B\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentCellVertAlign() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clvertalt \intbl A\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clvertalb \intbl A\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentCellBorders() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clbrdrl\brdrs\brdrw10 \intbl A\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clbrdrl\brdrs\brdrw20 \intbl A\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::TableWithEmptyCell() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::TableWithFormatting() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl {\b Bold}\b0 \cell \intbl Normal\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl Normal\cell \intbl Normal\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentCellShading() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clshdn1 \intbl A\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clshdn2 \intbl A\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentCellShadingVsNoShading() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clshdn1 \intbl A\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \intbl A\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::TableOrderingParagraphTableParagraph() {
@@ -1088,116 +999,88 @@ void TestSemanticComparison::TableOrderingPTPTP() {
 void TestSemanticComparison::DifferentCellPadding() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clpadl100 \intbl A\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clpadl200 \intbl A\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentRowPadding() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \trpaddl100 \intbl A\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \trpaddl200 \intbl A\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::SemanticPaddingCellVsRow() {
     // Same effective padding: cell-level vs row-level
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \trpaddl100 \intbl A\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clpadl100 \intbl A\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentTableAlignment() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \trql \cellx2000 \intbl A\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \trqc \cellx2000 \intbl A\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::RowBorderVsCellBorderSame() {
     // Row border and cell border produce same effective border
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \trbrdrl\brdrs\brdrw10 \cellx2000 \intbl A\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clbrdrl\brdrs\brdrw10 \intbl A\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::RowBorderVsCellBorderDifferent() {
     // Row border vs different cell border
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \trbrdrl\brdrs\brdrw10 \cellx2000 \intbl A\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clbrdrl\brdrs\brdrw20 \intbl A\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentBorderStyle() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clbrdrl\brdrs\brdrw10 \intbl A\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clbrdrl\brdrd\brdrw10 \intbl A\cell \row}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentDeflang() {
     std::string rtfA = R"({\rtf1\ansi\deff0\deflang1031 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\deflang1033 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentViewKind() {
     std::string rtfA = R"({\rtf1\ansi\deff0\viewkind4 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\viewkind3 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentUcByteCount() {
     std::string rtfA = R"({\rtf1\ansi\deff0\uc1 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\uc2 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::SemanticPlainVsManualReset() {
     std::string rtfA = R"({\rtf1\ansi\deff0\b Bold\i Italic\super Sup\plain Normal\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\b Bold\i Italic\super Sup\b0\i0\super0 Normal\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::SemanticPardVsManualReset() {
     std::string rtfA = R"({\rtf1\ansi\deff0\li500\qc Centered\pard\ql Left\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\li500\qc Centered\pard\ql Left\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentDeff() {
     std::string rtfA = R"({\rtf1\ansi\deff0 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff1 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::IdenticalDeff() {
     std::string rtfA = R"({\rtf1\ansi\deff0 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DeffGroupPersistent() {
@@ -1205,53 +1088,41 @@ void TestSemanticComparison::DeffGroupPersistent() {
     // Both have \deff1 in subgroup, so both paragraphs should have defaultFontIndex=1
     std::string rtfA = R"({\rtf1\ansi\deff0\pard\plain\f0 Outside\par {\deff1\pard\plain\f1 Inside\par}})";
     std::string rtfB = R"({\rtf1\ansi\deff0\pard\plain\f0 Outside\par {\deff1\pard\plain\f0 Inside\par}})";
-    std::string reason;
     // defaultFontIndex is the same (1) for both — the \f1 vs \f0 affects run font, not paragraph default
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DeffNestedGroupReverted() {
     // Nested group reverts to outer \deff
     std::string rtfA = R"({\rtf1\ansi\deff0 {\deff1 {\deff2\pard\plain\f2 Deep\par}\pard\plain\f1 Mid\par}\pard\plain\f0 Outer\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 {\deff1 {\deff2\pard\plain\f2 Deep\par}\pard\plain\f1 Mid\par}\pard\plain\f0 Outer\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentDeftab() {
     std::string rtfA = R"({\rtf1\ansi\deff0\deftab180 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\deftab360 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::IdenticalDeftab() {
     std::string rtfA = R"({\rtf1\ansi\deff0\deftab720 Text\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\deftab720 Text\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DeftabGroupPersistent() {
     // \deftab in subgroup affects paragraphs inside the subgroup
     std::string rtfA = R"({\rtf1\ansi\deff0\deftab180\pard\plain Outside\par {\deftab720\pard\plain Inside\par}})";
     std::string rtfB = R"({\rtf1\ansi\deff0\deftab180\pard\plain Outside\par {\deftab360\pard\plain Inside\par}})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DeftabNestedGroupReverted() {
     // Nested group reverts to outer \deftab
     std::string rtfA = R"({\rtf1\ansi\deff0\deftab180 {\deftab360 {\deftab540\pard\plain Deep\par}\pard\plain Mid\par}\pard\plain Outer\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0\deftab180 {\deftab360 {\deftab540\pard\plain Deep\par}\pard\plain Mid\par}\pard\plain Outer\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::HyperlinkExternalUrl() {
@@ -1295,18 +1166,14 @@ void TestSemanticComparison::HyperlinkIdentical() {
     // Two RTF with same hyperlink should be identical
     std::string rtfA = R"({\rtf1\ansi\deff0{\field{\*\fldinst HYPERLINK "https://example.com"}{\*\fldrslt Link text}}\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\field{\*\fldinst HYPERLINK "https://example.com"}{\*\fldrslt Link text}}\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::HyperlinkDifferentUrl() {
     // Different URLs should be detected as different
     std::string rtfA = R"({\rtf1\ansi\deff0{\field{\*\fldinst HYPERLINK "https://example.com"}{\*\fldrslt Link}}\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\field{\*\fldinst HYPERLINK "https://other.com"}{\*\fldrslt Link}}\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::HyperlinkWithBold() {
@@ -1330,9 +1197,7 @@ void TestSemanticComparison::HyperlinkWithBold() {
 void TestSemanticComparison::DifferentPntext() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\pntext\f0\'b7\tab}Bullet\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Bullet\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentHighlight() {
@@ -1343,9 +1208,7 @@ void TestSemanticComparison::DifferentHighlight() {
     std::string rtfB = R"({\rtf1\ansi\deff0
 {\colortbl ;\red0\green255\blue0;}
 {\highlight1 Highlighted}\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::StructuralDiff);
-    QVERIFY(!reason.empty());
+    AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::SemanticHighlight() {
@@ -1356,9 +1219,7 @@ void TestSemanticComparison::SemanticHighlight() {
     std::string rtfB = R"({\rtf1\ansi\deff0
 {\colortbl ;\red0\green255\blue0;\red255\green0\blue0;}
 {\highlight2 Highlighted}\par})";
-    std::string reason;
-    QCOMPARE(CompareRtf(rtfA, rtfB, reason), RtfCompareResult::Identical);
-    QVERIFY(reason.empty());
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::NegativeFirstLineIndent() {

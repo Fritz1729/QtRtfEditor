@@ -26,11 +26,8 @@ namespace Rte {
 namespace {
 
 QColor ResolveColor(int idx, const RtfDocument& doc) {
-    if (idx >= 0 && idx < static_cast<int>(doc.colors.size())) {
-        const RtfColorEntry& col = doc.colors[idx];
-        return QColor(col.red, col.green, col.blue);
-    }
-    return QColor();
+    const RtfColorEntry* col = ResolveColorEntry(idx, doc);
+    return col ? QColor(col->red, col->green, col->blue) : QColor();
 }
 
 void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
@@ -292,25 +289,9 @@ constexpr std::array<BorderBrushSetter, 4> kBorderBrushSetters = {{
     &QTextTableCellFormat::setRightBorderBrush, &QTextTableCellFormat::setBottomBorderBrush,
 }};
 
-struct TableCellBorderMember {
-    int TableCellBorders::*width;
-    BorderStyle TableCellBorders::*style;
-    int TableCellBorders::*color;
-};
-
-constexpr std::array<TableCellBorderMember, 4> kBorderMembers = {{
-    { &TableCellBorders::leftWidth,  &TableCellBorders::leftStyle,  &TableCellBorders::leftColor },
-    { &TableCellBorders::topWidth,   &TableCellBorders::topStyle,   &TableCellBorders::topColor },
-    { &TableCellBorders::rightWidth, &TableCellBorders::rightStyle, &TableCellBorders::rightColor },
-    { &TableCellBorders::bottomWidth,&TableCellBorders::bottomStyle,&TableCellBorders::bottomColor },
-}};
-
 QColor ResolveBorderColor(int colorIdx, const RtfDocument& doc) {
-    if (colorIdx > 0 && colorIdx < static_cast<int>(doc.colors.size())) {
-        const RtfColorEntry& col = doc.colors[colorIdx];
-        return QColor(col.red, col.green, col.blue);
-    }
-    return QColor();
+    const RtfColorEntry* col = ResolveColorEntry(colorIdx, doc);
+    return col && colorIdx > 0 ? QColor(col->red, col->green, col->blue) : QColor();
 }
 
 void ApplyBorderToCellFormat(QTextTableCellFormat& cellFmt, TableSide side,
@@ -330,7 +311,8 @@ void ApplyBorderToCellFormat(QTextTableCellFormat& cellFmt, TableSide side,
 }
 
 double ComputeEffectivePadding(int cellPad, int rowPad) {
-    return (cellPad > 0 || rowPad > 0) ? MarginTwipsToPoints(std::max(cellPad, rowPad)) : 0.0;
+    int eff = EffectiveCellPadding(cellPad, rowPad);
+    return eff > 0 ? MarginTwipsToPoints(eff) : 0.0;
 }
 
 void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEntry*>& tableRows,

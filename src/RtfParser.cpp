@@ -14,6 +14,42 @@ namespace Rte {
 
 namespace {
 
+static_assert(static_cast<int>(RtfControl::TableCtrlWord::ClVertAlignCenter) -
+              static_cast<int>(RtfControl::TableCtrlWord::ClVertAlignTop) == 1);
+static_assert(static_cast<int>(RtfControl::TableCtrlWord::ClVertAlignBottom) -
+              static_cast<int>(RtfControl::TableCtrlWord::ClVertAlignCenter) == 1);
+static_assert(static_cast<int>(RtfControl::TableCtrlWord::TrAlignCenter) -
+              static_cast<int>(RtfControl::TableCtrlWord::TrAlignLeft) == 1);
+static_assert(static_cast<int>(RtfControl::TableCtrlWord::TrAlignRight) -
+              static_cast<int>(RtfControl::TableCtrlWord::TrAlignCenter) == 1);
+
+constexpr TableSide CtrlWordToSide(RtfControl::TableCtrlWord ctrl) {
+    switch (ctrl) {
+        case RtfControl::TableCtrlWord::ClBorderLeft:
+        case RtfControl::TableCtrlWord::ClPadLeft:
+        case RtfControl::TableCtrlWord::TrPadLeft:
+        case RtfControl::TableCtrlWord::TrBorderLeft:
+            return Side_Left;
+        case RtfControl::TableCtrlWord::ClBorderTop:
+        case RtfControl::TableCtrlWord::ClPadTop:
+        case RtfControl::TableCtrlWord::TrPadTop:
+        case RtfControl::TableCtrlWord::TrBorderTop:
+            return Side_Top;
+        case RtfControl::TableCtrlWord::ClBorderRight:
+        case RtfControl::TableCtrlWord::ClPadRight:
+        case RtfControl::TableCtrlWord::TrPadRight:
+        case RtfControl::TableCtrlWord::TrBorderRight:
+            return Side_Right;
+        case RtfControl::TableCtrlWord::ClBorderBottom:
+        case RtfControl::TableCtrlWord::ClPadBottom:
+        case RtfControl::TableCtrlWord::TrPadBottom:
+        case RtfControl::TableCtrlWord::TrBorderBottom:
+            return Side_Bottom;
+        default:
+            return Side_Undefined;
+    }
+}
+
 class RtfParserImpl {
 public:
 
@@ -434,31 +470,17 @@ private:
             break;
 
         case RtfControl::TableCtrlWord::ClVertAlignTop:
-            _currentCellFormat.vertAlign = 0;
-            break;
-
         case RtfControl::TableCtrlWord::ClVertAlignCenter:
-            _currentCellFormat.vertAlign = 1;
-            break;
-
         case RtfControl::TableCtrlWord::ClVertAlignBottom:
-            _currentCellFormat.vertAlign = 2;
+            _currentCellFormat.vertAlign = static_cast<int>(ctrl.value.tableCtrlWord) -
+                static_cast<int>(RtfControl::TableCtrlWord::ClVertAlignTop);
             break;
 
         case RtfControl::TableCtrlWord::ClBorderLeft:
-            BeginBorderSide(Side_Left, false);
-            break;
-
         case RtfControl::TableCtrlWord::ClBorderTop:
-            BeginBorderSide(Side_Top, false);
-            break;
-
         case RtfControl::TableCtrlWord::ClBorderRight:
-            BeginBorderSide(Side_Right, false);
-            break;
-
         case RtfControl::TableCtrlWord::ClBorderBottom:
-            BeginBorderSide(Side_Bottom, false);
+            BeginBorderSide(CtrlWordToSide(ctrl.value.tableCtrlWord), false);
             break;
 
         case RtfControl::TableCtrlWord::BrdrSolid:
@@ -485,41 +507,28 @@ private:
             break;
 
         case RtfControl::TableCtrlWord::ClPadLeft:
-            if (arg >= 0) _currentCellFormat.padding[Side_Left] = arg;
-            break;
         case RtfControl::TableCtrlWord::ClPadTop:
-            if (arg >= 0) _currentCellFormat.padding[Side_Top] = arg;
-            break;
         case RtfControl::TableCtrlWord::ClPadRight:
-            if (arg >= 0) _currentCellFormat.padding[Side_Right] = arg;
-            break;
         case RtfControl::TableCtrlWord::ClPadBottom:
-            if (arg >= 0) _currentCellFormat.padding[Side_Bottom] = arg;
+            if (arg >= 0) {
+                _currentCellFormat.padding[CtrlWordToSide(ctrl.value.tableCtrlWord)] = arg;
+            }
             break;
 
         case RtfControl::TableCtrlWord::TrPadLeft:
-            if (arg >= 0) _currentRow.rowPadding[Side_Left] = arg;
-            break;
         case RtfControl::TableCtrlWord::TrPadTop:
-            if (arg >= 0) _currentRow.rowPadding[Side_Top] = arg;
-            break;
         case RtfControl::TableCtrlWord::TrPadRight:
-            if (arg >= 0) _currentRow.rowPadding[Side_Right] = arg;
-            break;
         case RtfControl::TableCtrlWord::TrPadBottom:
-            if (arg >= 0) _currentRow.rowPadding[Side_Bottom] = arg;
+            if (arg >= 0) {
+                _currentRow.rowPadding[CtrlWordToSide(ctrl.value.tableCtrlWord)] = arg;
+            }
             break;
 
         case RtfControl::TableCtrlWord::TrAlignLeft:
-            _currentRow.tableAlignment = 0;
-            break;
-
         case RtfControl::TableCtrlWord::TrAlignCenter:
-            _currentRow.tableAlignment = 1;
-            break;
-
         case RtfControl::TableCtrlWord::TrAlignRight:
-            _currentRow.tableAlignment = 2;
+            _currentRow.tableAlignment = static_cast<int>(ctrl.value.tableCtrlWord) -
+                static_cast<int>(RtfControl::TableCtrlWord::TrAlignLeft);
             break;
 
         case RtfControl::TableCtrlWord::TrLeft:
@@ -531,19 +540,10 @@ private:
             break;
 
         case RtfControl::TableCtrlWord::TrBorderLeft:
-            BeginBorderSide(Side_Left, true);
-            break;
-
         case RtfControl::TableCtrlWord::TrBorderTop:
-            BeginBorderSide(Side_Top, true);
-            break;
-
         case RtfControl::TableCtrlWord::TrBorderRight:
-            BeginBorderSide(Side_Right, true);
-            break;
-
         case RtfControl::TableCtrlWord::TrBorderBottom:
-            BeginBorderSide(Side_Bottom, true);
+            BeginBorderSide(CtrlWordToSide(ctrl.value.tableCtrlWord), true);
             break;
         }
     }
@@ -553,29 +553,10 @@ private:
         auto& borders = _pendingBorderIsRow ? _currentRow.rowBorders : _currentCellFormat.borders;
         int style = _pendingBorderStyle;
         if (style == 0 && _pendingBorderWidth > 0) style = 1;
-        switch (_pendingBorderSide) {
-            case Side_Left:
-                borders.leftWidth = _pendingBorderWidth;
-                borders.leftColor = _pendingBorderColor;
-                borders.leftStyle = static_cast<BorderStyle>(style);
-                break;
-            case Side_Top:
-                borders.topWidth = _pendingBorderWidth;
-                borders.topColor = _pendingBorderColor;
-                borders.topStyle = static_cast<BorderStyle>(style);
-                break;
-            case Side_Right:
-                borders.rightWidth = _pendingBorderWidth;
-                borders.rightColor = _pendingBorderColor;
-                borders.rightStyle = static_cast<BorderStyle>(style);
-                break;
-            case Side_Bottom:
-                borders.bottomWidth = _pendingBorderWidth;
-                borders.bottomColor = _pendingBorderColor;
-                borders.bottomStyle = static_cast<BorderStyle>(style);
-                break;
-            default: throw std::runtime_error("unexpected TableSide");
-        }
+        const TableCellBorderMember& members = kBorderMembers[_pendingBorderSide];
+        borders.*(members.width) = _pendingBorderWidth;
+        borders.*(members.color) = _pendingBorderColor;
+        borders.*(members.style) = static_cast<BorderStyle>(style);
         ResetPendingBorder();
     }
 
