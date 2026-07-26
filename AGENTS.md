@@ -5,14 +5,14 @@
 cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j$(nproc)
 ctest --output-on-failure --test-dir build -C Release
 ```
-Out-of-source into `build/`. Demo: `build/examples/demo/demo`.
+Out-of-source into `build/`. Demo: `build/demo/demo`.
 
 **Windows/MSVC:** multi-config generator — always pass `--config Release` to `cmake --build` and `-C Release` to `ctest`, or tests won't find binaries.
 
 ## Structure
 - **`src/`** — `QtRtfEditor` static library. See [documentation](documentation/).
 - **`tests/`** — Three executables: `test_protected_ranges`, `test_rtf_structural`, `test_roundtrip`. See [Tests](documentation/tests.md).
-- **`examples/demo/`** — Minimal GUI demo.
+- **`demo/`** — Minimal GUI demo.
 - **`documentation/`** — Architecture docs. Not packaged.
 
 ## References

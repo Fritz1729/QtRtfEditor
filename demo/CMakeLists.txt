@@ -1,4 +1,4 @@
-# examples/demo/CMakeLists.txt
+# demo/CMakeLists.txt
 
 add_executable(demo
     main.cpp

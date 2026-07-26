@@ -32,6 +32,6 @@ endif()
 
 # --- Examples ---
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-    add_subdirectory(examples/demo)
+    add_subdirectory(demo)
 endif()
 

@@ -39,8 +39,8 @@ prepare() {
   tar -xzf archive.tar.gz -C "$srcdir" --strip-components=1
   rm archive.tar.gz
 
-  # Remove examples; keep tests/ for check() phase.
-  rm -rf "${srcdir:?}/examples"
+  # Remove demo; keep tests/ for check() phase.
+  rm -rf "${srcdir:?}/demo"
 
   # Replace root CMakeLists.txt with a minimal build-only version.
   # Also replace src/CMakeLists.txt with the library-specific version

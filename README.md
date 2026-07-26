@@ -32,7 +32,7 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 
 # Run demo
-./build/examples/demo/demo
+./build/demo/demo
 
 # Tests
 cd build
