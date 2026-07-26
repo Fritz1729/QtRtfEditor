@@ -4,6 +4,7 @@
 #include "RtfTypes.h"
 
 #include <algorithm>
+#include <array>
 #include <QTextDocument>
 #include <QTextCursor>
 #include <QTextCharFormat>
@@ -268,6 +269,44 @@ static void BuildImage(QTextCursor& cursor, const RtfImage& img,
     cursor.insertImage(imgFmt);
 }
 
+using PadSetter = void (QTextTableCellFormat::*)(double);
+using BorderSetter = void (QTextTableCellFormat::*)(double);
+using BorderStyleSetter = void (QTextTableCellFormat::*)(QTextFrameFormat::BorderStyle);
+using BorderBrushSetter = void (QTextTableCellFormat::*)(const QBrush&);
+
+static constexpr std::array<PadSetter, 4> kPadSetters = {{
+    &QTextTableCellFormat::setLeftPadding, &QTextTableCellFormat::setTopPadding,
+    &QTextTableCellFormat::setRightPadding, &QTextTableCellFormat::setBottomPadding,
+}};
+
+static constexpr std::array<BorderSetter, 4> kBorderSetters = {{
+    &QTextTableCellFormat::setLeftBorder, &QTextTableCellFormat::setTopBorder,
+    &QTextTableCellFormat::setRightBorder, &QTextTableCellFormat::setBottomBorder,
+}};
+
+static constexpr std::array<BorderStyleSetter, 4> kBorderStyleSetters = {{
+    &QTextTableCellFormat::setLeftBorderStyle, &QTextTableCellFormat::setTopBorderStyle,
+    &QTextTableCellFormat::setRightBorderStyle, &QTextTableCellFormat::setBottomBorderStyle,
+}};
+
+static constexpr std::array<BorderBrushSetter, 4> kBorderBrushSetters = {{
+    &QTextTableCellFormat::setLeftBorderBrush, &QTextTableCellFormat::setTopBorderBrush,
+    &QTextTableCellFormat::setRightBorderBrush, &QTextTableCellFormat::setBottomBorderBrush,
+}};
+
+struct TableCellBorderMember {
+    int TableCellBorders::*width;
+    BorderStyle TableCellBorders::*style;
+    int TableCellBorders::*color;
+};
+
+static constexpr std::array<TableCellBorderMember, 4> kBorderMembers = {{
+    { &TableCellBorders::leftWidth,  &TableCellBorders::leftStyle,  &TableCellBorders::leftColor },
+    { &TableCellBorders::topWidth,   &TableCellBorders::topStyle,   &TableCellBorders::topColor },
+    { &TableCellBorders::rightWidth, &TableCellBorders::rightStyle, &TableCellBorders::rightColor },
+    { &TableCellBorders::bottomWidth,&TableCellBorders::bottomStyle,&TableCellBorders::bottomColor },
+}};
+
 static QColor ResolveBorderColor(int colorIdx, const RtfDocument& doc) {
     if (colorIdx > 0 && colorIdx < static_cast<int>(doc.colors.size())) {
         const RtfColorEntry& col = doc.colors[colorIdx];
@@ -276,40 +315,20 @@ static QColor ResolveBorderColor(int colorIdx, const RtfDocument& doc) {
     return QColor();
 }
 
-static void ApplyBorderToCellFormat(QTextTableCellFormat& cellFmt, int side,
-                                     int width, BorderStyle style, int colorIdx, const RtfDocument& doc) {
+static void ApplyBorderToCellFormat(QTextTableCellFormat& cellFmt, TableSide side,
+                                      int width, BorderStyle style, int colorIdx, const RtfDocument& doc) {
     if (width <= 0) return;
-    double borderPt = MarginTwipsToPoints(width);
     QTextFrameFormat::BorderStyle qtStyle = QTextFrameFormat::BorderStyle_None;
     switch (style) {
         case BorderStyle::Dashed: qtStyle = QTextFrameFormat::BorderStyle_Dashed; break;
         case BorderStyle::Solid: qtStyle = QTextFrameFormat::BorderStyle_Solid; break;
         default: return;
     }
+    double borderPt = MarginTwipsToPoints(width);
     QColor color = ResolveBorderColor(colorIdx, doc);
-
-    switch (side) {
-        case 0:
-            cellFmt.setLeftBorder(borderPt);
-            cellFmt.setLeftBorderStyle(qtStyle);
-            if (color.isValid()) cellFmt.setLeftBorderBrush(color);
-            break;
-        case 1:
-            cellFmt.setTopBorder(borderPt);
-            cellFmt.setTopBorderStyle(qtStyle);
-            if (color.isValid()) cellFmt.setTopBorderBrush(color);
-            break;
-        case 2:
-            cellFmt.setRightBorder(borderPt);
-            cellFmt.setRightBorderStyle(qtStyle);
-            if (color.isValid()) cellFmt.setRightBorderBrush(color);
-            break;
-        case 3:
-            cellFmt.setBottomBorder(borderPt);
-            cellFmt.setBottomBorderStyle(qtStyle);
-            if (color.isValid()) cellFmt.setBottomBorderBrush(color);
-            break;
-    }
+    (cellFmt.*(kBorderSetters.at(side)))(borderPt);
+    (cellFmt.*(kBorderStyleSetters.at(side)))(qtStyle);
+    if (color.isValid()) (cellFmt.*(kBorderBrushSetters.at(side)))(QBrush(color));
 }
 
 static double ComputeEffectivePadding(int cellPad, int rowPad) {
@@ -368,36 +387,23 @@ static void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEnt
                 }
 
                 // Apply padding — cell padding takes precedence, fall back to row padding
-                if (cellData.leftPadding > 0 || rowEntry->rowLeftPadding > 0)
-                    cellFmt.setLeftPadding(ComputeEffectivePadding(cellData.leftPadding, rowEntry->rowLeftPadding));
-                if (cellData.rightPadding > 0 || rowEntry->rowRightPadding > 0)
-                    cellFmt.setRightPadding(ComputeEffectivePadding(cellData.rightPadding, rowEntry->rowRightPadding));
-                if (cellData.topPadding > 0 || rowEntry->rowTopPadding > 0)
-                    cellFmt.setTopPadding(ComputeEffectivePadding(cellData.topPadding, rowEntry->rowTopPadding));
-                if (cellData.bottomPadding > 0 || rowEntry->rowBottomPadding > 0)
-                    cellFmt.setBottomPadding(ComputeEffectivePadding(cellData.bottomPadding, rowEntry->rowBottomPadding));
+                for (TableSide side : kTableSides) {
+                    double effPad = ComputeEffectivePadding(cellData.padding[side], rowEntry->rowPadding[side]);
+                    if (effPad > 0) (cellFmt.*(kPadSetters[side]))(effPad);
+                }
 
                 // Apply cell borders
                 const auto& borders = cellData.borders;
                 // For each side, use cell border; if not set, inherit from row borders
-                for (int side = 0; side < 4; ++side) {
-                    int w, ci;
-                    BorderStyle s;
-                    switch (side) {
-                        case 0: w = borders.leftWidth; ci = borders.leftColor; s = borders.leftStyle; break;
-                        case 1: w = borders.topWidth; ci = borders.topColor; s = borders.topStyle; break;
-                        case 2: w = borders.rightWidth; ci = borders.rightColor; s = borders.rightStyle; break;
-                        default: w = borders.bottomWidth; ci = borders.bottomColor; s = borders.bottomStyle; break;
-                    }
+                for (TableSide side : kTableSides) {
+                    const auto& members = kBorderMembers[side];
+                    const int w = borders.*(members.width);
+                    const BorderStyle s = borders.*(members.style);
+                    const int ci = borders.*(members.color);
                     if (w <= 0 && s == BorderStyle::None) {
-                        // No cell border — try row border
                         const TableCellBorders& rb = rowEntry->rowBorders;
-                        switch (side) {
-                            case 0: ApplyBorderToCellFormat(cellFmt, side, rb.leftWidth, rb.leftStyle, rb.leftColor, doc); break;
-                            case 1: ApplyBorderToCellFormat(cellFmt, side, rb.topWidth, rb.topStyle, rb.topColor, doc); break;
-                            case 2: ApplyBorderToCellFormat(cellFmt, side, rb.rightWidth, rb.rightStyle, rb.rightColor, doc); break;
-                            default: ApplyBorderToCellFormat(cellFmt, side, rb.bottomWidth, rb.bottomStyle, rb.bottomColor, doc); break;
-                        }
+                        ApplyBorderToCellFormat(cellFmt, side,
+                            rb.*(members.width), rb.*(members.style), rb.*(members.color), doc);
                     } else {
                         ApplyBorderToCellFormat(cellFmt, side, w, s, ci, doc);
                     }
@@ -407,10 +413,11 @@ static void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEnt
             } else {
                 // Empty cell — apply row borders
                 const TableCellBorders& rb = rowEntry->rowBorders;
-                ApplyBorderToCellFormat(cellFmt, 0, rb.leftWidth, rb.leftStyle, rb.leftColor, doc);
-                ApplyBorderToCellFormat(cellFmt, 1, rb.topWidth, rb.topStyle, rb.topColor, doc);
-                ApplyBorderToCellFormat(cellFmt, 2, rb.rightWidth, rb.rightStyle, rb.rightColor, doc);
-                ApplyBorderToCellFormat(cellFmt, 3, rb.bottomWidth, rb.bottomStyle, rb.bottomColor, doc);
+                for (TableSide side : kTableSides) {
+                    const auto& members = kBorderMembers[side];
+                    ApplyBorderToCellFormat(cellFmt, side,
+                        rb.*(members.width), rb.*(members.style), rb.*(members.color), doc);
+                }
             }
             cell.setFormat(cellFmt);
         }

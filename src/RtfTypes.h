@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <string>
@@ -116,6 +117,18 @@ struct ParagraphFormatting {
     int defaultTabStopTwips = 180;  // \deftabN group-persistent per RTF 1.5/1.9.1 spec (180 = 1/8 inch)
 };
 
+enum TableSide : size_t {
+    Side_Left = 0,
+    Side_Top = 1,
+    Side_Right = 2,
+    Side_Bottom = 3,
+    Side_Undefined,
+};
+
+constexpr std::array<TableSide, 4> kTableSides = {{
+    Side_Left, Side_Top, Side_Right, Side_Bottom
+}};
+
 enum class BorderStyle : uint8_t {
     None = 0,
     Solid = 1,
@@ -144,10 +157,7 @@ struct TableCellFormat {
     int vertAlign = 0;
     int shadingColor = -1;
     TableCellBorders borders;
-    int topPadding = 0;
-    int leftPadding = 0;
-    int rightPadding = 0;
-    int bottomPadding = 0;
+    std::array<int, 4> padding = {0, 0, 0, 0};
 
     bool operator==(const TableCellFormat& other) const = default;
 };
@@ -156,10 +166,7 @@ struct RtfTableRowEntry {
     std::vector<int> cellxPositions;
     std::vector<std::pair<std::vector<RtfRun>, TableCellFormat>> cells;
     TableCellBorders rowBorders;
-    int rowLeftPadding = 0;
-    int rowRightPadding = 0;
-    int rowTopPadding = 0;
-    int rowBottomPadding = 0;
+    std::array<int, 4> rowPadding = {0, 0, 0, 0};
     int tableAlignment = 0;
     int tableLeftPosition = 0;
     int tableWidth = 0;

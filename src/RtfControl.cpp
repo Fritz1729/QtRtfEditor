@@ -21,6 +21,8 @@ using FieldCtrlType = RtfControl::FieldCtrlType;
     { keyword, Action::TableControlWord, { .tableCtrlWord = ctrlWord } }
 #define DATA_FIELD(keyword, ctrlType) \
     { keyword, Action::FieldControl, { .fieldCtrlType = ctrlType } }
+#define DATA_SPECIAL(keyword, cp) \
+    { keyword, Action::SpecialChar, { .specialChar = cp } }
 
 constexpr RtfControl rtfControlTableEntries[] = {
     // Character toggles
@@ -219,6 +221,16 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA_FIELD("flddirty",  FieldCtrlType::FldDirty),
     DATA_FIELD("fldedit",   FieldCtrlType::FldEdit),
     DATA_FIELD("fldlock",   FieldCtrlType::FldLock),
+
+    // Special typographic characters (RE 2.0)
+    DATA_SPECIAL("bullet",     0x2022),
+    DATA_SPECIAL("emdash",     0x2014),
+    DATA_SPECIAL("endash",     0x2013),
+    DATA_SPECIAL("lquote",     0x2018),
+    DATA_SPECIAL("rquote",     0x2019),
+    DATA_SPECIAL("ldblquote",  0x201C),
+    DATA_SPECIAL("rdblquote",  0x201D),
+    DATA_SPECIAL("tab",        0x0009),
 };
 
 static_assert(std::size(rtfControlTableEntries) == kRtfControlTableSize,

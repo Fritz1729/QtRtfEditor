@@ -392,24 +392,16 @@ static RtfCompareResult DoCompareDocuments(const RtfDocument& a, const RtfDocume
 
                     // Compare effective padding
                     {
-                        struct Pad { int top, left, right, bottom; };
-                        const Pad padA{
-                            EffectiveCellPadding(fmtA.topPadding, rowA.rowTopPadding),
-                            EffectiveCellPadding(fmtA.leftPadding, rowA.rowLeftPadding),
-                            EffectiveCellPadding(fmtA.rightPadding, rowA.rowRightPadding),
-                            EffectiveCellPadding(fmtA.bottomPadding, rowA.rowBottomPadding)
-                        };
-                        const Pad padB{
-                            EffectiveCellPadding(fmtB.topPadding, rowB.rowTopPadding),
-                            EffectiveCellPadding(fmtB.leftPadding, rowB.rowLeftPadding),
-                            EffectiveCellPadding(fmtB.rightPadding, rowB.rowRightPadding),
-                            EffectiveCellPadding(fmtB.bottomPadding, rowB.rowBottomPadding)
-                        };
-                        if (padA.top != padB.top || padA.left != padB.left ||
-                            padA.right != padB.right || padA.bottom != padB.bottom) {
+                        bool padDiff = false;
+                        for (TableSide side : kTableSides) {
+                            int effA = EffectiveCellPadding(fmtA.padding[side], rowA.rowPadding[side]);
+                            int effB = EffectiveCellPadding(fmtB.padding[side], rowB.rowPadding[side]);
+                            if (effA != effB) { padDiff = true; break; }
+                        }
+                        if (padDiff) {
                             reason = "Table " + std::to_string(tableIdxA) +
-                                     " row " + std::to_string(ri) +
-                                     " cell " + std::to_string(ci) + " padding differs";
+                                      " row " + std::to_string(ri) +
+                                      " cell " + std::to_string(ci) + " padding differs";
                             return RtfCompareResult::StructuralDiff;
                         }
                     }

@@ -2,7 +2,24 @@
 #include "RtfCompare.h"
 #include "RtfParser.h"
 
+#include <QImage>
+#include <QBuffer>
+
 using namespace Rte;
+
+namespace {
+
+QByteArray EncodeImage(int r, int g, int b, const char* format) {
+    QByteArray data;
+    QImage img(1, 1, QImage::Format_RGB32);
+    img.fill(qRgb(r, g, b));
+    QBuffer buf(&data);
+    buf.open(QIODevice::WriteOnly);
+    img.save(&buf, format);
+    return data;
+}
+
+} // namespace
 
 class TestSemanticComparison : public QObject {
     Q_OBJECT
@@ -57,9 +74,17 @@ private slots:
 
     // Underline color
     void DifferentUlColor();
+    void ConsecutiveUlColorIndex();
+    void ConsecutiveUlColorIndexWithText();
 
     // Language ID
     void DifferentLangId();
+    void ConsecutiveLangId();
+    void ConsecutiveLangIdWithText();
+
+    // Highlight index
+    void ConsecutiveHighlightIndex();
+    void ConsecutiveHighlightIndexWithText();
 
     // RE 2.0 — True positives (must detect differences)
     void DifferentStrike();
@@ -390,6 +415,110 @@ void TestSemanticComparison::DifferentLangId() {
     QVERIFY(!reason.empty());
 }
 
+void TestSemanticComparison::ConsecutiveUlColorIndex() {
+    // \ulc0\ulc1 — no intervening text — the format should be ulColorIndex=1
+    auto doc = ParseRtf(R"({\rtf1\ansi\deff0{\ul\ulc0\ulc1 Underlined}\ul0\ulc0\par})");
+    QVERIFY(doc.elements.size() >= 1);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    // Only one run with text "Underlined" and ulColorIndex=1
+    for (const auto& run : para.runs) {
+        if (!run.text.empty()) {
+            QCOMPARE(run.format.ulColorIndex, 1);
+        }
+    }
+}
+
+void TestSemanticComparison::ConsecutiveUlColorIndexWithText() {
+    // \ulc0 A\ulc1 B — two separate runs with different underline colors
+    auto doc = ParseRtf(R"({\rtf1\ansi\deff0{\ul\ulc0 A \ulc1 B}\ul0\ulc0\par})");
+    QVERIFY(doc.elements.size() >= 1);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    // Find runs with correct ulColorIndex
+    bool foundColor0 = false, foundColor1 = false;
+    for (const auto& run : para.runs) {
+        if (run.text.find('A') != std::string::npos && run.text.find('B') == std::string::npos) {
+            QCOMPARE(run.format.ulColorIndex, 0);
+            foundColor0 = true;
+        }
+        if (run.text.find('B') != std::string::npos) {
+            QCOMPARE(run.format.ulColorIndex, 1);
+            foundColor1 = true;
+        }
+    }
+    QVERIFY(foundColor0);
+    QVERIFY(foundColor1);
+}
+
+void TestSemanticComparison::ConsecutiveLangId() {
+    // \lang1033\lang2057 — no intervening text — the format should be langId=2057
+    auto doc = ParseRtf(R"({\rtf1\ansi\deff0{\lang1033\lang2057 English}\lang0\par})");
+    QVERIFY(doc.elements.size() >= 1);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    for (const auto& run : para.runs) {
+        if (!run.text.empty()) {
+            QCOMPARE(run.format.langId, 2057);
+        }
+    }
+}
+
+void TestSemanticComparison::ConsecutiveLangIdWithText() {
+    // \lang1033 A\lang2057 B — two separate runs with different language IDs
+    auto doc = ParseRtf(R"({\rtf1\ansi\deff0{\lang1033 US \lang2057 UK}\lang0\par})");
+    QVERIFY(doc.elements.size() >= 1);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    bool found1033 = false, found2057 = false;
+    for (const auto& run : para.runs) {
+        if (run.text.find("US") != std::string::npos && run.text.find("UK") == std::string::npos) {
+            QCOMPARE(run.format.langId, 1033);
+            found1033 = true;
+        }
+        if (run.text.find("UK") != std::string::npos) {
+            QCOMPARE(run.format.langId, 2057);
+            found2057 = true;
+        }
+    }
+    QVERIFY(found1033);
+    QVERIFY(found2057);
+}
+
+void TestSemanticComparison::ConsecutiveHighlightIndex() {
+    // \highlight0\highlight2 — no intervening text — the format should be highlightIndex=2
+    auto doc = ParseRtf(R"({\rtf1\ansi\deff0{\highlight0\highlight2 Highlighted}\highlight0\par})");
+    QVERIFY(doc.elements.size() >= 1);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    for (const auto& run : para.runs) {
+        if (!run.text.empty()) {
+            QCOMPARE(run.format.highlightIndex, 2);
+        }
+    }
+}
+
+void TestSemanticComparison::ConsecutiveHighlightIndexWithText() {
+    // \highlight1 A\highlight2 B — two separate runs with different highlight colors
+    auto doc = ParseRtf(R"({\rtf1\ansi\deff0{\highlight1 First \highlight2 Second}\highlight0\par})");
+    QVERIFY(doc.elements.size() >= 1);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    bool foundH1 = false, foundH2 = false;
+    for (const auto& run : para.runs) {
+        if (run.text.find("First") != std::string::npos && run.text.find("Second") == std::string::npos) {
+            QCOMPARE(run.format.highlightIndex, 1);
+            foundH1 = true;
+        }
+        if (run.text.find("Second") != std::string::npos) {
+            QCOMPARE(run.format.highlightIndex, 2);
+            foundH2 = true;
+        }
+    }
+    QVERIFY(foundH1);
+    QVERIFY(foundH2);
+}
+
 void TestSemanticComparison::DifferentStrike() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\strike Strike}\strike0\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Strike\par})";
@@ -566,14 +695,8 @@ void TestSemanticComparison::CbSemantic() {
 }
 
 void TestSemanticComparison::DifferentImageCount() {
-    // Create minimal 1x1 red PNG
-    QByteArray png1, png2;
-    {
-        QImage img(1, 1, QImage::Format_RGB32);
-        img.fill(qRgb(255, 0, 0));
-        QBuffer b1(&png1); b1.open(QIODevice::WriteOnly); img.save(&b1, "PNG");
-        QBuffer b2(&png2); b2.open(QIODevice::WriteOnly); img.save(&b2, "PNG");
-    }
+    const QByteArray png1 = EncodeImage(255, 0, 0, "PNG");
+    const QByteArray png2 = EncodeImage(255, 0, 0, "PNG");
 
     std::string rtfA = R"({\rtf1\ansi\deff0)";
     rtfA += "{\\pict\\pngblip ";
@@ -593,13 +716,8 @@ void TestSemanticComparison::DifferentImageCount() {
 }
 
 void TestSemanticComparison::DifferentImageFormat() {
-    QByteArray pngData, bmpData;
-    {
-        QImage img(1, 1, QImage::Format_RGB32);
-        img.fill(qRgb(255, 0, 0));
-        QBuffer b1(&pngData); b1.open(QIODevice::WriteOnly); img.save(&b1, "PNG");
-        QBuffer b2(&bmpData); b2.open(QIODevice::WriteOnly); img.save(&b2, "BMP");
-    }
+    const QByteArray pngData = EncodeImage(255, 0, 0, "PNG");
+    const QByteArray bmpData = EncodeImage(255, 0, 0, "BMP");
 
     std::string rtfA = R"({\rtf1\ansi\deff0)";
     rtfA += "{\\pict\\pngblip ";
@@ -616,16 +734,8 @@ void TestSemanticComparison::DifferentImageFormat() {
 }
 
 void TestSemanticComparison::DifferentImageData() {
-    QByteArray png1, png2;
-    {
-        QImage img1(1, 1, QImage::Format_RGB32);
-        img1.fill(qRgb(255, 0, 0));
-        QBuffer b1(&png1); b1.open(QIODevice::WriteOnly); img1.save(&b1, "PNG");
-
-        QImage img2(1, 1, QImage::Format_RGB32);
-        img2.fill(qRgb(0, 255, 0));
-        QBuffer b2(&png2); b2.open(QIODevice::WriteOnly); img2.save(&b2, "PNG");
-    }
+    const QByteArray png1 = EncodeImage(255, 0, 0, "PNG");
+    const QByteArray png2 = EncodeImage(0, 255, 0, "PNG");
 
     std::string rtfA = R"({\rtf1\ansi\deff0)";
     rtfA += "{\\pict\\pngblip ";
@@ -642,12 +752,7 @@ void TestSemanticComparison::DifferentImageData() {
 }
 
 void TestSemanticComparison::SemanticImageData() {
-    QByteArray pngData;
-    {
-        QImage img(1, 1, QImage::Format_RGB32);
-        img.fill(qRgb(255, 0, 0));
-        QBuffer b(&pngData); b.open(QIODevice::WriteOnly); img.save(&b, "PNG");
-    }
+    const QByteArray pngData = EncodeImage(255, 0, 0, "PNG");
 
     std::string hex = QString::fromLatin1(pngData.toHex().data()).toStdString();
 

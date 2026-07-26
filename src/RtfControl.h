@@ -30,6 +30,7 @@ struct RtfControl {
         TableControlWord,
         GroupPersistent,
         FieldControl,
+        SpecialChar,
         Unknown,
     };
 
@@ -89,12 +90,13 @@ struct RtfControl {
         TabAlign tabAlign;
         TableCtrlWord tableCtrlWord;
         FieldCtrlType fieldCtrlType;
+        uint32_t specialChar;
     };
 
     Value value;
 };
 
-constexpr std::size_t kRtfControlTableSize = 158;
+constexpr std::size_t kRtfControlTableSize = 166;
 
 extern const std::array<RtfControl, kRtfControlTableSize> rtfControlTable;
 

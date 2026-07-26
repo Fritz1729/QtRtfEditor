@@ -8,6 +8,7 @@
 #include <cctype>
 #include <cstring>
 #include <map>
+#include <stdexcept>
 
 namespace Rte {
 
@@ -41,7 +42,7 @@ public:
         _inRow = false;
         _inTableCell = false;
         _currentCellIndex = 0;
-        _pendingBorderSide = -1;
+        _pendingBorderSide = Side_Undefined;
         _listId = 0;
         _listLevel = 0;
         _listStyle = ListStyle::None;
@@ -143,15 +144,12 @@ private:
                 }
                 break;
             case RtfControl::CharSetProp::UlColorIndex:
-                FinalizeRun();
                 _format.ulColorIndex = arg;
                 break;
             case RtfControl::CharSetProp::HighlightIndex:
-                FinalizeRun();
                 _format.highlightIndex = arg;
                 break;
             case RtfControl::CharSetProp::LangId:
-                FinalizeRun();
                 _format.langId = arg;
                 break;
             }
@@ -338,6 +336,9 @@ private:
             break;
         case RtfControl::Action::FieldControl:
             break;
+        case RtfControl::Action::SpecialChar:
+            AppendUtf8(ctrl.value.specialChar);
+            break;
         case RtfControl::Action::Unknown:
             break;
         }
@@ -437,19 +438,19 @@ private:
             break;
 
         case RtfControl::TableCtrlWord::ClBorderLeft:
-            BeginBorderSide(0, false);
+            BeginBorderSide(Side_Left, false);
             break;
 
         case RtfControl::TableCtrlWord::ClBorderTop:
-            BeginBorderSide(1, false);
+            BeginBorderSide(Side_Top, false);
             break;
 
         case RtfControl::TableCtrlWord::ClBorderRight:
-            BeginBorderSide(2, false);
+            BeginBorderSide(Side_Right, false);
             break;
 
         case RtfControl::TableCtrlWord::ClBorderBottom:
-            BeginBorderSide(3, false);
+            BeginBorderSide(Side_Bottom, false);
             break;
 
         case RtfControl::TableCtrlWord::BrdrSolid:
@@ -476,35 +477,29 @@ private:
             break;
 
         case RtfControl::TableCtrlWord::ClPadLeft:
-            if (arg >= 0) _currentCellFormat.leftPadding = arg;
+            if (arg >= 0) _currentCellFormat.padding[Side_Left] = arg;
             break;
-
-        case RtfControl::TableCtrlWord::ClPadRight:
-            if (arg >= 0) _currentCellFormat.rightPadding = arg;
-            break;
-
         case RtfControl::TableCtrlWord::ClPadTop:
-            if (arg >= 0) _currentCellFormat.topPadding = arg;
+            if (arg >= 0) _currentCellFormat.padding[Side_Top] = arg;
             break;
-
+        case RtfControl::TableCtrlWord::ClPadRight:
+            if (arg >= 0) _currentCellFormat.padding[Side_Right] = arg;
+            break;
         case RtfControl::TableCtrlWord::ClPadBottom:
-            if (arg >= 0) _currentCellFormat.bottomPadding = arg;
+            if (arg >= 0) _currentCellFormat.padding[Side_Bottom] = arg;
             break;
 
         case RtfControl::TableCtrlWord::TrPadLeft:
-            if (arg >= 0) _currentRow.rowLeftPadding = arg;
+            if (arg >= 0) _currentRow.rowPadding[Side_Left] = arg;
             break;
-
-        case RtfControl::TableCtrlWord::TrPadRight:
-            if (arg >= 0) _currentRow.rowRightPadding = arg;
-            break;
-
         case RtfControl::TableCtrlWord::TrPadTop:
-            if (arg >= 0) _currentRow.rowTopPadding = arg;
+            if (arg >= 0) _currentRow.rowPadding[Side_Top] = arg;
             break;
-
+        case RtfControl::TableCtrlWord::TrPadRight:
+            if (arg >= 0) _currentRow.rowPadding[Side_Right] = arg;
+            break;
         case RtfControl::TableCtrlWord::TrPadBottom:
-            if (arg >= 0) _currentRow.rowBottomPadding = arg;
+            if (arg >= 0) _currentRow.rowPadding[Side_Bottom] = arg;
             break;
 
         case RtfControl::TableCtrlWord::TrAlignLeft:
@@ -528,62 +523,63 @@ private:
             break;
 
         case RtfControl::TableCtrlWord::TrBorderLeft:
-            BeginBorderSide(0, true);
+            BeginBorderSide(Side_Left, true);
             break;
 
         case RtfControl::TableCtrlWord::TrBorderTop:
-            BeginBorderSide(1, true);
+            BeginBorderSide(Side_Top, true);
             break;
 
         case RtfControl::TableCtrlWord::TrBorderRight:
-            BeginBorderSide(2, true);
+            BeginBorderSide(Side_Right, true);
             break;
 
         case RtfControl::TableCtrlWord::TrBorderBottom:
-            BeginBorderSide(3, true);
+            BeginBorderSide(Side_Bottom, true);
             break;
         }
     }
 
     void ApplyPendingBorder() {
-        if (_pendingBorderSide < 0) return;
+        if (_pendingBorderSide == Side_Undefined) return;
         auto& borders = _pendingBorderIsRow ? _currentRow.rowBorders : _currentCellFormat.borders;
         int style = _pendingBorderStyle;
         if (style == 0 && _pendingBorderWidth > 0) style = 1;
         switch (_pendingBorderSide) {
-            case 0:
+            case Side_Left:
                 borders.leftWidth = _pendingBorderWidth;
                 borders.leftColor = _pendingBorderColor;
                 borders.leftStyle = static_cast<BorderStyle>(style);
                 break;
-            case 1:
+            case Side_Top:
                 borders.topWidth = _pendingBorderWidth;
                 borders.topColor = _pendingBorderColor;
                 borders.topStyle = static_cast<BorderStyle>(style);
                 break;
-            case 2:
+            case Side_Right:
                 borders.rightWidth = _pendingBorderWidth;
                 borders.rightColor = _pendingBorderColor;
                 borders.rightStyle = static_cast<BorderStyle>(style);
                 break;
-            case 3:
+            case Side_Bottom:
                 borders.bottomWidth = _pendingBorderWidth;
                 borders.bottomColor = _pendingBorderColor;
                 borders.bottomStyle = static_cast<BorderStyle>(style);
                 break;
+            default: throw std::runtime_error("unexpected TableSide");
         }
         ResetPendingBorder();
     }
 
     void ResetPendingBorder() {
-        _pendingBorderSide = -1;
+        _pendingBorderSide = Side_Undefined;
         _pendingBorderStyle = 0;
         _pendingBorderWidth = 0;
         _pendingBorderColor = 0;
         _pendingBorderIsRow = false;
     }
 
-    void BeginBorderSide(int side, bool isRow) {
+    void BeginBorderSide(TableSide side, bool isRow) {
         ApplyPendingBorder();
         _pendingBorderSide = side;
         _pendingBorderStyle = 0;
@@ -647,13 +643,6 @@ private:
         _currentParagraph = {};
     }
 
-    static bool ParagraphIsEmpty(const RtfParagraph& p) {
-        for (const RtfRun& r : p.runs) {
-            if (!r.text.empty()) return false;
-        }
-        return true;
-    }
-
     static bool ParagraphHasNonWhitespaceContent(const RtfParagraph& p) {
         for (const RtfRun& r : p.runs) {
             if (!r.text.empty()) {
@@ -663,15 +652,6 @@ private:
             }
         }
         return false;
-    }
-
-    static bool TableRowIsEmpty(const RtfTableRowEntry& r) {
-        for (const auto& [runs, _] : r.cells) {
-            for (const RtfRun& run : runs) {
-                if (!run.text.empty()) return false;
-            }
-        }
-        return true;
     }
 
     static bool ParagraphHasNonWhitespaceContent(const RtfTableRowEntry& r) {
@@ -691,8 +671,8 @@ private:
         while (!_doc.elements.empty()) {
             bool hasText = std::visit([](const auto& elem) -> bool {
                 using T = std::decay_t<decltype(elem)>;
-                if constexpr (std::is_same_v<T, RtfParagraph>) return !ParagraphIsEmpty(elem);
-                else if constexpr (std::is_same_v<T, RtfTableRowEntry>) return !TableRowIsEmpty(elem);
+                if constexpr (std::is_same_v<T, RtfParagraph>) return ParagraphHasNonWhitespaceContent(elem);
+                else if constexpr (std::is_same_v<T, RtfTableRowEntry>) return ParagraphHasNonWhitespaceContent(elem);
                 else return true;
             }, _doc.elements.back());
             if (!hasText) {
@@ -766,7 +746,7 @@ private:
     RtfTableRowEntry _currentRow;
     std::vector<RtfRun> _currentCellRuns;
     TableCellFormat _currentCellFormat;
-    int _pendingBorderSide = -1;
+    TableSide _pendingBorderSide = Side_Undefined;
     int _pendingBorderStyle = 0;
     int _pendingBorderWidth = 0;
     int _pendingBorderColor = 0;
@@ -1589,16 +1569,6 @@ private:
         if (word == "colortbl" || word == "fonttbl") return;
         // Star prefix: only meaningful as part of destination {\*\word}
         if (word == "*") return;
-
-        // Special typographic characters (RE 2.0)
-        if (word == "bullet") { AppendUtf8(0x2022); return; }
-        if (word == "emdash") { AppendUtf8(0x2014); return; }
-        if (word == "endash") { AppendUtf8(0x2013); return; }
-        if (word == "lquote") { AppendUtf8(0x2018); return; }
-        if (word == "rquote") { AppendUtf8(0x2019); return; }
-        if (word == "ldblquote") { AppendUtf8(0x201C); return; }
-        if (word == "rdblquote") { AppendUtf8(0x201D); return; }
-        if (word == "tab") { _literalText += static_cast<char>(9); return; }
 
         auto* ctrl = FindControl(word.c_str());
         if (ctrl) {

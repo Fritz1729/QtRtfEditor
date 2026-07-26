@@ -33,6 +33,44 @@ namespace Rte {
 
 namespace {
 
+static constexpr std::array<const char*, 4> kRowBorderSideTags = {{
+    "\\trbrdrl", "\\trbrdrt", "\\trbrdrr", "\\trbrdrb"
+}};
+
+static constexpr std::array<const char*, 4> kCellBorderSideTags = {{
+    "\\clbrdrl", "\\clbrdrt", "\\clbrdrr", "\\clbrdrb"
+}};
+
+using BorderWidthGetter = double (QTextTableCellFormat::*)() const;
+using BorderStyleGetter = QTextFrameFormat::BorderStyle (QTextTableCellFormat::*)() const;
+using BorderBrushGetter = QBrush (QTextTableCellFormat::*)() const;
+
+static constexpr std::array<BorderWidthGetter, 4> kBorderWidthGetters = {{
+    &QTextTableCellFormat::leftBorder, &QTextTableCellFormat::topBorder,
+    &QTextTableCellFormat::rightBorder, &QTextTableCellFormat::bottomBorder,
+}};
+
+static constexpr std::array<BorderStyleGetter, 4> kBorderStyleGetters = {{
+    &QTextTableCellFormat::leftBorderStyle, &QTextTableCellFormat::topBorderStyle,
+    &QTextTableCellFormat::rightBorderStyle, &QTextTableCellFormat::bottomBorderStyle,
+}};
+
+static constexpr std::array<BorderBrushGetter, 4> kBorderBrushGetters = {{
+    &QTextTableCellFormat::leftBorderBrush, &QTextTableCellFormat::topBorderBrush,
+    &QTextTableCellFormat::rightBorderBrush, &QTextTableCellFormat::bottomBorderBrush,
+}};
+
+using PaddingGetter = double (QTextTableCellFormat::*)() const;
+
+static constexpr std::array<PaddingGetter, 4> kPaddingGetters = {{
+    &QTextTableCellFormat::leftPadding, &QTextTableCellFormat::topPadding,
+    &QTextTableCellFormat::rightPadding, &QTextTableCellFormat::bottomPadding,
+}};
+
+static constexpr std::array<const char*, 4> kCellPaddingTags = {{
+    "clpadl", "clpadt", "clpadr", "clpadb"
+}};
+
 static const char* UnderlineStyleTag(UnderlineStyle style) {
     switch (style) {
         case UnderlineStyle::None:       return "";
@@ -335,34 +373,13 @@ static void CollectBorderColor(const QBrush& brush, std::vector<QColor>& colorLi
     }
 }
 
-static CellBorderInfo ReadCellBorder(const QTextTableCellFormat& cf, const std::vector<QColor>& colorList, int side) {
+static CellBorderInfo ReadCellBorder(const QTextTableCellFormat& cf, const std::vector<QColor>& colorList, TableSide side) {
     CellBorderInfo bi{};
-    switch (side) {
-        case 0:
-            bi.width = cf.leftBorder();
-            bi.style = cf.leftBorderStyle();
-            if (cf.leftBorderBrush().style() != Qt::NoBrush)
-                bi.colorIdx = FindColorIndex(colorList, cf.leftBorderBrush().color()) + 1;
-            break;
-        case 1:
-            bi.width = cf.topBorder();
-            bi.style = cf.topBorderStyle();
-            if (cf.topBorderBrush().style() != Qt::NoBrush)
-                bi.colorIdx = FindColorIndex(colorList, cf.topBorderBrush().color()) + 1;
-            break;
-        case 2:
-            bi.width = cf.rightBorder();
-            bi.style = cf.rightBorderStyle();
-            if (cf.rightBorderBrush().style() != Qt::NoBrush)
-                bi.colorIdx = FindColorIndex(colorList, cf.rightBorderBrush().color()) + 1;
-            break;
-        default:
-            bi.width = cf.bottomBorder();
-            bi.style = cf.bottomBorderStyle();
-            if (cf.bottomBorderBrush().style() != Qt::NoBrush)
-                bi.colorIdx = FindColorIndex(colorList, cf.bottomBorderBrush().color()) + 1;
-            break;
-    }
+    bi.width = (cf.*(kBorderWidthGetters.at(side)))();
+    bi.style = (cf.*(kBorderStyleGetters.at(side)))();
+    const QBrush& brush = (cf.*(kBorderBrushGetters.at(side)))();
+    if (brush.style() != Qt::NoBrush)
+        bi.colorIdx = FindColorIndex(colorList, brush.color()) + 1;
     return bi;
 }
 
@@ -899,7 +916,7 @@ std::string ExportRtf(const QTextDocument& document) {
                     QTextTableCell cell = table->cellAt(r, c);
                     if (cell.isValid()) {
                         QTextTableCellFormat cf(cell.format().toTableCellFormat());
-                        for (int side = 0; side < 4; ++side) {
+                        for (TableSide side : kTableSides) {
                             rowCellBorders[c][side] = ReadCellBorder(cf, colorList, side);
                         }
                     }
@@ -908,7 +925,7 @@ std::string ExportRtf(const QTextDocument& document) {
                 // Determine which sides have uniform borders across all cells
                 bool uniformSide[4] = {true, true, true, true};
                 CellBorderInfo uniformBorder[4]{};
-                for (int side = 0; side < 4; ++side) {
+                for (TableSide side : kTableSides) {
                     uniformBorder[side] = rowCellBorders[0][side];
                     for (int c = 1; c < colCount; ++c) {
                         if (rowCellBorders[c][side] != uniformBorder[side]) {
@@ -921,10 +938,9 @@ std::string ExportRtf(const QTextDocument& document) {
                 }
 
                 // Emit row-level borders for uniform sides
-                if (uniformSide[0]) EmitBorderSide(out, "\\trbrdrl", uniformBorder[0].width, uniformBorder[0].style, uniformBorder[0].colorIdx);
-                if (uniformSide[1]) EmitBorderSide(out, "\\trbrdrt", uniformBorder[1].width, uniformBorder[1].style, uniformBorder[1].colorIdx);
-                if (uniformSide[2]) EmitBorderSide(out, "\\trbrdrr", uniformBorder[2].width, uniformBorder[2].style, uniformBorder[2].colorIdx);
-                if (uniformSide[3]) EmitBorderSide(out, "\\trbrdrb", uniformBorder[3].width, uniformBorder[3].style, uniformBorder[3].colorIdx);
+                for (TableSide side : kTableSides) {
+                    if (uniformSide[side]) EmitBorderSide(out, kRowBorderSideTags.at(side), uniformBorder[side].width, uniformBorder[side].style, uniformBorder[side].colorIdx);
+                }
 
                 for (int c = 0; c < colCount; ++c) {
                     QTextTableCell cell = table->cellAt(r, c);
@@ -936,23 +952,15 @@ std::string ExportRtf(const QTextDocument& document) {
                     QTextTableCellFormat cf(cell.format().toTableCellFormat());
 
                     // Emit cell padding
-                    EmitTwipsTag(out, cf.leftPadding(), "clpadl");
-                    EmitTwipsTag(out, cf.rightPadding(), "clpadr");
-                    EmitTwipsTag(out, cf.topPadding(), "clpadt");
-                    EmitTwipsTag(out, cf.bottomPadding(), "clpadb");
+                    for (TableSide side : kTableSides) {
+                        EmitTwipsTag(out, (cf.*(kPaddingGetters[side]))(), kCellPaddingTags[side]);
+                    }
 
                     // Emit cell borders (skip sides that are emitted as row borders)
-                    for (int side = 0; side < 4; ++side) {
+                    for (TableSide side : kTableSides) {
                         if (uniformSide[side]) continue;
-                        const char* sideTag = "";
-                        switch (side) {
-                            case 0: sideTag = "\\clbrdrl"; break;
-                            case 1: sideTag = "\\clbrdrt"; break;
-                            case 2: sideTag = "\\clbrdrr"; break;
-                            default: sideTag = "\\clbrdrb"; break;
-                        }
                         auto& bi = rowCellBorders[c][side];
-                        EmitBorderSide(out, sideTag, bi.width, bi.style, bi.colorIdx);
+                        EmitBorderSide(out, kCellBorderSideTags.at(side), bi.width, bi.style, bi.colorIdx);
                     }
 
                     // Iterate over blocks within the cell
