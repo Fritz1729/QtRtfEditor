@@ -66,6 +66,17 @@ private:
         if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
     }
 
+    void SkipGroup() {
+        _pos++;
+        int depth = 1;
+        while (_pos < _len && depth > 0) {
+            CheckIter();
+            char c = _rtf[_pos++];
+            if (c == '{') depth++;
+            else if (c == '}') depth--;
+        }
+    }
+
     const RtfControl* FindControl(const char* word) const {
         for (const RtfControl& ctrl : rtfControlTable) {
             if (strcmp(word, ctrl.keyword) == 0) return &ctrl;
@@ -614,14 +625,11 @@ private:
             _currentRow = {};
             return;
         }
-        if (ParagraphHasNonWhitespaceContent(_currentRow)) {
-            _doc.elements.push_back(std::move(_currentRow));
-        }
+        EmitTableRow();
         _inTable = false;
         _inRow = false;
         _inTableCell = false;
         _currentCellIndex = 0;
-        _currentRow = {};
     }
 
     void FlushCurrentParagraph() {
@@ -643,26 +651,29 @@ private:
         _currentParagraph = {};
     }
 
-    static bool ParagraphHasNonWhitespaceContent(const RtfParagraph& p) {
-        for (const RtfRun& r : p.runs) {
-            if (!r.text.empty()) {
-                for (char c : r.text) {
-                    if (!std::isspace(static_cast<unsigned char>(c))) return true;
-                }
+    static bool RunHasNonWhitespaceContent(const RtfRun& run) {
+        if (!run.text.empty()) {
+            for (char c : run.text) {
+                if (!std::isspace(static_cast<unsigned char>(c))) return true;
             }
         }
         return false;
     }
 
+    static bool RunsHaveNonWhitespaceContent(const std::vector<RtfRun>& runs) {
+        for (const RtfRun& r : runs) {
+            if (RunHasNonWhitespaceContent(r)) return true;
+        }
+        return false;
+    }
+
+    static bool ParagraphHasNonWhitespaceContent(const RtfParagraph& p) {
+        return RunsHaveNonWhitespaceContent(p.runs);
+    }
+
     static bool ParagraphHasNonWhitespaceContent(const RtfTableRowEntry& r) {
         for (const auto& [runs, _] : r.cells) {
-            for (const RtfRun& run : runs) {
-                if (!run.text.empty()) {
-                    for (char c : run.text) {
-                        if (!std::isspace(static_cast<unsigned char>(c))) return true;
-                    }
-                }
-            }
+            if (RunsHaveNonWhitespaceContent(runs)) return true;
         }
         return false;
     }
@@ -675,11 +686,8 @@ private:
                 else if constexpr (std::is_same_v<T, RtfTableRowEntry>) return ParagraphHasNonWhitespaceContent(elem);
                 else return true;
             }, _doc.elements.back());
-            if (!hasText) {
-                _doc.elements.pop_back();
-            } else {
-                break;
-            }
+            if (!hasText) _doc.elements.pop_back();
+            else break;
         }
     }
 
@@ -778,14 +786,7 @@ private:
     void ParseGroup() {
         _pos++; // skip '{'
         _groupDepth++;
-
-        // Push state
-        _formatStack.push_back(_format);
-        _paraStateStack.push_back(_para);
-        _pendingTabAlignmentStack.push_back(_pendingTabAlignment);
-        _deffStack.push_back(_currentDeff);
-        _deftabStack.push_back(_currentDeftab);
-        _ucStack.push_back(_currentUc);
+        PushState();
 
         // Check for known table groups
         SkipWhitespace();
@@ -889,13 +890,7 @@ private:
             // If unknown destination, skip the entire group silently
             if (!destWord.empty() && !FindControl(destWord.c_str())) {
                 RestoreState();
-                int depth = 1;
-                while (_pos < _len && depth > 0) {
-                    CheckIter();
-                    char c = _rtf[_pos++];
-                    if (c == '{') depth++;
-                    else if (c == '}') depth--;
-                }
+                SkipGroup();
                 return;
             }
         }
@@ -909,6 +904,15 @@ private:
         }
 
         RestoreState();
+    }
+
+    void PushState() {
+        _formatStack.push_back(_format);
+        _paraStateStack.push_back(_para);
+        _pendingTabAlignmentStack.push_back(_pendingTabAlignment);
+        _deffStack.push_back(_currentDeff);
+        _deftabStack.push_back(_currentDeftab);
+        _ucStack.push_back(_currentUc);
     }
 
     void RestoreState() {
@@ -998,7 +1002,11 @@ private:
             int val = 0;
             for (int h = 0; h < 2 && _pos < _len; ++h) {
                 char hc = _rtf[_pos++];
-                val = val * 16 + (hc >= '0' && hc <= '9' ? hc - '0' : (hc >= 'a' && hc <= 'f' ? hc - 'a' + 10 : hc - 'A' + 10));
+                int digit;
+                if (hc >= '0' && hc <= '9') digit = hc - '0';
+                else if (hc >= 'a' && hc <= 'f') digit = hc - 'a' + 10;
+                else digit = hc - 'A' + 10;
+                val = val * 16 + digit;
             }
             int fcharset = 0;
             std::string fontFamily;
@@ -1156,7 +1164,9 @@ private:
 
                 // Remove leading/trailing whitespace from family
                 while (!family.empty() && family.back() == ' ') family.pop_back();
-                while (!family.empty() && family.front() == ' ') family.erase(family.begin());
+                size_t firstNonSpace = 0;
+                while (firstNonSpace < family.size() && family[firstNonSpace] == ' ') firstNonSpace++;
+                if (firstNonSpace > 0) family.erase(family.begin(), family.begin() + static_cast<std::ptrdiff_t>(firstNonSpace));
 
                 if (!family.empty()) {
                     _doc.fonts.push_back({family, fcharset});
@@ -1236,14 +1246,7 @@ private:
         // {\field{\*\fldinst HYPERLINK "URL"}{\*\fldrslt display text}}
         _fieldAnchorHref.clear();
         _inFieldRslt = false;
-
-        // Push state for field group
-        _formatStack.push_back(_format);
-        _paraStateStack.push_back(_para);
-        _pendingTabAlignmentStack.push_back(_pendingTabAlignment);
-        _deffStack.push_back(_currentDeff);
-        _deftabStack.push_back(_currentDeftab);
-        _ucStack.push_back(_currentUc);
+        PushState();
 
         while (_pos < _len && _rtf[_pos] != '}') {
             CheckIter();
@@ -1274,24 +1277,10 @@ private:
                     } else if (destWord == "fldrslt") {
                         ParseFldRslt();
                     } else {
-                        // Unknown destination group — skip it
-                        int depth = 1;
-                        while (_pos < _len && depth > 0) {
-            CheckIter();
-                            char c = _rtf[_pos++];
-                            if (c == '{') depth++;
-                            else if (c == '}') depth--;
-                        }
+                        SkipGroup();
                     }
                 } else {
-                    // Unknown sub-group — skip it
-                    int depth = 1;
-                    while (_pos < _len && depth > 0) {
-                        CheckIter();
-                        char c = _rtf[_pos++];
-                        if (c == '{') depth++;
-                        else if (c == '}') depth--;
-                    }
+                    SkipGroup();
                 }
             } else if (_rtf[_pos] == '\\') {
                 // Control word at field level — skip
@@ -1370,7 +1359,8 @@ private:
         // Also handle HYPERLINK \\bkmk3 Name (internal bookmark reference)
         std::string lowerInst;
         lowerInst.reserve(inst.size());
-        for (char c : inst) lowerInst += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        std::transform(inst.begin(), inst.end(), std::back_inserter(lowerInst),
+            [](unsigned char c) { return std::tolower(c); });
 
         size_t hyperlinkPos = lowerInst.find("hyperlink");
         if (hyperlinkPos != std::string::npos) {
@@ -1592,11 +1582,10 @@ private:
         if (_literalText.empty()) return;
 
         if (_inTableCell) {
-            _currentCellRuns.emplace_back(_literalText, _format);
+            _currentCellRuns.emplace_back(std::move(_literalText), _format);
         } else {
-            _currentParagraph.runs.emplace_back(_literalText, _format);
+            _currentParagraph.runs.emplace_back(std::move(_literalText), _format);
         }
-        _literalText.clear();
     }
 
     void AppendUtf8(int cp) {

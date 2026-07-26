@@ -25,7 +25,15 @@ namespace Rte {
 
 namespace {
 
-static void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
+QColor ResolveColor(int idx, const RtfDocument& doc) {
+    if (idx >= 0 && idx < static_cast<int>(doc.colors.size())) {
+        const RtfColorEntry& col = doc.colors[idx];
+        return QColor(col.red, col.green, col.blue);
+    }
+    return QColor();
+}
+
+void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
                        const RtfDocument& doc, const QFont& defaultFont) {
     for (const RtfRun& run : runs) {
         // Skip \pntext runs — content is structural list marker, not paragraph body
@@ -61,17 +69,11 @@ static void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
             }
         }
 
-        if (run.format.colorIndex >= 0 &&
-            run.format.colorIndex < static_cast<int>(doc.colors.size())) {
-            const auto& col = doc.colors[run.format.colorIndex];
-            charFmt.setForeground(QColor(col.red, col.green, col.blue));
-        }
+        QColor fgColor = ResolveColor(run.format.colorIndex, doc);
+        if (fgColor.isValid()) charFmt.setForeground(fgColor);
 
-        if (run.format.bgColorIndex >= 0 &&
-            run.format.bgColorIndex < static_cast<int>(doc.colors.size())) {
-            const auto& col = doc.colors[run.format.bgColorIndex];
-            charFmt.setBackground(QBrush(QColor(col.red, col.green, col.blue)));
-        }
+        QColor bgColor = ResolveColor(run.format.bgColorIndex, doc);
+        if (bgColor.isValid()) charFmt.setBackground(QBrush(bgColor));
 
         if (run.format.underline) {
             if (run.format.underlineStyle == UnderlineStyle::Solid ||
@@ -82,11 +84,12 @@ static void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
             }
             charFmt.setProperty(UserPropUlStyle, static_cast<int>(run.format.underlineStyle));
         }
-        if (run.format.ulColorIndex > 0 &&
-            run.format.ulColorIndex < static_cast<int>(doc.colors.size())) {
-            const auto& col = doc.colors[run.format.ulColorIndex];
-            charFmt.setProperty(UserPropUlColorIndex,
-                                QString("%1,%2,%3").arg(col.red).arg(col.green).arg(col.blue));
+        if (run.format.ulColorIndex > 0) {
+            QColor ulColor = ResolveColor(run.format.ulColorIndex, doc);
+            if (ulColor.isValid()) {
+                charFmt.setProperty(UserPropUlColorIndex,
+                                    QString("%1,%2,%3").arg(ulColor.red()).arg(ulColor.green()).arg(ulColor.blue()));
+            }
         }
 
         if (run.format.capitalization == Capitalization::AllCaps) {
@@ -135,7 +138,7 @@ static void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
     }
 }
 
-static void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
+void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
                              const RtfDocument& doc, const QFont& defaultFont,
                              int& prevListId, int& prevListLevel,
                              bool& inList, QTextList*& currentList) {
@@ -194,41 +197,37 @@ static void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
     }
 
     // Store per-paragraph group-persistent values as block properties
-    {
-        QTextBlockFormat curFmt = cursor.blockFormat();
-        curFmt.setProperty(UserPropParaDefaultFontIndex, para.defaultFontIndex);
-        curFmt.setProperty(UserPropParaDefaultTabStopTwips, para.defaultTabStopTwips);
-        if (!para.pntextRtf.empty()) {
-            curFmt.setProperty(UserPropBlockPntextRtf, QString::fromLatin1(para.pntextRtf.c_str()));
-        }
-        if (para.slMult != 1) {
-            curFmt.setProperty(UserPropSlMult, para.slMult);
-        }
-        cursor.setBlockFormat(curFmt);
+    QTextBlockFormat curFmt = cursor.blockFormat();
+    curFmt.setProperty(UserPropParaDefaultFontIndex, para.defaultFontIndex);
+    curFmt.setProperty(UserPropParaDefaultTabStopTwips, para.defaultTabStopTwips);
+    if (!para.pntextRtf.empty()) {
+        curFmt.setProperty(UserPropBlockPntextRtf, QString::fromLatin1(para.pntextRtf.c_str()));
     }
+    if (para.slMult != 1) {
+        curFmt.setProperty(UserPropSlMult, para.slMult);
+    }
+    cursor.setBlockFormat(curFmt);
     prevListId = para.listId;
     prevListLevel = para.listLevel;
 
     InsertRuns(cursor, para.runs, doc, defaultFont);
 }
 
-static void BuildImage(QTextCursor& cursor, const RtfImage& img,
+void BuildImage(QTextCursor& cursor, const RtfImage& img,
                         QTextDocument* document) {
     static int imgCounter = 0;
     cursor.insertBlock();
 
     // Determine image size in pixels
     qreal widthPx = 0, heightPx = 0;
-    {
-        QByteArray imageData = img.data;
-        QBuffer buffer(&imageData);
-        buffer.open(QIODevice::ReadOnly);
-        QImageReader reader(&buffer);
-        QSize size = reader.size();
-        if (size.isValid() && size.width() > 0 && size.height() > 0) {
-            widthPx = size.width() * 96.0 / 72.0;
-            heightPx = size.height() * 96.0 / 72.0;
-        }
+    QByteArray imageData = img.data;
+    QBuffer buffer(&imageData);
+    buffer.open(QIODevice::ReadOnly);
+    QImageReader reader(&buffer);
+    QSize size = reader.size();
+    if (size.isValid() && size.width() > 0 && size.height() > 0) {
+        widthPx = size.width() * 96.0 / 72.0;
+        heightPx = size.height() * 96.0 / 72.0;
     }
 
     if (widthPx <= 0 || heightPx <= 0) {
@@ -274,22 +273,22 @@ using BorderSetter = void (QTextTableCellFormat::*)(double);
 using BorderStyleSetter = void (QTextTableCellFormat::*)(QTextFrameFormat::BorderStyle);
 using BorderBrushSetter = void (QTextTableCellFormat::*)(const QBrush&);
 
-static constexpr std::array<PadSetter, 4> kPadSetters = {{
+constexpr std::array<PadSetter, 4> kPadSetters = {{
     &QTextTableCellFormat::setLeftPadding, &QTextTableCellFormat::setTopPadding,
     &QTextTableCellFormat::setRightPadding, &QTextTableCellFormat::setBottomPadding,
 }};
 
-static constexpr std::array<BorderSetter, 4> kBorderSetters = {{
+constexpr std::array<BorderSetter, 4> kBorderSetters = {{
     &QTextTableCellFormat::setLeftBorder, &QTextTableCellFormat::setTopBorder,
     &QTextTableCellFormat::setRightBorder, &QTextTableCellFormat::setBottomBorder,
 }};
 
-static constexpr std::array<BorderStyleSetter, 4> kBorderStyleSetters = {{
+constexpr std::array<BorderStyleSetter, 4> kBorderStyleSetters = {{
     &QTextTableCellFormat::setLeftBorderStyle, &QTextTableCellFormat::setTopBorderStyle,
     &QTextTableCellFormat::setRightBorderStyle, &QTextTableCellFormat::setBottomBorderStyle,
 }};
 
-static constexpr std::array<BorderBrushSetter, 4> kBorderBrushSetters = {{
+constexpr std::array<BorderBrushSetter, 4> kBorderBrushSetters = {{
     &QTextTableCellFormat::setLeftBorderBrush, &QTextTableCellFormat::setTopBorderBrush,
     &QTextTableCellFormat::setRightBorderBrush, &QTextTableCellFormat::setBottomBorderBrush,
 }};
@@ -300,14 +299,14 @@ struct TableCellBorderMember {
     int TableCellBorders::*color;
 };
 
-static constexpr std::array<TableCellBorderMember, 4> kBorderMembers = {{
+constexpr std::array<TableCellBorderMember, 4> kBorderMembers = {{
     { &TableCellBorders::leftWidth,  &TableCellBorders::leftStyle,  &TableCellBorders::leftColor },
     { &TableCellBorders::topWidth,   &TableCellBorders::topStyle,   &TableCellBorders::topColor },
     { &TableCellBorders::rightWidth, &TableCellBorders::rightStyle, &TableCellBorders::rightColor },
     { &TableCellBorders::bottomWidth,&TableCellBorders::bottomStyle,&TableCellBorders::bottomColor },
 }};
 
-static QColor ResolveBorderColor(int colorIdx, const RtfDocument& doc) {
+QColor ResolveBorderColor(int colorIdx, const RtfDocument& doc) {
     if (colorIdx > 0 && colorIdx < static_cast<int>(doc.colors.size())) {
         const RtfColorEntry& col = doc.colors[colorIdx];
         return QColor(col.red, col.green, col.blue);
@@ -315,7 +314,7 @@ static QColor ResolveBorderColor(int colorIdx, const RtfDocument& doc) {
     return QColor();
 }
 
-static void ApplyBorderToCellFormat(QTextTableCellFormat& cellFmt, TableSide side,
+void ApplyBorderToCellFormat(QTextTableCellFormat& cellFmt, TableSide side,
                                       int width, BorderStyle style, int colorIdx, const RtfDocument& doc) {
     if (width <= 0) return;
     QTextFrameFormat::BorderStyle qtStyle = QTextFrameFormat::BorderStyle_None;
@@ -331,11 +330,11 @@ static void ApplyBorderToCellFormat(QTextTableCellFormat& cellFmt, TableSide sid
     if (color.isValid()) (cellFmt.*(kBorderBrushSetters.at(side)))(QBrush(color));
 }
 
-static double ComputeEffectivePadding(int cellPad, int rowPad) {
+double ComputeEffectivePadding(int cellPad, int rowPad) {
     return (cellPad > 0 || rowPad > 0) ? MarginTwipsToPoints(std::max(cellPad, rowPad)) : 0.0;
 }
 
-static void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEntry*>& tableRows,
+void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEntry*>& tableRows,
                               const RtfDocument& doc, const QFont& defaultFont) {
     if (tableRows.empty()) return;
 
@@ -352,12 +351,10 @@ static void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEnt
     tableFmt.setCellSpacing(0);
 
     // Table alignment from first row
-    {
-        int align = tableRows[0]->tableAlignment;
-        if (align == 1) tableFmt.setAlignment(Qt::AlignHCenter);
-        else if (align == 2) tableFmt.setAlignment(Qt::AlignRight);
-        else tableFmt.setAlignment(Qt::AlignLeft);
-    }
+    int align = tableRows[0]->tableAlignment;
+    if (align == 1) tableFmt.setAlignment(Qt::AlignHCenter);
+    else if (align == 2) tableFmt.setAlignment(Qt::AlignRight);
+    else tableFmt.setAlignment(Qt::AlignLeft);
 
     // Set column widths from \cellx positions
     QVector<QTextLength> constraints;
@@ -372,7 +369,7 @@ static void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEnt
     QTextTable* qtTable = cursor.insertTable(rowCount, colCount, tableFmt);
 
     for (int r = 0; r < rowCount; ++r) {
-        const auto& rowEntry = tableRows[r];
+        const RtfTableRowEntry* rowEntry = tableRows[r];
         for (int c = 0; c < colCount; ++c) {
             QTextTableCell cell = qtTable->cellAt(r, c);
             QTextCursor cellCursor = cell.firstCursorPosition();
@@ -393,10 +390,10 @@ static void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEnt
                 }
 
                 // Apply cell borders
-                const auto& borders = cellData.borders;
+                const TableCellBorders& borders = cellData.borders;
                 // For each side, use cell border; if not set, inherit from row borders
                 for (TableSide side : kTableSides) {
-                    const auto& members = kBorderMembers[side];
+                    const TableCellBorderMember& members = kBorderMembers[side];
                     const int w = borders.*(members.width);
                     const BorderStyle s = borders.*(members.style);
                     const int ci = borders.*(members.color);
@@ -414,7 +411,7 @@ static void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEnt
                 // Empty cell — apply row borders
                 const TableCellBorders& rb = rowEntry->rowBorders;
                 for (TableSide side : kTableSides) {
-                    const auto& members = kBorderMembers[side];
+                    const TableCellBorderMember& members = kBorderMembers[side];
                     ApplyBorderToCellFormat(cellFmt, side,
                         rb.*(members.width), rb.*(members.style), rb.*(members.color), doc);
                 }

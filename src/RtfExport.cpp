@@ -33,11 +33,11 @@ namespace Rte {
 
 namespace {
 
-static constexpr std::array<const char*, 4> kRowBorderSideTags = {{
+constexpr std::array<const char*, 4> kRowBorderSideTags = {{
     "\\trbrdrl", "\\trbrdrt", "\\trbrdrr", "\\trbrdrb"
 }};
 
-static constexpr std::array<const char*, 4> kCellBorderSideTags = {{
+constexpr std::array<const char*, 4> kCellBorderSideTags = {{
     "\\clbrdrl", "\\clbrdrt", "\\clbrdrr", "\\clbrdrb"
 }};
 
@@ -45,29 +45,29 @@ using BorderWidthGetter = double (QTextTableCellFormat::*)() const;
 using BorderStyleGetter = QTextFrameFormat::BorderStyle (QTextTableCellFormat::*)() const;
 using BorderBrushGetter = QBrush (QTextTableCellFormat::*)() const;
 
-static constexpr std::array<BorderWidthGetter, 4> kBorderWidthGetters = {{
+constexpr std::array<BorderWidthGetter, 4> kBorderWidthGetters = {{
     &QTextTableCellFormat::leftBorder, &QTextTableCellFormat::topBorder,
     &QTextTableCellFormat::rightBorder, &QTextTableCellFormat::bottomBorder,
 }};
 
-static constexpr std::array<BorderStyleGetter, 4> kBorderStyleGetters = {{
+constexpr std::array<BorderStyleGetter, 4> kBorderStyleGetters = {{
     &QTextTableCellFormat::leftBorderStyle, &QTextTableCellFormat::topBorderStyle,
     &QTextTableCellFormat::rightBorderStyle, &QTextTableCellFormat::bottomBorderStyle,
 }};
 
-static constexpr std::array<BorderBrushGetter, 4> kBorderBrushGetters = {{
+constexpr std::array<BorderBrushGetter, 4> kBorderBrushGetters = {{
     &QTextTableCellFormat::leftBorderBrush, &QTextTableCellFormat::topBorderBrush,
     &QTextTableCellFormat::rightBorderBrush, &QTextTableCellFormat::bottomBorderBrush,
 }};
 
 using PaddingGetter = double (QTextTableCellFormat::*)() const;
 
-static constexpr std::array<PaddingGetter, 4> kPaddingGetters = {{
+constexpr std::array<PaddingGetter, 4> kPaddingGetters = {{
     &QTextTableCellFormat::leftPadding, &QTextTableCellFormat::topPadding,
     &QTextTableCellFormat::rightPadding, &QTextTableCellFormat::bottomPadding,
 }};
 
-static constexpr std::array<const char*, 4> kCellPaddingTags = {{
+constexpr std::array<const char*, 4> kCellPaddingTags = {{
     "clpadl", "clpadt", "clpadr", "clpadb"
 }};
 
@@ -158,20 +158,19 @@ static std::string RtfEscape(const QString& text) {
 
     for (const QChar& ch : text) {
         ushort code = ch.unicode();
-        switch (static_cast<char>(code)) {
-            case '\\':  result += "\\\\"; break;
-            case '{':   result += "\\{"; break;
-            case '}':   result += "\\}"; break;
-            case '\t':  result += "\\tab "; break;
-            default:
-                if (code > 127) {
-                    int val = static_cast<int>(code);
-                    char fallback = (code < 128) ? static_cast<char>(code) : '?';
-                    result += QString("\\u%1%2").arg(val).arg(fallback).toStdString();
-                } else {
-                    result += static_cast<char>(code);
-                }
-                break;
+        if (code == '\\') {
+            result += "\\\\";
+        } else if (code == '{') {
+            result += "\\{";
+        } else if (code == '}') {
+            result += "\\}";
+        } else if (code == '\t') {
+            result += "\\tab ";
+        } else if (code > 127) {
+            int val = static_cast<int>(code);
+            result += QString("\\u%1%2").arg(val).arg('?').toStdString();
+        } else {
+            result += static_cast<char>(code);
         }
     }
     return result;
@@ -197,13 +196,11 @@ static std::string EmitImageAsPict(const QTextDocument& doc, const QString& name
                                       qreal width, qreal height) {
     // Extract counter from name (e.g., "rtfimage://1.png" -> "1")
     int counter = 0;
-    {
-        int lastSlash = name.lastIndexOf('/');
-        if (lastSlash >= 0) {
-            QString mid = name.mid(lastSlash + 1);
-            mid = mid.split('.').first();
-            counter = mid.toInt();
-        }
+    int lastSlash = name.lastIndexOf('/');
+    if (lastSlash >= 0) {
+        QString mid = name.mid(lastSlash + 1);
+        mid = mid.split('.').first();
+        counter = mid.toInt();
     }
 
     // Look up stored format (jpg, png, bmp)
@@ -234,10 +231,8 @@ static std::string EmitImageAsPict(const QTextDocument& doc, const QString& name
 
     // Path 2: Re-encode from binary data (e.g., pasted/dropped images)
     QImage image;
-    {
-        QByteArray raw = doc.resource(QTextDocument::ImageResource, QUrl(name)).toByteArray();
-        image.loadFromData(raw);
-    }
+    QByteArray raw = doc.resource(QTextDocument::ImageResource, QUrl(name)).toByteArray();
+    image.loadFromData(raw);
     if (image.isNull()) return "";
 
     QByteArray encodedData;
@@ -247,11 +242,9 @@ static std::string EmitImageAsPict(const QTextDocument& doc, const QString& name
     } else if (fmt == "bmp") {
         encFormat = "BMP";
     }
-    {
-        QBuffer buffer(&encodedData);
-        buffer.open(QIODevice::WriteOnly);
-        image.save(&buffer, qPrintable(encFormat));
-    }
+    QBuffer buffer(&encodedData);
+    buffer.open(QIODevice::WriteOnly);
+    image.save(&buffer, qPrintable(encFormat));
 
     std::ostringstream out;
     EmitPictHeader(out, blipTag, width, height);
@@ -449,11 +442,9 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
     EmitParaFormattingIfNeeded(out, blockFmt, lastParaFmt, lastParaFmtSet);
 
     // Emit \pntext group if the block has pntext content stored
-    {
-        QString pntext = blockFmt.property(UserPropBlockPntextRtf).toString();
-        if (!pntext.isEmpty()) {
-            out << "{\\pntext" << qPrintable(pntext) << "}";
-        }
+    QString pntext = blockFmt.property(UserPropBlockPntextRtf).toString();
+    if (!pntext.isEmpty()) {
+        out << "{\\pntext" << qPrintable(pntext) << "}";
     }
 
     {
@@ -515,27 +506,25 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
             std::string url;
         };
         std::vector<AnchorRange> anchorRanges;
-        {
-            QTextBlock::iterator scanIt = block.begin();
-            size_t fragIdx = 0;
-            while (scanIt != block.end()) {
-                QTextFragment frag = scanIt.fragment();
-                if (frag.isValid() && frag.length() > 0 && frag.charFormat().isAnchor()) {
-                    QString href = frag.charFormat().anchorHref();
-                    if (!href.isEmpty()) {
-                        bool canExtend = !anchorRanges.empty() &&
-                            anchorRanges.back().url == href.toStdString() &&
-                            anchorRanges.back().fragIdxEnd + 1 == fragIdx;
-                        if (canExtend) {
-                            anchorRanges.back().fragIdxEnd = fragIdx;
-                        } else {
-                            anchorRanges.push_back({fragIdx, fragIdx, href.toStdString()});
-                        }
+        QTextBlock::iterator scanIt = block.begin();
+        size_t scanFragIdx = 0;
+        while (scanIt != block.end()) {
+            QTextFragment frag = scanIt.fragment();
+            if (frag.isValid() && frag.length() > 0 && frag.charFormat().isAnchor()) {
+                QString href = frag.charFormat().anchorHref();
+                if (!href.isEmpty()) {
+                    bool canExtend = !anchorRanges.empty() &&
+                        anchorRanges.back().url == href.toStdString() &&
+                        anchorRanges.back().fragIdxEnd + 1 == scanFragIdx;
+                    if (canExtend) {
+                        anchorRanges.back().fragIdxEnd = scanFragIdx;
+                    } else {
+                        anchorRanges.push_back({scanFragIdx, scanFragIdx, href.toStdString()});
                     }
                 }
-                fragIdx++;
-                scanIt++;
             }
+            scanFragIdx++;
+            scanIt++;
         }
         std::map<size_t, int> fragToAnchorRange;
         for (int r = 0; r < static_cast<int>(anchorRanges.size()); ++r) {
@@ -556,23 +545,22 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
         bool inAnchor = false;
 
         QTextBlock::iterator it = block.begin();
-        {
-            size_t fragIdx = 0;
-            while (it != block.end()) {
-                QTextFragment frag = it.fragment();
-                if (frag.isValid() && frag.length() > 0) {
-                    int anchorRange = fragToAnchorRange.count(fragIdx) ? fragToAnchorRange[fragIdx] : -1;
+        size_t fragIdx = 0;
+        while (it != block.end()) {
+            QTextFragment frag = it.fragment();
+            if (frag.isValid() && frag.length() > 0) {
+                int anchorRange = fragToAnchorRange.count(fragIdx) ? fragToAnchorRange[fragIdx] : -1;
 
-                    // Emit field opening if entering an anchor range
-                    if (anchorRange >= 0 && !inAnchor && anchorRanges[anchorRange].fragIdxStart == fragIdx) {
-                        out << "{\\field{\\*\\fldinst HYPERLINK \"" << anchorRanges[anchorRange].url << "\"}{\\*\\fldrslt";
-                        inAnchor = true;
-                        currentAnchorRange = anchorRange;
-                    }
+                // Emit field opening if entering an anchor range
+                if (anchorRange >= 0 && !inAnchor && anchorRanges[anchorRange].fragIdxStart == fragIdx) {
+                    out << "{\\field{\\*\\fldinst HYPERLINK \"" << anchorRanges[anchorRange].url << "\"}{\\*\\fldrslt";
+                    inAnchor = true;
+                    currentAnchorRange = anchorRange;
                 }
-                if (!frag.isValid() || frag.length() == 0) { fragIdx++; it++; continue; }
+            }
+            if (!frag.isValid() || frag.length() == 0) { fragIdx++; it++; continue; }
 
-                QTextCharFormat charFmt = frag.charFormat();
+            QTextCharFormat charFmt = frag.charFormat();
 
             RtfRunFormat cur;
             qreal ptSize = charFmt.fontPointSize();
@@ -580,22 +568,17 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
             cur.fontSize = static_cast<int>(ptSize * 2);
 
             QString fam;
-            {
-                QStringList fFams = charFmt.fontFamilies().toStringList();
-                fam = fFams.isEmpty() ? QString() : fFams.first();
-            }
+            QStringList fFams = charFmt.fontFamilies().toStringList();
+            fam = fFams.isEmpty() ? QString() : fFams.first();
             if (fam.isEmpty()) fam = defaultFont.family();
             auto fIt = fontMap.find(fam.toStdString());
             cur.fontIndex = (fIt != fontMap.end()) ? fIt->second : defaultFontIdx;
 
             cur.colorIndex = LookupColorIndex(charFmt.foreground().color(), colorList);
-            {
-                QBrush bgBrush = charFmt.background();
-                if (bgBrush.style() != Qt::NoBrush)
-                    cur.bgColorIndex = LookupColorIndex(bgBrush.color(), bgColorList);
-                else
-                    cur.bgColorIndex = 0;
-            }
+            if (charFmt.background().style() != Qt::NoBrush)
+                cur.bgColorIndex = LookupColorIndex(charFmt.background().color(), bgColorList);
+            else
+                cur.bgColorIndex = 0;
 
             cur.bold = charFmt.fontWeight() >= 700;
             cur.italic = charFmt.fontItalic();
@@ -610,16 +593,12 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
             cur.dnOffset = charFmt.property(UserPropDnOffset).toInt();
             cur.langId = charFmt.property(UserPropLangId).toInt();
             cur.highlightIndex = charFmt.property(UserPropHighlightIndex).toInt();
-            {
-                QColor ulCol = ParseUlColor(charFmt);
-                if (ulCol.isValid())
-                    cur.ulColorIndex = LookupColorIndex(ulCol, colorList);
-            }
-            {
-                qreal spacing = charFmt.fontLetterSpacing();
-                if (spacing > 0) {
-                    cur.expnd = lround(spacing * 20.0 / ptSize);
-                }
+            QColor ulCol = ParseUlColor(charFmt);
+            if (ulCol.isValid())
+                cur.ulColorIndex = LookupColorIndex(ulCol, colorList);
+            qreal spacing = charFmt.fontLetterSpacing();
+            if (spacing > 0) {
+                cur.expnd = lround(spacing * 20.0 / ptSize);
             }
 
             if (firstRun || cur != prev) {
@@ -662,7 +641,6 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
             prev = cur;
             firstRun = false;
 
-            // Emit field closing if exiting an anchor range
             if (inAnchor && currentAnchorRange >= 0 &&
                 fragIdx == anchorRanges[static_cast<size_t>(currentAnchorRange)].fragIdxEnd) {
                 out << "}}";
@@ -672,7 +650,6 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
 
             fragIdx++;
             it++;
-            }
         }
 
         if (!firstRun) {
@@ -713,11 +690,10 @@ std::string ExportRtf(const QTextDocument& document) {
     int lastDeff = defaultFontIdx;
     int lastDeftab = defaultTabStopTwips > 0 ? defaultTabStopTwips : 180;
     int deffDeftabGroupDepth = 0;
-    {
-        int idx = 0;
-        std::string defFamily = defaultFont.family().toStdString();
-        fontMap[defFamily] = idx;
-        defaultFontIdx = idx;
+    int idx = 0;
+    std::string defFamily = defaultFont.family().toStdString();
+    fontMap[defFamily] = idx;
+    defaultFontIdx = idx;
         for (QTextBlock block = document.begin(); block.isValid(); block = block.next()) {
             // Collect lists
             if (block.textList()) {
@@ -737,25 +713,18 @@ std::string ExportRtf(const QTextDocument& document) {
                 if (!fam.isEmpty() && fontMap.find(fam.toStdString()) == fontMap.end()) {
                     fontMap[fam.toStdString()] = ++idx;
                 }
-                {
-                    QColor fg = frag.charFormat().foreground().color();
-                    if (!(fg.red() == 0 && fg.green() == 0 && fg.blue() == 0))
-                        CollectColor(fg, colorList);
-                }
-                {
-                    QBrush bgBrush = frag.charFormat().background();
-                    if (bgBrush.style() != Qt::NoBrush)
-                        CollectColor(bgBrush.color(), bgColorList);
-                }
-                {
-                    QColor ulCol = ParseUlColor(frag.charFormat());
-                    if (ulCol.isValid())
-                        CollectColor(ulCol, colorList);
-                }
+                QColor fg = frag.charFormat().foreground().color();
+                if (!(fg.red() == 0 && fg.green() == 0 && fg.blue() == 0))
+                    CollectColor(fg, colorList);
+                QBrush bgBrush = frag.charFormat().background();
+                if (bgBrush.style() != Qt::NoBrush)
+                    CollectColor(bgBrush.color(), bgColorList);
+                QColor ulCol = ParseUlColor(frag.charFormat());
+                if (ulCol.isValid())
+                    CollectColor(ulCol, colorList);
                 it++;
             }
         }
-    }
 
     out << "{\\rtf1\\ansi\\deff" << defaultFontIdx;
     if (defaultTabStopTwips != 180)
@@ -817,35 +786,31 @@ std::string ExportRtf(const QTextDocument& document) {
     fonttblOut << "}";
 
     // Emit fonttbl only if it contains fonts other than Qt's default
-    {
-        std::string defaultFamily = QFont().family().toStdString();
-        bool hasNonDefaultFont = false;
-        for (const auto& [family, _] : fontMap) {
-            if (family != defaultFamily) {
-                hasNonDefaultFont = true;
-                break;
-            }
+    std::string defaultFamily = QFont().family().toStdString();
+    bool hasNonDefaultFont = false;
+    for (const auto& [family, _] : fontMap) {
+        if (family != defaultFamily) {
+            hasNonDefaultFont = true;
+            break;
         }
-        if (hasNonDefaultFont) {
-            out << fonttblOut.str();
-        }
+    }
+    if (hasNonDefaultFont) {
+        out << fonttblOut.str();
     }
 
     // Emit metadata (only if present in imported document)
-    {
-        QVariant langIdVar = document.property(UserPropMetaDefaultLangId);
-        if (langIdVar.isValid()) {
-            out << "\\deflang" << langIdVar.toInt();
-        }
-        QVariant viewKindVar = document.property(UserPropMetaViewKind);
-        if (viewKindVar.isValid()) {
-            out << "\\viewkind" << viewKindVar.toInt();
-        }
-        QVariant ucVar = document.property(UserPropMetaUcByteCount);
-        if (ucVar.isValid()) {
-            int ucVal = ucVar.toInt();
-            out << "\\uc" << ucVal;
-        }
+    QVariant langIdVar = document.property(UserPropMetaDefaultLangId);
+    if (langIdVar.isValid()) {
+        out << "\\deflang" << langIdVar.toInt();
+    }
+    QVariant viewKindVar = document.property(UserPropMetaViewKind);
+    if (viewKindVar.isValid()) {
+        out << "\\viewkind" << viewKindVar.toInt();
+    }
+    QVariant ucVar = document.property(UserPropMetaUcByteCount);
+    if (ucVar.isValid()) {
+        int ucVal = ucVar.toInt();
+        out << "\\uc" << ucVal;
     }
 
     // Content export — iterate root frame to handle tables and paragraphs
@@ -878,20 +843,18 @@ std::string ExportRtf(const QTextDocument& document) {
                 cellxPositions.push_back(cumulative);
             }
 
-            // Collect border colors from all cells
-            {
-                for (int r = 0; r < rowCount; ++r) {
-                    for (int c = 0; c < colCount; ++c) {
-                        QTextTableCell cell = table->cellAt(r, c);
-                        if (!cell.isValid()) continue;
-                        QTextTableCellFormat cf(cell.format().toTableCellFormat());
-                        CollectBorderColor(cf.leftBorderBrush(), colorList);
-                        CollectBorderColor(cf.topBorderBrush(), colorList);
-                        CollectBorderColor(cf.rightBorderBrush(), colorList);
-                        CollectBorderColor(cf.bottomBorderBrush(), colorList);
-                    }
-                }
-            }
+    // Collect border colors from all cells
+    for (int r = 0; r < rowCount; ++r) {
+        for (int c = 0; c < colCount; ++c) {
+            QTextTableCell cell = table->cellAt(r, c);
+            if (!cell.isValid()) continue;
+            QTextTableCellFormat cf(cell.format().toTableCellFormat());
+            CollectBorderColor(cf.leftBorderBrush(), colorList);
+            CollectBorderColor(cf.topBorderBrush(), colorList);
+            CollectBorderColor(cf.rightBorderBrush(), colorList);
+            CollectBorderColor(cf.bottomBorderBrush(), colorList);
+        }
+    }
 
             for (int r = 0; r < rowCount; ++r) {
                 out << "{\\trowd ";
@@ -959,7 +922,7 @@ std::string ExportRtf(const QTextDocument& document) {
                     // Emit cell borders (skip sides that are emitted as row borders)
                     for (TableSide side : kTableSides) {
                         if (uniformSide[side]) continue;
-                        auto& bi = rowCellBorders[c][side];
+                        CellBorderInfo& bi = rowCellBorders[c][side];
                         EmitBorderSide(out, kCellBorderSideTags.at(side), bi.width, bi.style, bi.colorIdx);
                     }
 
