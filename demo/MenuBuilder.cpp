@@ -79,7 +79,7 @@ void MenuBuilder::BuildHelpMenu(QMenu* pHelpMenu) {
     QObject::connect(pAbout, &QAction::triggered, _pWindow, [this] {
         QMessageBox::about(_pWindow, "About QtRtfEditor",
             "QtRtfEditor Demo\n"
-            "Reusable RTF-capable QTextEdit subclass\n"
+            "QTextEdit subclass with partial RTF support\n"
             "\n"
             "Features supported in roundtrip:\n"
             "  Formatting: bold, italic, underline,\n"

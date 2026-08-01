@@ -1,6 +1,6 @@
 # QtRtfEditor
 
-A reusable **RTF-capable QTextEdit subclass** for Qt6.
+A **QTextEdit subclass with partial RTF support** for Qt6.
 
 > **Early development.** The library is ready for testing but should not
 > yet be trusted to preserve document data.

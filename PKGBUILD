@@ -2,12 +2,17 @@
 
 pkgname=qt-rtf-editor
 _pkgbasename=QtRtfEditor
-pkgver=0.1.2
 pkgrel=1
-pkgdesc='Reusable RTF-capable QTextEdit subclass'
+
+pkgver() {
+  local repo_root
+  repo_root="$(dirname "${BASH_SOURCE[0]}")"
+  grep 'VERSION' "$repo_root/CMakeLists.txt" | grep -v 'cmake_minimum_required' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1
+}
+pkgdesc='QTextEdit subclass with partial RTF support'
 arch=('x86_64' 'aarch64')
 url='https://github.com/Fritz1729/QtRtfEditor'
-license=('GPL-3.0-only' 'custom')
+license=('LGPL-3.0-only')
 depends=('qt6-base')
 makedepends=('cmake' 'ninja' 'qt6-base')
 checkdepends=('qt6-base')
@@ -50,7 +55,7 @@ prepare() {
 cmake_minimum_required(VERSION 3.16)
 project(QtRtfEditor
      VERSION ${_cmake_ver}
-    DESCRIPTION "Reusable RTF-capable QTextEdit subclass"
+    DESCRIPTION "QTextEdit subclass with partial RTF support"
     HOMEPAGE_URL https://github.com/Fritz1729/QtRtfEditor
     LANGUAGES CXX
 )
@@ -186,4 +191,7 @@ check() {
 
 package() {
   cmake --install build --prefix "${pkgdir}/usr"
+  install -Dm644 "${srcdir}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  install -Dm644 "${srcdir}/licenses/LGPL-3.0-only.txt" "${pkgdir}/usr/share/licenses/${pkgname}/LGPL-3.0-only.txt"
+  install -Dm644 "${srcdir}/licenses/GPL-3.0-only.txt" "${pkgdir}/usr/share/licenses/${pkgname}/GPL-3.0-only.txt"
 }

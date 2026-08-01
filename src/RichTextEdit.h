@@ -26,7 +26,7 @@ namespace Rte {
 enum class FormatMode { Rtf, Html };
 
 /**
- * @brief RTF-capable QTextEdit subclass with \protect support.
+ * @brief QTextEdit subclass with partial RTF support.
  *
  * RichTextEdit allows loading and saving RTF data
  * (Delphi/TRichEdit-compatible) and supports the \protect

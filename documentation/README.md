@@ -6,7 +6,7 @@ This documentation covers the architecture, API, and internals of QtRtfEditor.
 
 ## Overview
 
-QtRtfEditor is a reusable RTF-capable `QTextEdit` subclass. It provides bidirectional RTF I/O with Delphi/TRichEdit compatibility, HTML support, and protected range functionality.
+QtRtfEditor is a `QTextEdit` subclass with partial RTF support. It provides bidirectional RTF I/O with Delphi/TRichEdit compatibility, HTML support, and protected range functionality.
 
 ## Document Navigation
 

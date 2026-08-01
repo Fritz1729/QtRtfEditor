@@ -5,15 +5,21 @@
 cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j$(nproc)
 ctest --output-on-failure --test-dir build -C Release
 ```
-Out-of-source into `build/`. Demo: `build/demo/demo`.
+Out-of-source into `build/`. Demo: `build/demo/demo`. Convenience wrapper: `./build.sh`.
 
-**Windows/MSVC:** multi-config generator — always pass `--config Release` to `cmake --build` and `-C Release` to `ctest`, or tests won't find binaries.
+**Windows/MSVC:** multi-config generator — always pass `--config Release` to `cmake --build` and `-C Release` to `ctest`.
+
+**Headless testing:** set `QT_QPA_PLATFORM=offscreen` (used in CI).
 
 ## Structure
-- **`src/`** — `QtRtfEditor` static library. See [documentation](documentation/).
+- **`src/`** — `QtRtfEditor` static library. See [documentation](documentation/). Built with `RTE_BUILD_LIBRARY` preprocessor define.
 - **`tests/`** — Three executables: `test_protected_ranges`, `test_rtf_structural`, `test_roundtrip`. See [Tests](documentation/tests.md).
 - **`demo/`** — Minimal GUI demo.
 - **`documentation/`** — Architecture docs. Not packaged.
+- **`3rdparty/`** — Not tracked (gitignored). Do not reference.
+
+## Test Data
+`test_roundtrip` reads from `tests/TestData/*.rtf`. A POST_BUILD step copies these to `testdata/` next to the test binary. Adding a new test file requires only placing it in `tests/TestData/` — no CMake changes.
 
 ## References
 - **Supported / unsupported features:** [Supported Features](documentation/supported_features.md) — do NOT implement "Out of Scope" items.

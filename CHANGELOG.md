@@ -14,4 +14,4 @@ Protected ranges, images, tables, lists, tab stops, character formatting (`\expn
 
 ## v0.1.0
 
-Initial release: RTF-capable QTextEdit subclass with character/paragraph formatting, roundtrip tests, CI.
+Initial release: QTextEdit subclass with partial RTF support, character/paragraph formatting, roundtrip tests, CI.
