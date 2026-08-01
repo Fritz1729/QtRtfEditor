@@ -1,6 +1,11 @@
 # QtRtfEditor — CMakeLists.txt (Library)
 
-add_library(QtRtfEditor STATIC
+set(_rte_lib_type STATIC)
+if(BUILD_SHARED_LIBS)
+    set(_rte_lib_type SHARED)
+endif()
+
+add_library(QtRtfEditor ${_rte_lib_type}
     RichTextEdit.h
     RichTextEdit.cpp
     RtfExport.h
@@ -37,6 +42,7 @@ target_compile_definitions(QtRtfEditor
 set_target_properties(QtRtfEditor PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
+    POSITION_INDEPENDENT_CODE ON
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
 )

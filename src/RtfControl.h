@@ -3,6 +3,8 @@
 #include <array>
 #include <cstdint>
 
+#include "RichTextEdit.h"
+
 namespace Rte {
 
 /**
@@ -87,6 +89,6 @@ struct RtfControl {
  * @brief Look up a control by keyword. O(1) via static unordered_map.
  * @return Pointer to the control entry, or nullptr if not found.
  */
-const RtfControl* FindControl(const char* keyword);
+RTE_EXPORT const RtfControl* FindControl(const char* keyword);
 
 } // namespace Rte

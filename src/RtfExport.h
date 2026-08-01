@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "RichTextEdit.h"
+
 class QTextDocument;
 
 namespace Rte {
@@ -16,13 +18,13 @@ namespace Rte {
  * This ensures round-trip compatibility when data is shared with
  * Delphi applications.
  */
-std::string ExportRtf(const QTextDocument& document);
+RTE_EXPORT std::string ExportRtf(const QTextDocument& document);
 
 /**
  * @brief Serialize QTextDocument as HTML string.
  * @param document  The QTextDocument to serialize.
  * @return          HTML string (UTF-8, q:-namespaced).
  */
-std::string ExportHtml(const QTextDocument& document);
+RTE_EXPORT std::string ExportHtml(const QTextDocument& document);
 
 } // namespace Rte

@@ -12,11 +12,17 @@ Out-of-source into `build/`. Demo: `build/demo/demo`. Convenience wrapper: `./bu
 **Headless testing:** set `QT_QPA_PLATFORM=offscreen` (used in CI).
 
 ## Structure
-- **`src/`** — `QtRtfEditor` static library. See [documentation](documentation/). Built with `RTE_BUILD_LIBRARY` preprocessor define.
+- **`src/`** — `QtRtfEditor` library (static by default; shared with `-DBUILD_SHARED_LIBS=ON`). Built with `RTE_BUILD_LIBRARY` preprocessor define. See [documentation](documentation/).
 - **`tests/`** — Three executables: `test_protected_ranges`, `test_rtf_structural`, `test_roundtrip`. See [Tests](documentation/tests.md).
 - **`demo/`** — Minimal GUI demo.
 - **`documentation/`** — Architecture docs. Not packaged.
 - **`3rdparty/`** — Not tracked (gitignored). Do not reference.
+
+## Shared Library — Export Rules
+- `RTE_EXPORT` is defined in `RichTextEdit.h`. It expands to `dllexport`/`visibility("default")` when building the library as shared, empty otherwise.
+- **Every public symbol** exported from the shared library must be marked `RTE_EXPORT`: the `RichTextEdit` class and all free functions (`ExportRtf`, `ExportHtml`, `ImportRtf`, `ParseRtf`, `MapSymbolByte`, `MapCp1252Byte`, `MapHexByteToCodepoint`, `FindControl`).
+- Headers that use `RTE_EXPORT` must `#include "RichTextEdit.h"` — do not include it from `RtfTypes.h` (header-only types/inline helpers have no export needs).
+- CI tests both static and shared linking (`link: [static, shared]` matrix dimension in `.github/workflows/build.yml`).
 
 ## Test Data
 `test_roundtrip` reads from `tests/TestData/*.rtf`. A POST_BUILD step copies these to `testdata/` next to the test binary. Adding a new test file requires only placing it in `tests/TestData/` — no CMake changes.
