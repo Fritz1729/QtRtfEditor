@@ -45,9 +45,7 @@ enum class FormatMode { Rtf, Html };
 class RTE_EXPORT RichTextEdit : public QTextEdit
 {
 #ifdef RTE_BUILD_LIBRARY
-#  if defined(Q_OS_WIN)
-#    pragma comment(linker, "/EXPORT:staticMetaObject=_Rte_RichTextEdit_staticMetaObject")
-#  elif defined(__GNUC__) || defined(__clang__)
+#  if defined(__GNUC__) || defined(__clang__)
 #    pragma GCC visibility push(default)
 #  endif
 #endif

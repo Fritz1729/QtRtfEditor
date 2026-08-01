@@ -47,6 +47,12 @@ set_target_properties(QtRtfEditor PROPERTIES
     VISIBILITY_INLINES_HIDDEN ON
 )
 
+if(WIN32 AND (_rte_lib_type STREQUAL "SHARED"))
+    target_link_options(QtRtfEditor PRIVATE
+        "/EXPORT:?staticMetaObject@RichTextEdit@Rte@@2UQMetaObject@@B"
+    )
+endif()
+
 # --- Installation ---
 include(GNUInstallDirs)
 
