@@ -50,8 +50,3 @@ The following more mature projects provided valuable reference material:
 
 - **[Ted](https://github.com/mdedoes/Ted)** — stable RTF standalone editor for Linux (written in C)
 - **[Calligra RTF filter](https://github.com/KDE/calligra/tree/master/filters/words/rtf)** — parser used by KDE
-
-## License
-
-Dual licensing: **LGPL-3.0-or-later** or **commercial license**.
-See [Qt Licensing](https://www.qt.io/licensing) for details.
