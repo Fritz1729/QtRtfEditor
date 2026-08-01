@@ -6,7 +6,7 @@
 cmake_minimum_required(VERSION 3.27)
 
 project(QtRtfEditor
-    VERSION 0.1.3
+    VERSION 0.1.3.1
     LANGUAGES CXX
     SPDX_LICENSE "LGPL-3.0-only"
     DESCRIPTION "QTextEdit subclass with partial RTF support"

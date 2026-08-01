@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.3.1
+
+PKGBUILD pkgver fix, license text files added, `examples/demo` renamed to `demo`.
+
 ## v0.1.3
 
 Hyperlinks, `\highlight`, `\pntext`, parser hardening (`\ucN`, star groups), hex escape fix, O(1) control lookup, table deduplication, per-module documentation.
