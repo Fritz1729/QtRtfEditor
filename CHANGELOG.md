@@ -2,9 +2,7 @@
 
 ## v0.1.4
 
-Shared library builds via BUILD_SHARED_LIBS, symbol exports (RTE_EXPORT),
-Windows dllimport for DLL consumers, CI static/shared matrix,
-PKGBUILD shared library default.
+Optional shared library builds via BUILD_SHARED_LIBS (static remains the CMake default). PKGBUILD defaults to shared.
 
 ## v0.1.3.1
 
