@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.4
+
+Shared library builds via BUILD_SHARED_LIBS, symbol exports (RTE_EXPORT),
+Windows dllimport for DLL consumers, CI static/shared matrix,
+PKGBUILD shared library default.
+
 ## v0.1.3.1
 
 PKGBUILD pkgver fix, license text files added, `examples/demo` renamed to `demo`.
