@@ -6,16 +6,20 @@
 #include <QMimeData>
 #include <QMouseEvent>
 
-// Symbol export macro (DLL/shared builds)
+// Symbol export/import macro (shared library builds)
 #ifndef RTE_EXPORT
-#  ifdef RTE_BUILD_LIBRARY
-#    if defined(Q_OS_WIN)
+#  if defined(Q_OS_WIN)
+#    ifdef RTE_BUILD_LIBRARY
 #      define RTE_EXPORT __declspec(dllexport)
 #    else
-#      define RTE_EXPORT __attribute__((visibility("default")))
+#      define RTE_EXPORT __declspec(dllimport)
 #    endif
 #  else
-#    define RTE_EXPORT
+#    ifdef RTE_BUILD_LIBRARY
+#      define RTE_EXPORT __attribute__((visibility("default")))
+#    else
+#      define RTE_EXPORT
+#    endif
 #  endif
 #endif
 
