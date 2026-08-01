@@ -18,7 +18,7 @@ mkdir -p "$BUILD_DIR"
 # the source tree and use the project version from CMakeLists.txt.
 _pkgver=$(grep 'VERSION' "${SCRIPT_DIR}/CMakeLists.txt" | grep -v 'cmake_minimum_required' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
 sed -e "s|repo_root=\"\$(dirname \"\${BASH_SOURCE\[0\]}\")\"|repo_root='${SCRIPT_DIR}'|" \
-    -e "s|^pkgver=.*|pkgver=${_pkgver}|" \
+    -e "/^pkgrel=/a pkgver=${_pkgver}" \
     "${SCRIPT_DIR}/PKGBUILD" > "${BUILD_DIR}/PKGBUILD"
 
 # Run makepkg in the clean directory.
