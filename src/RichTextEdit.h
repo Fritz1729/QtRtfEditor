@@ -44,7 +44,21 @@ enum class FormatMode { Rtf, Html };
  */
 class RTE_EXPORT RichTextEdit : public QTextEdit
 {
+#ifdef RTE_BUILD_LIBRARY
+#  if defined(Q_OS_WIN)
+#    pragma comment(linker, "/EXPORT:staticMetaObject=_Rte_RichTextEdit_staticMetaObject")
+#  elif defined(__GNUC__) || defined(__clang__)
+#    pragma GCC visibility push(default)
+#  endif
+#endif
+
     Q_OBJECT
+
+#ifdef RTE_BUILD_LIBRARY
+#  if defined(__GNUC__) || defined(__clang__)
+#    pragma GCC visibility pop
+#  endif
+#endif
 
 public:
     explicit RichTextEdit(QWidget* parent = nullptr, int codePage = 1252);
