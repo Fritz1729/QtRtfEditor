@@ -7,7 +7,6 @@
 #include <QDebug>
 #include <QFont>
 #include <QVector>
-#include <optional>
 #include <stdexcept>
 #include "RtfCompare.h"
 #include "RtfParser.h"
@@ -48,9 +47,7 @@ public:
 
 private:
     void RunFromCustomDir(const QString& dirPath);
-    void DoRoundtrip(const QString& name, const std::string& rtf);
-    std::optional<RoundtripResult> RunRoundtripWithTimeout(const std::string& original,
-                                                            const QString& filename);
+    RoundtripResult RunRoundtripOnMainThread(const std::string& original);
 
     int _pass = 0;
     int _fail = 0;
@@ -86,33 +83,34 @@ static std::string ReadFile(const std::string& path) {
     return file.readAll().toStdString();
 }
 
-static RoundtripResult RunRoundtrip(const std::string& original) {
+RoundtripResult TestRoundtrip::RunRoundtripOnMainThread(const std::string& original) {
     RoundtripResult r;
     try {
-        qDebug() << "[roundtrip] Before RichTextEdit constructor";
         Rte::RichTextEdit editor;
-        qDebug() << "[roundtrip] After RichTextEdit, before Load";
         editor.Load(original, Rte::FormatMode::Rtf);
-        qDebug() << "[roundtrip] After Load, before Save";
         std::string saved = editor.Save(Rte::FormatMode::Rtf);
-        qDebug() << "[roundtrip] After Save, before ParseRtf";
 
-        RtfDocument doc = ParseRtf(saved);
-        qDebug() << "[roundtrip] After ParseRtf, before CompareRtf";
+        auto doc = ParseRtf(saved);
         if (!doc.unknownTags.empty()) {
-            for (const auto& tag : doc.unknownTags) {
-                qDebug() << "  UNKNOWN TAG:" << QString::fromStdString(tag);
-            }
             r.outputUnsupported = true;
             return r;
         }
 
-        std::string reason;
-        RtfCompareResult result = CompareRtf(original, saved, reason);
-        qDebug() << "[roundtrip] After CompareRtf, result=" << (result == RtfCompareResult::Identical ? "Identical" : "Diff");
-        r.passed = (result == RtfCompareResult::Identical);
-        r.reason = std::move(reason);
-    } catch (const std::exception& e) {
+        auto result = RunWithTimeout([original, saved]() {
+            std::string reason;
+            auto cmp = CompareRtf(original, saved, reason);
+            return std::make_pair(cmp, std::move(reason));
+        }, std::chrono::seconds(1));
+
+        if (!result) {
+            r.passed = false;
+            r.reason = "timeout (1s)";
+            return r;
+        }
+
+        r.passed = (result->first == RtfCompareResult::Identical);
+        r.reason = std::move(result->second);
+    } catch (...) {
         r.exception = true;
     }
     return r;
@@ -170,13 +168,7 @@ void TestRoundtrip::RunFromCustomDir(const QString& dirPath) {
             continue;
         }
 
-        std::optional<RoundtripResult> optResult = RunRoundtripWithTimeout(original, filename);
-        if (!optResult) {
-            ReportCase(filename, "TIMEOUT");
-            qCritical() << "File:" << filename << "timed out (1s)";
-            QFAIL(("Roundtrip timed out for " + filename.toStdString()).c_str());
-        }
-        RoundtripResult r = *optResult;
+        RoundtripResult r = RunRoundtripOnMainThread(original);
 
         if (r.outputUnsupported) {
             ReportCase(filename, "FAIL (output has unsupported features)");
@@ -211,14 +203,6 @@ void TestRoundtrip::cleanupTestCase() {
                         << " exceptions";
     qDebug().noquote() << "======================================";
 }
-
-std::optional<RoundtripResult> TestRoundtrip::RunRoundtripWithTimeout(
-        const std::string& original, const QString& filename) {
-    return RunWithTimeout([original]() {
-        return RunRoundtrip(original);
-    }, std::chrono::seconds(1));
-}
-
 // Compute default font family on the main thread before any worker threads are spawned.
 // QFont() is not thread-safe and can deadlock when called from a non-main thread on Windows.
 static void InitDefaultFontFamily() {
