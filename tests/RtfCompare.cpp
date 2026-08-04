@@ -3,6 +3,7 @@
 #include "TestUtils.h"
 
 #include <algorithm>
+#include <QDebug>
 #include <QFont>
 #include <string>
 #include <vector>
@@ -120,7 +121,9 @@ static bool CompareFormatSemantic(const RtfRunFormat& fmtA, const RtfRunFormat& 
     if (ReportBoolDiff(loc, "underline", fmtA.underline, fmtB.underline, reason)) return false;
 
     // Font — resolve by family; missing \fonttbl ≡ Qt default font
+    qDebug() << "[compare] Before QFont().family() in CompareFormatSemantic";
     static const std::string defaultFamily = QFont().family().toStdString();
+    qDebug() << "[compare] QFont().family() returned:" << defaultFamily.c_str();
     std::string familyA, familyB;
     bool hasFontA = fmtA.fontIndex >= 0 && fmtA.fontIndex < static_cast<int>(docA.fonts.size());
     bool hasFontB = fmtB.fontIndex >= 0 && fmtB.fontIndex < static_cast<int>(docB.fonts.size());
@@ -502,22 +505,30 @@ static RtfCompareResult DoCompareDocuments(const RtfDocument& a, const RtfDocume
 static std::pair<RtfCompareResult, std::string> DoCompareParse(
         const std::string& rtfA, const std::string& rtfB) {
     std::string localReason;
+    qDebug() << "[compare] Before ParseRtf(docA)";
     RtfDocument docA = ParseRtf(rtfA);
+    qDebug() << "[compare] After ParseRtf(docA), elements=" << docA.elements.size();
+    qDebug() << "[compare] Before ParseRtf(docB)";
     RtfDocument docB = ParseRtf(rtfB);
+    qDebug() << "[compare] After ParseRtf(docB), elements=" << docB.elements.size();
     RtfCompareResult result = DoCompareDocuments(docA, docB, localReason);
     return {result, std::move(localReason)};
 }
 
 RtfCompareResult CompareRtf(const std::string& rtfA, const std::string& rtfB,
                               std::string& reason) {
+    qDebug() << "[compare] CompareRtf entering, calling RunWithTimeout";
     auto result = RunWithTimeout([rtfA, rtfB]() {
         return DoCompareParse(rtfA, rtfB);
     }, std::chrono::seconds(1));
     if (!result) {
+        qDebug() << "[compare] CompareRtf timeout!";
         reason = "timeout (1s)";
         return RtfCompareResult::StructuralDiff;
     }
     auto [compareResult, localReason] = *result;
+    qDebug() << "[compare] CompareRtf completed, result="
+             << (compareResult == RtfCompareResult::Identical ? "Identical" : "Diff");
     reason = std::move(localReason);
     return compareResult;
 }

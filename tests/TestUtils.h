@@ -6,12 +6,14 @@
 #include <thread>
 #include <type_traits>
 
+#include <QDebug>
+
 namespace Rte {
 
 /**
  * @brief Run a callable with a timeout. Returns std::nullopt on timeout.
- * The worker thread is joined; if timeout fires, the worker continues
- * until completion before join returns (safe across CRT boundaries).
+ * On timeout, the worker is detached (not joined) to avoid hanging when
+ * the worker is deadlocked (e.g., Qt operations across CRT boundaries).
  */
 template<typename F>
 auto RunWithTimeout(F func, std::chrono::seconds timeout)
@@ -22,8 +24,10 @@ auto RunWithTimeout(F func, std::chrono::seconds timeout)
     std::thread worker([f = std::move(func), p = std::move(promise)]() mutable {
         p.set_value(f());
     });
+    qDebug() << "[timeout] Spawning worker, timeout=" << timeout.count() << "s";
     if (future.wait_for(timeout) != std::future_status::ready) {
-        worker.join();
+        qDebug() << "[timeout] Timeout fired, detaching worker";
+        worker.detach();
         return std::nullopt;
     }
     R result = future.get();

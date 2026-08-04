@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFile>
 #include <QApplication>
+#include <QDebug>
 #include <QVector>
 #include <optional>
 #include <stdexcept>
@@ -87,11 +88,16 @@ static std::string ReadFile(const std::string& path) {
 static RoundtripResult RunRoundtrip(const std::string& original) {
     RoundtripResult r;
     try {
+        qDebug() << "[roundtrip] Before RichTextEdit constructor";
         Rte::RichTextEdit editor;
+        qDebug() << "[roundtrip] After RichTextEdit, before Load";
         editor.Load(original, Rte::FormatMode::Rtf);
+        qDebug() << "[roundtrip] After Load, before Save";
         std::string saved = editor.Save(Rte::FormatMode::Rtf);
+        qDebug() << "[roundtrip] After Save, before ParseRtf";
 
         RtfDocument doc = ParseRtf(saved);
+        qDebug() << "[roundtrip] After ParseRtf, before CompareRtf";
         if (!doc.unknownTags.empty()) {
             for (const auto& tag : doc.unknownTags) {
                 qDebug() << "  UNKNOWN TAG:" << QString::fromStdString(tag);
@@ -102,6 +108,7 @@ static RoundtripResult RunRoundtrip(const std::string& original) {
 
         std::string reason;
         RtfCompareResult result = CompareRtf(original, saved, reason);
+        qDebug() << "[roundtrip] After CompareRtf, result=" << (result == RtfCompareResult::Identical ? "Identical" : "Diff");
         r.passed = (result == RtfCompareResult::Identical);
         r.reason = std::move(reason);
     } catch (const std::exception& e) {
