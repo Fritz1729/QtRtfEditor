@@ -39,6 +39,12 @@ target_compile_definitions(QtRtfEditor
     PRIVATE RTE_BUILD_LIBRARY
 )
 
+if(NOT _rte_lib_type STREQUAL "SHARED")
+    target_compile_definitions(QtRtfEditor
+        INTERFACE RTE_STATIC
+    )
+endif()
+
 set_target_properties(QtRtfEditor PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
