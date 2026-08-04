@@ -162,7 +162,9 @@ void RichTextEdit::mousePressEvent(QMouseEvent* event) {
         run.setPosition(start);
         run.setPosition(end < document()->characterCount() ? end : document()->characterCount(), QTextCursor::KeepAnchor);
 
-        emit protectedRegionClicked(start, end, run.selectedText());
+        emit protectedRegionClicked(static_cast<std::size_t>(start),
+                                    static_cast<std::size_t>(end),
+                                    run.selectedText());
     }
 
     ClampCursor();

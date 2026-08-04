@@ -30,15 +30,17 @@
 #include <map>
 #include <sstream>
 
+using namespace std;
+
 namespace Rte {
 
 namespace {
 
-constexpr std::array<const char*, 4> kRowBorderSideTags = {{
+constexpr array<const char*, 4> kRowBorderSideTags = {{
     "\\trbrdrl", "\\trbrdrt", "\\trbrdrr", "\\trbrdrb"
 }};
 
-constexpr std::array<const char*, 4> kCellBorderSideTags = {{
+constexpr array<const char*, 4> kCellBorderSideTags = {{
     "\\clbrdrl", "\\clbrdrt", "\\clbrdrr", "\\clbrdrb"
 }};
 
@@ -46,29 +48,29 @@ using BorderWidthGetter = double (QTextTableCellFormat::*)() const;
 using BorderStyleGetter = QTextFrameFormat::BorderStyle (QTextTableCellFormat::*)() const;
 using BorderBrushGetter = QBrush (QTextTableCellFormat::*)() const;
 
-constexpr std::array<BorderWidthGetter, 4> kBorderWidthGetters = {{
+constexpr array<BorderWidthGetter, 4> kBorderWidthGetters = {{
     &QTextTableCellFormat::leftBorder, &QTextTableCellFormat::topBorder,
     &QTextTableCellFormat::rightBorder, &QTextTableCellFormat::bottomBorder,
 }};
 
-constexpr std::array<BorderStyleGetter, 4> kBorderStyleGetters = {{
+constexpr array<BorderStyleGetter, 4> kBorderStyleGetters = {{
     &QTextTableCellFormat::leftBorderStyle, &QTextTableCellFormat::topBorderStyle,
     &QTextTableCellFormat::rightBorderStyle, &QTextTableCellFormat::bottomBorderStyle,
 }};
 
-constexpr std::array<BorderBrushGetter, 4> kBorderBrushGetters = {{
+constexpr array<BorderBrushGetter, 4> kBorderBrushGetters = {{
     &QTextTableCellFormat::leftBorderBrush, &QTextTableCellFormat::topBorderBrush,
     &QTextTableCellFormat::rightBorderBrush, &QTextTableCellFormat::bottomBorderBrush,
 }};
 
 using PaddingGetter = double (QTextTableCellFormat::*)() const;
 
-constexpr std::array<PaddingGetter, 4> kPaddingGetters = {{
+constexpr array<PaddingGetter, 4> kPaddingGetters = {{
     &QTextTableCellFormat::leftPadding, &QTextTableCellFormat::topPadding,
     &QTextTableCellFormat::rightPadding, &QTextTableCellFormat::bottomPadding,
 }};
 
-constexpr std::array<const char*, 4> kCellPaddingTags = {{
+constexpr array<const char*, 4> kCellPaddingTags = {{
     "clpadl", "clpadt", "clpadr", "clpadb"
 }};
 
@@ -86,7 +88,7 @@ static const char* UnderlineStyleTag(UnderlineStyle style) {
     return "";
 }
 
-static void WriteConditionalFormatOff(std::ostringstream& out, const RtfRunFormat& cur, const RtfRunFormat& lastEmitted, bool trailingSpace) {
+static void WriteConditionalFormatOff(ostringstream& out, const RtfRunFormat& cur, const RtfRunFormat& lastEmitted, bool trailingSpace) {
     const char* space = trailingSpace ? " " : "";
     if (!cur.bold && lastEmitted.bold) out << "\\b0" << space;
     if (!cur.italic && lastEmitted.italic) out << "\\i0" << space;
@@ -117,7 +119,7 @@ static bool IsFormatActive(const RtfRunFormat& fmt) {
         fmt.highlightIndex != 0 || fmt.ulColorIndex != 0;
 }
 
-static bool WritePlainTextOff(std::ostringstream& out, const RtfRunFormat& fmt) {
+static bool WritePlainTextOff(ostringstream& out, const RtfRunFormat& fmt) {
     if (IsFormatActive(fmt)) {
         out << "\\plain ";
         return true;
@@ -135,16 +137,16 @@ static UnderlineStyle EffectiveUnderlineStyle(const QTextCharFormat& fmt) {
     return UnderlineStyle::None;
 }
 
-static int FindColorIndex(const std::vector<QColor>& colorList, const QColor& color) {
+static int FindColorIndex(const vector<QColor>& colorList, const QColor& color) {
     for (int i = 0; i < static_cast<int>(colorList.size()); ++i) {
-        if (colorList[i] == color) return i;
+        if (colorList[static_cast<size_t>(i)] == color) return i;
     }
     return -1;
 }
 
-static std::string RtfEscape(const QString& text) {
-    std::string result;
-    result.reserve(text.size() * 2);
+static string RtfEscape(const QString& text) {
+    string result;
+    result.reserve(static_cast<size_t>(text.size()) * 2);
 
     for (const QChar& ch : text) {
         ushort code = ch.unicode();
@@ -166,14 +168,14 @@ static std::string RtfEscape(const QString& text) {
     return result;
 }
 
-static std::string AlignmentToRtf(Qt::Alignment alignment) {
+static string AlignmentToRtf(Qt::Alignment alignment) {
     if (alignment & Qt::AlignRight) return "\\qr";
     if (alignment & Qt::AlignHCenter) return "\\qc";
     if (alignment & Qt::AlignJustify) return "\\qj";
     return "";
 }
 
-static void EmitPictHeader(std::ostringstream& out, const QString& blipTag, qreal width, qreal height) {
+static void EmitPictHeader(ostringstream& out, const QString& blipTag, qreal width, qreal height) {
     out << "{\\pict\\" << blipTag.toStdString() << " ";
     int picwgoal = static_cast<int>(width * 2.0);
     int pichgoal = static_cast<int>(height * 2.0);
@@ -182,7 +184,7 @@ static void EmitPictHeader(std::ostringstream& out, const QString& blipTag, qrea
     out << ' ';
 }
 
-static std::string EmitImageAsPict(const QTextDocument& doc, const QString& name,
+static string EmitImageAsPict(const QTextDocument& doc, const QString& name,
                                       qreal width, qreal height) {
     // Extract counter from name (e.g., "rtfimage://1.png" -> "1")
     int counter = 0;
@@ -212,7 +214,7 @@ static std::string EmitImageAsPict(const QTextDocument& doc, const QString& name
     QVariant hexVariant = doc.property(qPrintable(propName));
     if (hexVariant.canConvert<QString>()) {
         QString hexStr = hexVariant.toString();
-        std::ostringstream out;
+        ostringstream out;
         EmitPictHeader(out, blipTag, width, height);
         out << hexStr.toStdString();
         out << '}';
@@ -236,21 +238,21 @@ static std::string EmitImageAsPict(const QTextDocument& doc, const QString& name
     buffer.open(QIODevice::WriteOnly);
     image.save(&buffer, qPrintable(encFormat));
 
-    std::ostringstream out;
+    ostringstream out;
     EmitPictHeader(out, blipTag, width, height);
     out << encodedData.toHex().data();
     out << "}";
     return out.str();
 }
 
-static void EmitTwipsTag(std::ostringstream& out, double val, const char* tag) {
+static void EmitTwipsTag(ostringstream& out, double val, const char* tag) {
     if (val > 0) {
         int twips = PointsToHalfPtTwips(val);
         out << "\\" << tag << twips;
     }
 }
 
-static void EmitParaFormatting(std::ostringstream& out, const QTextBlockFormat& blockFmt) {
+static void EmitParaFormatting(ostringstream& out, const QTextBlockFormat& blockFmt) {
     out << AlignmentToRtf(blockFmt.alignment());
     EmitTwipsTag(out, blockFmt.leftMargin(), "li");
     EmitTwipsTag(out, static_cast<double>(blockFmt.indent()), "fi");
@@ -281,6 +283,7 @@ static void EmitParaFormatting(std::ostringstream& out, const QTextBlockFormat& 
         case QTextOption::CenterTab:
             out << "\\tqc\\tx" << twips;
             break;
+        case QTextOption::DelimiterTab:
         default:
             out << "\\tx" << twips;
             break;
@@ -299,7 +302,7 @@ static bool NeedsParaReset(const QTextBlockFormat& last, const QTextBlockFormat&
         blockFmt.lineHeight() != last.lineHeight();
 }
 
-static void EmitParaFormattingIfNeeded(std::ostringstream& out, const QTextBlockFormat& blockFmt,
+static void EmitParaFormattingIfNeeded(ostringstream& out, const QTextBlockFormat& blockFmt,
     QTextBlockFormat& lastParaFmt, bool& lastParaFmtSet) {
     bool hasParaFormatting = blockFmt.alignment() != Qt::AlignLeft ||
         blockFmt.leftMargin() > 0 || blockFmt.indent() > 0 ||
@@ -328,12 +331,12 @@ struct CellBorderInfo {
     }
 };
 
-static void CollectColor(const QColor& col, std::vector<QColor>& list) {
+static void CollectColor(const QColor& col, vector<QColor>& list) {
     if (col.isValid() && col.alpha() == 255 && FindColorIndex(list, col) < 0)
         list.push_back(col);
 }
 
-static int LookupColorIndex(const QColor& col, const std::vector<QColor>& list) {
+static int LookupColorIndex(const QColor& col, const vector<QColor>& list) {
     if (!col.isValid() || col.alpha() != 255) return 0;
     return FindColorIndex(list, col) + 1;
 }
@@ -347,7 +350,7 @@ static QColor ParseUlColor(const QTextCharFormat& fmt) {
     return {};
 }
 
-static void CollectBorderColor(const QBrush& brush, std::vector<QColor>& colorList) {
+static void CollectBorderColor(const QBrush& brush, vector<QColor>& colorList) {
     if (brush.style() != Qt::NoBrush && brush.color().isValid()) {
         QColor col = brush.color();
         if (col.alpha() == 255 &&
@@ -356,7 +359,7 @@ static void CollectBorderColor(const QBrush& brush, std::vector<QColor>& colorLi
     }
 }
 
-static CellBorderInfo ReadCellBorder(const QTextTableCellFormat& cf, const std::vector<QColor>& colorList, TableSide side) {
+static CellBorderInfo ReadCellBorder(const QTextTableCellFormat& cf, const vector<QColor>& colorList, TableSide side) {
     CellBorderInfo bi{};
     bi.width = (cf.*(kBorderWidthGetters.at(side)))();
     bi.style = (cf.*(kBorderStyleGetters.at(side)))();
@@ -366,32 +369,41 @@ static CellBorderInfo ReadCellBorder(const QTextTableCellFormat& cf, const std::
     return bi;
 }
 
-static void EmitBorderSpec(std::ostringstream& out, double width, QTextFrameFormat::BorderStyle style, int colorIdx) {
+static void EmitBorderSpec(ostringstream& out, double width, QTextFrameFormat::BorderStyle style, int colorIdx) {
     if (width <= 0.0) return;
     int halfPts = PointsToHalfPtTwips(width);
     switch (style) {
         case QTextFrameFormat::BorderStyle_Solid:  out << "\\brdrs"; break;
         case QTextFrameFormat::BorderStyle_Dashed:  out << "\\brdrd"; break;
+        case QTextFrameFormat::BorderStyle_None:
+        case QTextFrameFormat::BorderStyle_Dotted:
+        case QTextFrameFormat::BorderStyle_Double:
+        case QTextFrameFormat::BorderStyle_DotDash:
+        case QTextFrameFormat::BorderStyle_DotDotDash:
+        case QTextFrameFormat::BorderStyle_Groove:
+        case QTextFrameFormat::BorderStyle_Ridge:
+        case QTextFrameFormat::BorderStyle_Inset:
+        case QTextFrameFormat::BorderStyle_Outset:
         default: return;
     }
     out << "\\brdrw" << halfPts;
     if (colorIdx > 0) out << "\\brdrcf" << colorIdx;
 }
 
-static void EmitBorderSide(std::ostringstream& out, const char* sideTag, double width, QTextFrameFormat::BorderStyle style, int colorIdx) {
+static void EmitBorderSide(ostringstream& out, const char* sideTag, double width, QTextFrameFormat::BorderStyle style, int colorIdx) {
     if (width <= 0.0) return;
     out << sideTag;
     EmitBorderSpec(out, width, style, colorIdx);
 }
 
 struct BlockExportContext {
-    std::ostringstream& out;
+    ostringstream& out;
     const QTextDocument& document;
     const QFont& defaultFont;
-    const std::map<std::string, int>& fontMap;
-    const std::vector<QColor>& colorList;
-    const std::vector<QColor>& bgColorList;
-    const std::map<const QTextList*, int>& listMap;
+    const map<string, int>& fontMap;
+    const vector<QColor>& colorList;
+    const vector<QColor>& bgColorList;
+    const map<const QTextList*, int>& listMap;
     int defaultFontIdx;
     RtfRunFormat carriedOverFormat{};
     QTextBlockFormat lastParaFmt{};
@@ -477,7 +489,7 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
                 qreal w = imgFmt.width();
                 qreal h = imgFmt.height();
                 if (w > 0 && h > 0) {
-                    std::string pict = EmitImageAsPict(document, name, w, h);
+                    string pict = EmitImageAsPict(document, name, w, h);
                     if (!pict.empty()) {
                         out << pict << "\n";
                     }
@@ -493,9 +505,9 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
         struct AnchorRange {
             size_t fragIdxStart;
             size_t fragIdxEnd; // inclusive
-            std::string url;
+            string url;
         };
-        std::vector<AnchorRange> anchorRanges;
+        vector<AnchorRange> anchorRanges;
         QTextBlock::iterator scanIt = block.begin();
         size_t scanFragIdx = 0;
         while (scanIt != block.end()) {
@@ -516,8 +528,8 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
             scanFragIdx++;
             scanIt++;
         }
-        std::map<size_t, int> fragToAnchorRange;
-        for (int r = 0; r < static_cast<int>(anchorRanges.size()); ++r) {
+        map<size_t, size_t> fragToAnchorRange;
+        for (size_t r = 0; r < anchorRanges.size(); ++r) {
             for (size_t i = anchorRanges[r].fragIdxStart; i <= anchorRanges[r].fragIdxEnd; ++i) {
                 fragToAnchorRange[i] = r;
             }
@@ -531,7 +543,7 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
         bool firstRun = true;
 
         // Anchor tracking
-        int currentAnchorRange = -1;
+        size_t currentAnchorRange = SIZE_MAX;
         bool inAnchor = false;
 
         QTextBlock::iterator it = block.begin();
@@ -539,11 +551,14 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
         while (it != block.end()) {
             QTextFragment frag = it.fragment();
             if (frag.isValid() && frag.length() > 0) {
-                int anchorRange = fragToAnchorRange.count(fragIdx) ? fragToAnchorRange[fragIdx] : -1;
+                size_t anchorRange =
+                    fragToAnchorRange.count(fragIdx) ? fragToAnchorRange[fragIdx] : SIZE_MAX;
 
                 // Emit field opening if entering an anchor range
-                if (anchorRange >= 0 && !inAnchor && anchorRanges[anchorRange].fragIdxStart == fragIdx) {
-                    out << "{\\field{\\*\\fldinst HYPERLINK \"" << anchorRanges[anchorRange].url << "\"}{\\*\\fldrslt";
+                if (anchorRange != SIZE_MAX && !inAnchor &&
+                    anchorRanges[anchorRange].fragIdxStart == fragIdx) {
+                    out << "{\\field{\\*\\fldinst HYPERLINK \""
+                        << anchorRanges[anchorRange].url << "\"}{\\*\\fldrslt";
                     inAnchor = true;
                     currentAnchorRange = anchorRange;
                 }
@@ -631,11 +646,11 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
             prev = cur;
             firstRun = false;
 
-            if (inAnchor && currentAnchorRange >= 0 &&
-                fragIdx == anchorRanges[static_cast<size_t>(currentAnchorRange)].fragIdxEnd) {
+            if (inAnchor && currentAnchorRange != SIZE_MAX &&
+                fragIdx == anchorRanges[currentAnchorRange].fragIdxEnd) {
                 out << "}}";
                 inAnchor = false;
-                currentAnchorRange = -1;
+                currentAnchorRange = SIZE_MAX;
             }
 
             fragIdx++;
@@ -661,8 +676,8 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
 
 } // namespace
 
-std::string ExportRtf(const QTextDocument& document) {
-    std::ostringstream out;
+string ExportRtf(const QTextDocument& document) {
+    ostringstream out;
 
     qDebug() << "[export] ExportRtf start, collecting fonts";
     QFont defaultFont = document.defaultFont();
@@ -671,15 +686,15 @@ std::string ExportRtf(const QTextDocument& document) {
     int defaultTabStopTwips = document.property(UserPropMetaDefaultTabStopTwips).toInt();
     if (defaultTabStopTwips <= 0) defaultTabStopTwips = 180;  // RTF spec default
 
-    std::map<std::string, int> fontMap;
-    std::vector<QColor> colorList;
-    std::vector<QColor> bgColorList;
-    std::map<const QTextList*, int> listMap;
-    std::map<const QTextList*, ListStyle> listStyleMap;
+    map<string, int> fontMap;
+    vector<QColor> colorList;
+    vector<QColor> bgColorList;
+    map<const QTextList*, int> listMap;
+    map<const QTextList*, ListStyle> listStyleMap;
     int defaultFontIdx = 0;
     int listIdCounter = 1;
     int idx = 0;
-    std::string defFamily = defaultFont.family().toStdString();
+    string defFamily = defaultFont.family().toStdString();
     fontMap[defFamily] = idx;
     defaultFontIdx = idx;
         for (QTextBlock block = document.begin(); block.isValid(); block = block.next()) {
@@ -747,23 +762,23 @@ std::string ExportRtf(const QTextDocument& document) {
     }
 
     // Build fonttbl into a separate buffer; emit only if non-default fonts exist
-    std::ostringstream fonttblOut;
+    ostringstream fonttblOut;
     fonttblOut << "{\\fonttbl";
-    std::map<std::string, std::string> typeHints = {
+    map<string, string> typeHints = {
         {"arial", "\\fswiss"},
         {"times new roman", "\\froman"},
         {"courier new", "\\fmodern"},
     };
     for (int i = 0; i < static_cast<int>(fontMap.size()); ++i) {
-        auto fontIt = std::find_if(fontMap.begin(), fontMap.end(),
+        auto fontIt = find_if(fontMap.begin(), fontMap.end(),
             [i](const auto& p) { return p.second == i; });
         if (fontIt == fontMap.end()) continue;
-        const std::string& family = fontIt->first;
-        int idx = fontIt->second;
-        fonttblOut << "{\\f" << idx;
-        std::string lower = family;
-        std::transform(lower.begin(), lower.end(), lower.begin(),
-                        [](unsigned char c) { return std::tolower(c); });
+        const string& family = fontIt->first;
+        int fontIdx = fontIt->second;
+        fonttblOut << "{\\f" << fontIdx;
+        string lower = family;
+        transform(lower.begin(), lower.end(), lower.begin(),
+                        [](unsigned char c) { return tolower(c); });
         auto it = typeHints.find(lower);
         if (it != typeHints.end()) {
             fonttblOut << it->second;
@@ -776,7 +791,7 @@ std::string ExportRtf(const QTextDocument& document) {
 
     // Emit fonttbl only if it contains fonts other than Qt's default
     qDebug() << "[export] Before QFont().family()";
-    std::string defaultFamily = QFont().family().toStdString();
+    string defaultFamily = QFont().family().toStdString();
     qDebug() << "[export] QFont().family() returned:" << defaultFamily.c_str();
     bool hasNonDefaultFont = false;
     for (const auto& [family, _] : fontMap) {
@@ -825,7 +840,7 @@ std::string ExportRtf(const QTextDocument& document) {
             int rowCount = table->rows();
 
             // Compute cumulative \cellx positions
-            std::vector<int> cellxPositions;
+            vector<int> cellxPositions;
             int cumulative = 0;
             for (int c = 0; c < colCount; ++c) {
                 double width = constraints[c].value(QTextLength::FixedLength);
@@ -864,14 +879,16 @@ std::string ExportRtf(const QTextDocument& document) {
                 out << "\n";
 
                 // Pre-read all cell border info for this row to detect uniform sides
-                std::vector<std::array<CellBorderInfo, 4>> rowCellBorders(colCount);
+                vector<array<CellBorderInfo, 4>> rowCellBorders(
+                    static_cast<size_t>(colCount));
 
                 for (int c = 0; c < colCount; ++c) {
                     QTextTableCell cell = table->cellAt(r, c);
                     if (cell.isValid()) {
                         QTextTableCellFormat cf(cell.format().toTableCellFormat());
                         for (TableSide side : kTableSides) {
-                            rowCellBorders[c][side] = ReadCellBorder(cf, colorList, side);
+                            rowCellBorders[static_cast<size_t>(c)][side] =
+                                ReadCellBorder(cf, colorList, side);
                         }
                     }
                 }
@@ -882,7 +899,8 @@ std::string ExportRtf(const QTextDocument& document) {
                 for (TableSide side : kTableSides) {
                     uniformBorder[side] = rowCellBorders[0][side];
                     for (int c = 1; c < colCount; ++c) {
-                        if (rowCellBorders[c][side] != uniformBorder[side]) {
+                        if (rowCellBorders[static_cast<size_t>(c)][side] !=
+                            uniformBorder[side]) {
                             uniformSide[side] = false;
                             break;
                         }
@@ -913,7 +931,7 @@ std::string ExportRtf(const QTextDocument& document) {
                     // Emit cell borders (skip sides that are emitted as row borders)
                     for (TableSide side : kTableSides) {
                         if (uniformSide[side]) continue;
-                        CellBorderInfo& bi = rowCellBorders[c][side];
+                        CellBorderInfo& bi = rowCellBorders[static_cast<size_t>(c)][side];
                         EmitBorderSide(out, kCellBorderSideTags.at(side), bi.width, bi.style, bi.colorIdx);
                     }
 
@@ -950,7 +968,7 @@ std::string ExportRtf(const QTextDocument& document) {
     return out.str();
 }
 
-std::string ExportHtml(const QTextDocument& document) {
+string ExportHtml(const QTextDocument& document) {
     QString html = document.toHtml();
     return html.toStdString();
 }

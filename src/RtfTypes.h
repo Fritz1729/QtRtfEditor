@@ -170,7 +170,7 @@ struct TableCellFormat {
     int vertAlign = 0;
     int shadingColor = -1;
     TableCellBorders borders;
-    std::array<int, 4> padding = {0, 0, 0, 0};
+    std::array<int, 4> padding = {{0, 0, 0, 0}};
 
     bool operator==(const TableCellFormat& other) const = default;
 };
@@ -179,7 +179,7 @@ struct RtfTableRowEntry {
     std::vector<int> cellxPositions;
     std::vector<std::pair<std::vector<RtfRun>, TableCellFormat>> cells;
     TableCellBorders rowBorders;
-    std::array<int, 4> rowPadding = {0, 0, 0, 0};
+    std::array<int, 4> rowPadding = {{0, 0, 0, 0}};
     int tableAlignment = 0;
     int tableLeftPosition = 0;
     int tableWidth = 0;
@@ -201,7 +201,7 @@ struct RtfParagraph : ParagraphFormatting {
     explicit RtfParagraph(ParagraphFormatting fmt) : ParagraphFormatting(fmt) {}
 
     void setFormatting(ParagraphFormatting fmt) {
-        *static_cast<ParagraphFormatting*>(this) = fmt;
+        static_cast<ParagraphFormatting&>(*this) = fmt;
     }
 };
 
@@ -263,14 +263,14 @@ struct RtfDocument {
 
 inline const RtfColorEntry* ResolveColorEntry(int idx, const RtfDocument& doc) {
     if (idx >= 0 && idx < static_cast<int>(doc.colors.size()))
-        return &doc.colors[idx];
+        return &doc.colors[static_cast<std::size_t>(idx)];
     return nullptr;
 }
 
 inline TableCellBorders NormalizeCellBorders(const TableCellBorders& cellBorders,
                                                 const TableCellBorders& rowBorders) {
     TableCellBorders normalized = cellBorders;
-    auto FillFromRow = [&normalized](int& cellVal, int& cellColor, BorderStyle& cellStyle,
+    auto FillFromRow = [](int& cellVal, int& cellColor, BorderStyle& cellStyle,
                                      int rowVal, int rowColor, BorderStyle rowStyle) {
         if (cellVal <= 0 && cellStyle == BorderStyle::None) {
             cellVal = rowVal;
@@ -325,12 +325,15 @@ inline UnderlineStyle toUnderlineStyle(QTextCharFormat::UnderlineStyle qtStyle) 
         case QTextCharFormat::DashDotLine:     return UnderlineStyle::DashDot;
         case QTextCharFormat::DashDotDotLine:  return UnderlineStyle::DashDotDot;
         case QTextCharFormat::WaveUnderline:   return UnderlineStyle::Thick;
+        case QTextCharFormat::SpellCheckUnderline:
         default:                               return UnderlineStyle::None;
     }
 }
 
 inline QTextCharFormat::UnderlineStyle qtUnderlineStyleFor(UnderlineStyle style) {
     switch (style) {
+        case UnderlineStyle::None:          return QTextCharFormat::NoUnderline;
+        case UnderlineStyle::Solid:         return QTextCharFormat::SingleUnderline;
         case UnderlineStyle::Dotted:        return QTextCharFormat::DotLine;
         case UnderlineStyle::Dashed:        return QTextCharFormat::DashUnderline;
         case UnderlineStyle::DashDot:       return QTextCharFormat::DashDotLine;
@@ -343,15 +346,19 @@ inline QTextCharFormat::UnderlineStyle qtUnderlineStyleFor(UnderlineStyle style)
 
 inline Capitalization toCapitalization(QFont::Capitalization qtCaps) {
     switch (qtCaps) {
-        case QFont::MixedCase:      return Capitalization::None;
+        case QFont::MixedCase:
+        case QFont::AllLowercase:
+        case QFont::Capitalize:
+        default:                    return Capitalization::None;
         case QFont::AllUppercase:   return Capitalization::AllCaps;
         case QFont::SmallCaps:      return Capitalization::SmallCaps;
-        default:                    return Capitalization::None;
     }
 }
 
 inline QTextListFormat::Style RtfListStyleToQt(ListStyle style) {
     switch (style) {
+        case ListStyle::None:
+        default:                return QTextListFormat::ListDisc;
         case ListStyle::Disc:   return QTextListFormat::ListDisc;
         case ListStyle::Bullet: return QTextListFormat::ListCircle;
         case ListStyle::Box:    return QTextListFormat::ListSquare;
@@ -359,7 +366,6 @@ inline QTextListFormat::Style RtfListStyleToQt(ListStyle style) {
         case ListStyle::Number: return QTextListFormat::ListDecimal;
         case ListStyle::Letter: return QTextListFormat::ListLowerAlpha;
         case ListStyle::Roman:  return QTextListFormat::ListLowerRoman;
-        default:                return QTextListFormat::ListDisc;
     }
 }
 
@@ -371,6 +377,9 @@ inline ListStyle QtListStyleToRtf(QTextListFormat::Style style) {
         case QTextListFormat::ListDecimal:         return ListStyle::Number;
         case QTextListFormat::ListLowerAlpha:      return ListStyle::Letter;
         case QTextListFormat::ListLowerRoman:      return ListStyle::Roman;
+        case QTextListFormat::ListUpperAlpha:
+        case QTextListFormat::ListUpperRoman:
+        case QTextListFormat::ListStyleUndefined:
         default:                                   return ListStyle::None;
     }
 }

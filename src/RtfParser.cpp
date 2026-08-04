@@ -4,11 +4,14 @@
 #include "RtfTypes.h"
 
 #include <algorithm>
+#include <iterator>
 #include <sstream>
 #include <cctype>
 #include <cstring>
 #include <map>
 #include <stdexcept>
+
+using namespace std;
 
 namespace Rte {
 
@@ -45,6 +48,26 @@ constexpr TableSide CtrlWordToSide(RtfControl::TableCtrlWord ctrl) {
         case RtfControl::TableCtrlWord::TrPadBottom:
         case RtfControl::TableCtrlWord::TrBorderBottom:
             return Side_Bottom;
+        case RtfControl::TableCtrlWord::Trowd:
+        case RtfControl::TableCtrlWord::Cellx:
+        case RtfControl::TableCtrlWord::Cell:
+        case RtfControl::TableCtrlWord::Row:
+        case RtfControl::TableCtrlWord::Intbl:
+        case RtfControl::TableCtrlWord::ClShading:
+        case RtfControl::TableCtrlWord::ClVertAlignTop:
+        case RtfControl::TableCtrlWord::ClVertAlignCenter:
+        case RtfControl::TableCtrlWord::ClVertAlignBottom:
+        case RtfControl::TableCtrlWord::BrdrSolid:
+        case RtfControl::TableCtrlWord::BrdrWidth:
+        case RtfControl::TableCtrlWord::BrdrColor:
+        case RtfControl::TableCtrlWord::ClMerge:
+        case RtfControl::TableCtrlWord::BrdrNone:
+        case RtfControl::TableCtrlWord::BrdrDashed:
+        case RtfControl::TableCtrlWord::TrAlignLeft:
+        case RtfControl::TableCtrlWord::TrAlignCenter:
+        case RtfControl::TableCtrlWord::TrAlignRight:
+        case RtfControl::TableCtrlWord::TrLeft:
+        case RtfControl::TableCtrlWord::TrWidth:
         default:
             return Side_Undefined;
     }
@@ -53,7 +76,7 @@ constexpr TableSide CtrlWordToSide(RtfControl::TableCtrlWord ctrl) {
 class RtfParserImpl {
 public:
 
-    RtfDocument Parse(const std::string& rtf, int codePage) {
+    RtfDocument Parse(const string& rtf, int codePage) {
         _doc = RtfDocument{};
         _codePage = codePage;
         _doc.codePage = codePage;
@@ -99,7 +122,7 @@ private:
     static constexpr size_t kMaxIter = 10'000'000;
 
     void CheckIter() {
-        if (++_iter > kMaxIter) throw std::runtime_error("parser iteration limit");
+        if (++_iter > kMaxIter) throw runtime_error("parser iteration limit");
     }
 
     void SkipGroup() {
@@ -151,6 +174,7 @@ private:
             case RtfControl::CharProp::Protect:
                 _format.protected_ = on;
                 break;
+            case RtfControl::CharProp::Underline:
             default:
                 break;
             }
@@ -381,10 +405,10 @@ private:
             }
             break;
         case RtfControl::Action::FieldControl:
-            break;
-        case RtfControl::Action::SpecialChar:
-            AppendUtf8(ctrl.value.specialChar);
-            break;
+             break;
+         case RtfControl::Action::SpecialChar:
+             AppendUtf8(ctrl.value.specialChar);
+             break;
         case RtfControl::Action::Unknown:
             break;
         }
@@ -580,18 +604,18 @@ private:
     }
 
     void AddCurrentCellToRow() {
-        while (static_cast<int>(_currentRow.cells.size()) <= _currentCellIndex) {
+        while (_currentRow.cells.size() <= _currentCellIndex) {
             _currentRow.cells.push_back({{}, {}});
         }
         _currentRow.cells[_currentCellIndex] =
-            {std::move(_currentCellRuns), _currentCellFormat};
+            {move(_currentCellRuns), _currentCellFormat};
         _currentCellRuns.clear();
         _currentCellFormat = {};
     }
 
     void EmitTableRow() {
         if (ParagraphHasNonWhitespaceContent(_currentRow)) {
-            _doc.elements.push_back(std::move(_currentRow));
+            _doc.elements.push_back(move(_currentRow));
         }
         _currentRow = {};
     }
@@ -627,20 +651,20 @@ private:
         _currentParagraph.listIndent = _para.leftIndent;
         _currentParagraph.defaultFontIndex = _currentDeff;
         _currentParagraph.defaultTabStopTwips = _currentDeftab;
-        _doc.elements.push_back(std::move(_currentParagraph));
+        _doc.elements.push_back(move(_currentParagraph));
         _currentParagraph = {};
     }
 
     static bool RunHasNonWhitespaceContent(const RtfRun& run) {
         if (!run.text.empty()) {
             for (char c : run.text) {
-                if (!std::isspace(static_cast<unsigned char>(c))) return true;
+                if (!isspace(static_cast<unsigned char>(c))) return true;
             }
         }
         return false;
     }
 
-    static bool RunsHaveNonWhitespaceContent(const std::vector<RtfRun>& runs) {
+    static bool RunsHaveNonWhitespaceContent(const vector<RtfRun>& runs) {
         for (const RtfRun& r : runs) {
             if (RunHasNonWhitespaceContent(r)) return true;
         }
@@ -660,10 +684,10 @@ private:
 
     void RemoveTrailingEmptyElements() {
         while (!_doc.elements.empty()) {
-            bool hasText = std::visit([](const auto& elem) -> bool {
-                using T = std::decay_t<decltype(elem)>;
-                if constexpr (std::is_same_v<T, RtfParagraph>) return ParagraphHasNonWhitespaceContent(elem);
-                else if constexpr (std::is_same_v<T, RtfTableRowEntry>) return ParagraphHasNonWhitespaceContent(elem);
+            bool hasText = visit([](const auto& elem) -> bool {
+                using T = decay_t<decltype(elem)>;
+                if constexpr (is_same_v<T, RtfParagraph>) return ParagraphHasNonWhitespaceContent(elem);
+                else if constexpr (is_same_v<T, RtfTableRowEntry>) return ParagraphHasNonWhitespaceContent(elem);
                 else return true;
             }, _doc.elements.back());
             if (!hasText) _doc.elements.pop_back();
@@ -673,33 +697,33 @@ private:
 
     RtfDocument _doc;
     RtfParagraph _currentParagraph;
-    std::string _rtf;
+    string _rtf;
     size_t _pos = 0;
     size_t _len = 0;
-    std::string _literalText;
+    string _literalText;
     bool _skipLeadingWsTrim = false;
     bool _paragraphFlushed = false;
     size_t _iter = 0;
     int _codePage = 1252;
     RtfRunFormat _format;
     ParagraphFormatting _para;
-    std::vector<RtfRunFormat> _formatStack;
+    vector<RtfRunFormat> _formatStack;
     bool _inColortbl = false;
     bool _inFonttbl = false;
     bool _inPict = false;
     bool _inListtable = false;
     bool _inPntext = false;
-    std::map<int, ListStyle> _listIdToStyle;
-    std::vector<ParagraphFormatting> _paraStateStack;
-    std::vector<int> _pendingTabAlignmentStack;
+    map<int, ListStyle> _listIdToStyle;
+    vector<ParagraphFormatting> _paraStateStack;
+    vector<int> _pendingTabAlignmentStack;
     int _pendingTabAlignment = 1;
 
     // Group-persistent control words: push on group enter, pop on group exit
-    std::vector<int> _deffStack;
+    vector<int> _deffStack;
     int _currentDeff = 0;
-    std::vector<int> _deftabStack;
+    vector<int> _deftabStack;
     int _currentDeftab = 180;  // RTF spec default = 180 twips (1/8 inch)
-    std::vector<int> _ucStack;
+    vector<int> _ucStack;
     int _currentUc = 1;  // RTF spec default = 1 fallback byte after \uXXXX
     int _listId = 0;
     int _listLevel = 0;
@@ -707,7 +731,7 @@ private:
 
     // Pict state
     QByteArray _pictData;
-    std::string _pictFormat;  // "jpg", "png", "bmp"
+    string _pictFormat;  // "jpg", "png", "bmp"
     int _pictPicw = 0;
     int _pictPich = 0;
     int _pictPicwgoal = 0;
@@ -724,15 +748,15 @@ private:
 
     // Field parsing state
     bool _inFieldRslt = false;
-    std::string _fieldAnchorHref;
+    string _fieldAnchorHref;
 
     // Table state
     bool _inTable = false;
     bool _inRow = false;
     bool _inTableCell = false;
-    int _currentCellIndex = 0;
+    size_t _currentCellIndex = 0;
     RtfTableRowEntry _currentRow;
-    std::vector<RtfRun> _currentCellRuns;
+    vector<RtfRun> _currentCellRuns;
     TableCellFormat _currentCellFormat;
     TableSide _pendingBorderSide = Side_Undefined;
     int _pendingBorderStyle = 0;
@@ -842,7 +866,7 @@ private:
             FinalizeRun();
             _format.inPntext = false;
             _inPntext = false;
-            std::string frag = _rtf.substr(fragStart, static_cast<size_t>(_pos - fragStart));
+            string frag = _rtf.substr(fragStart, _pos - fragStart);
             _currentParagraph.pntextRtf = frag;
             // Consume closing '}'
             if (_pos < _len && _rtf[_pos] == '}') _pos++;
@@ -856,7 +880,7 @@ private:
             size_t starPos = _pos;
             _pos += 2; // skip \*
             SkipWhitespace();
-            std::string destWord;
+            string destWord;
             if (_pos < _len && _rtf[_pos] == '\\') {
                 _pos++; // skip the \ before the control word
                 SkipWhitespace();
@@ -990,13 +1014,13 @@ private:
                 val = val * 16 + digit;
             }
             int fcharset = 0;
-            std::string fontFamily;
+            string fontFamily;
             int fi = _format.fontIndex;
-            if (fi >= 0 && static_cast<size_t>(fi) < _doc.fonts.size()) {
+            if (fi >= 0 && fi < ssize(_doc.fonts)) {
                 fcharset = _doc.fonts[static_cast<size_t>(fi)].fcharset;
                 fontFamily = _doc.fonts[static_cast<size_t>(fi)].family;
             }
-            AppendUtf8(MapHexByteToCodepoint(val, fcharset, _doc.codePage, fontFamily));
+            AppendUtf8(static_cast<uint32_t>(MapHexByteToCodepoint(val, fcharset, _doc.codePage, fontFamily)));
         } else if ((c == 'u' || c == 'U') && _pos + 1 < _len && (IsDigit(_rtf[_pos + 1]) || _rtf[_pos + 1] == '-')) {
             // Unicode escape: \uNNN? (only if 'u' is immediately followed by digit)
             ParseUnicodeEscape();
@@ -1061,7 +1085,7 @@ private:
                 cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
             }
         }
-        AppendUtf8(cp);
+         AppendUtf8(static_cast<uint32_t>(cp));
 
         // Skip \ucN fallback bytes (alternate ANSI encoding after \uXXXX)
         // RTF spec: \ucN sets how many bytes follow \uNNNN for backward compat
@@ -1116,7 +1140,7 @@ private:
                 _pos++;
 
                 int fcharset = 0;
-                std::string family;
+                string family;
 
                 while (_pos < _len && _rtf[_pos] != '}') {
                     if (_rtf[_pos] == '\\') {
@@ -1142,7 +1166,7 @@ private:
                 while (!family.empty() && family.back() == ' ') family.pop_back();
                 size_t firstNonSpace = 0;
                 while (firstNonSpace < family.size() && family[firstNonSpace] == ' ') firstNonSpace++;
-                if (firstNonSpace > 0) family.erase(family.begin(), family.begin() + static_cast<std::ptrdiff_t>(firstNonSpace));
+                if (firstNonSpace > 0) family.erase(family.begin(), family.begin() + static_cast<ptrdiff_t>(firstNonSpace));
 
                 if (!family.empty()) {
                     _doc.fonts.push_back({family, fcharset});
@@ -1214,7 +1238,7 @@ private:
             img.piccropb = _pictPiccropb;
             img.rtfPictHex = _pictData.toStdString();
             FlushCurrentParagraph();
-            _doc.elements.push_back(std::move(img));
+            _doc.elements.push_back(move(img));
         }
     }
 
@@ -1237,7 +1261,7 @@ private:
                     size_t starPos = _pos;
                     _pos += 2;
                     SkipWhitespace();
-                    std::string destWord;
+                    string destWord;
                     if (_pos < _len && _rtf[_pos] == '\\') {
                         _pos++;
                         SkipWhitespace();
@@ -1273,9 +1297,9 @@ private:
         if (_pos < _len && _rtf[_pos] == '}') _pos++;
 
         // Save accumulated text and anchor state before RestoreState clears _format
-        std::string savedText = _literalText;
+        string savedText = _literalText;
         bool savedIsAnchor = _format.isAnchor;
-        std::string savedHref = _format.anchorHref;
+        string savedHref = _format.anchorHref;
         _literalText.clear();
 
         RestoreState();
@@ -1301,7 +1325,7 @@ private:
     void ParseFldInst() {
         // {\*\fldinst HYPERLINK "URL"}
         // Collect instruction text to extract HYPERLINK target
-        std::string inst;
+        string inst;
         while (_pos < _len && _rtf[_pos] != '}') {
             CheckIter();
             if (_rtf[_pos] == '\\') {
@@ -1331,13 +1355,13 @@ private:
 
         // Parse HYPERLINK "URL" from instruction
         // Also handle HYPERLINK \\bkmk3 Name (internal bookmark reference)
-        std::string lowerInst;
+        string lowerInst;
         lowerInst.reserve(inst.size());
-        std::transform(inst.begin(), inst.end(), std::back_inserter(lowerInst),
-            [](unsigned char c) { return std::tolower(c); });
+        transform(inst.begin(), inst.end(), back_inserter(lowerInst),
+            [](unsigned char c) { return tolower(c); });
 
         size_t hyperlinkPos = lowerInst.find("hyperlink");
-        if (hyperlinkPos != std::string::npos) {
+        if (hyperlinkPos != string::npos) {
             size_t afterHyperlink = hyperlinkPos + 9;
             // Skip whitespace
             while (afterHyperlink < inst.size() && inst[afterHyperlink] == ' ') afterHyperlink++;
@@ -1346,8 +1370,8 @@ private:
                     // Quoted URL: HYPERLINK "https://..."
                     size_t start = afterHyperlink + 1;
                     size_t end = inst.find('"', start);
-                    if (end != std::string::npos) {
-                        std::string rawUrl = inst.substr(start, end - start);
+                    if (end != string::npos) {
+                        string rawUrl = inst.substr(start, end - start);
                         // Unescape RTF escapes in URL
                         _fieldAnchorHref = UnescapeRtfString(rawUrl);
                     }
@@ -1357,7 +1381,7 @@ private:
                     size_t skip = afterHyperlink + 1;
                     while (skip < inst.size() && IsWordChar(inst[skip])) skip++;
                     while (skip < inst.size() && (inst[skip] == ' ' || inst[skip] == '_')) skip++;
-                    _fieldAnchorHref = std::string("#") + inst.substr(skip);
+                    _fieldAnchorHref = string("#") + inst.substr(skip);
                 } else {
                     // Unquoted URL — rare but possible
                     size_t start = afterHyperlink;
@@ -1388,8 +1412,8 @@ private:
         _inFieldRslt = false;
     }
 
-    static std::string UnescapeRtfString(const std::string& s) {
-        std::string result;
+    static string UnescapeRtfString(const string& s) {
+        string result;
         result.reserve(s.size());
         size_t i = 0;
         while (i < s.size()) {
@@ -1528,7 +1552,7 @@ private:
         }
     }
 
-    void ProcessControlWord(const std::string& word, int arg) {
+    void ProcessControlWord(const string& word, int arg) {
         // Table group markers (should have been caught in parseGroup)
         if (word == "colortbl" || word == "fonttbl") return;
         // Star prefix: only meaningful as part of destination {\*\word}
@@ -1539,9 +1563,9 @@ private:
             Dispatch(*ctrl, arg);
         } else {
             // Unknown tag — record for preservation
-            std::string tag = "\\" + word;
+            string tag = "\\" + word;
             if (arg >= 0) {
-                tag += std::to_string(arg);
+                tag += to_string(arg);
             }
             _doc.unknownTags.push_back(tag);
         }
@@ -1556,13 +1580,13 @@ private:
         if (_literalText.empty()) return;
 
         if (_inTableCell) {
-            _currentCellRuns.emplace_back(std::move(_literalText), _format);
+            _currentCellRuns.emplace_back(move(_literalText), _format);
         } else {
-            _currentParagraph.runs.emplace_back(std::move(_literalText), _format);
+            _currentParagraph.runs.emplace_back(move(_literalText), _format);
         }
-    }
+     }
 
-    void AppendUtf8(int cp) {
+    void AppendUtf8(uint32_t cp) {
         if (cp < 0x80) {
             _literalText += static_cast<char>(cp);
         } else if (cp < 0x800) {
@@ -1604,8 +1628,8 @@ private:
         return val;
     }
 
-    std::pair<std::string, int> ReadControlWord() {
-        std::string word;
+    pair<string, int> ReadControlWord() {
+        string word;
         int arg = 0;
         bool hasArg = false;
         while (_pos < _len && (IsWordChar(_rtf[_pos]) || IsDigit(_rtf[_pos]))) {
@@ -1621,6 +1645,7 @@ private:
     }
 
     void ConsumeControlDelimiter(int arg, bool hasArg) {
+        (void)arg;
         if (hasArg && _pos < _len && !IsWordChar(_rtf[_pos]) && _rtf[_pos] != '\\' && _rtf[_pos] != '}' && _rtf[_pos] != '{') {
             _pos++;
         } else if (!hasArg && _pos < _len && _rtf[_pos] == ' ') {
@@ -1654,7 +1679,7 @@ private:
 
 } // namespace
 
-RtfDocument ParseRtf(const std::string& rtf, int codePage) {
+RtfDocument ParseRtf(const string& rtf, int codePage) {
     RtfParserImpl impl;
     return impl.Parse(rtf, codePage);
 }

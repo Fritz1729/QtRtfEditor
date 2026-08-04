@@ -125,8 +125,10 @@ static bool CompareFormatSemantic(const RtfRunFormat& fmtA, const RtfRunFormat& 
     std::string familyA, familyB;
     bool hasFontA = fmtA.fontIndex >= 0 && fmtA.fontIndex < static_cast<int>(docA.fonts.size());
     bool hasFontB = fmtB.fontIndex >= 0 && fmtB.fontIndex < static_cast<int>(docB.fonts.size());
-    if (hasFontA) familyA = docA.fonts[fmtA.fontIndex].family;
-    if (hasFontB) familyB = docB.fonts[fmtB.fontIndex].family;
+    if (hasFontA) familyA =
+        docA.fonts[static_cast<std::size_t>(fmtA.fontIndex)].family;
+    if (hasFontB) familyB =
+        docB.fonts[static_cast<std::size_t>(fmtB.fontIndex)].family;
     if (familyA.empty()) familyA = defaultFamily;
     if (familyB.empty()) familyB = defaultFamily;
     if ((hasFontA || hasFontB) && familyA != familyB) {
@@ -522,10 +524,11 @@ RtfCompareResult CompareRtf(const std::string& rtfA, const std::string& rtfB,
 
 static const char* ImageFormatName(RtfImageFormat fmt) {
     switch (fmt) {
-        case RtfImageFormat::Jpeg:  return "jpeg";
-        case RtfImageFormat::Png:   return "png";
-        case RtfImageFormat::Bmp:   return "bmp";
-        default:                    return "unknown";
+        case RtfImageFormat::Jpeg:    return "jpeg";
+        case RtfImageFormat::Png:     return "png";
+        case RtfImageFormat::Bmp:     return "bmp";
+        case RtfImageFormat::Unknown:
+        default:                      return "unknown";
     }
 }
 

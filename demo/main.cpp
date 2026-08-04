@@ -152,11 +152,11 @@ void DemoWindow::LoadFile() {
         return;
     }
 
-    QByteArray data = file.readAll();
+    QByteArray fileData = file.readAll();
     file.close();
 
     try {
-        _editor.Load(data.toStdString(), Rte::FormatMode::Rtf);
+        _editor.Load(fileData.toStdString(), Rte::FormatMode::Rtf);
         statusBar()->showMessage(QString("Loaded: %1").arg(path));
     } catch (const std::exception& e) {
         QMessageBox::critical(this, "Error", e.what());

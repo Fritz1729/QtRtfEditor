@@ -52,7 +52,8 @@ void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
 
         if (run.format.fontIndex >= 0 &&
             run.format.fontIndex < static_cast<int>(doc.fonts.size())) {
-            const RtfFontEntry& fontEntry = doc.fonts[run.format.fontIndex];
+            const RtfFontEntry& fontEntry =
+                doc.fonts[static_cast<std::size_t>(run.format.fontIndex)];
             QString fam = QString::fromStdString(fontEntry.family);
             if (!fam.isEmpty()) {
                 QStringList families = {fam};
@@ -239,10 +240,11 @@ void BuildImage(QTextCursor& cursor, const RtfImage& img,
     ++imgCounter;
     const char* ext = "";
     switch (img.format) {
-        case Rte::RtfImageFormat::Jpeg: ext = "jpg"; break;
-        case Rte::RtfImageFormat::Png:  ext = "png"; break;
-        case Rte::RtfImageFormat::Bmp:  ext = "bmp"; break;
-        default:                        ext = "png"; break;
+        case Rte::RtfImageFormat::Jpeg:  ext = "jpg"; break;
+        case Rte::RtfImageFormat::Png:   ext = "png"; break;
+        case Rte::RtfImageFormat::Bmp:   ext = "bmp"; break;
+        case Rte::RtfImageFormat::Unknown:
+        default:                         ext = "png"; break;
     }
     QString name = QString("rtfimage://%1.%2").arg(imgCounter).arg(ext);
     document->addResource(QTextDocument::ImageResource, QUrl(name), QVariant::fromValue(img.data));
@@ -300,7 +302,8 @@ void ApplyBorderToCellFormat(QTextTableCellFormat& cellFmt, TableSide side,
     QTextFrameFormat::BorderStyle qtStyle = QTextFrameFormat::BorderStyle_None;
     switch (style) {
         case BorderStyle::Dashed: qtStyle = QTextFrameFormat::BorderStyle_Dashed; break;
-        case BorderStyle::Solid: qtStyle = QTextFrameFormat::BorderStyle_Solid; break;
+        case BorderStyle::Solid:  qtStyle = QTextFrameFormat::BorderStyle_Solid; break;
+        case BorderStyle::None:
         default: return;
     }
     double borderPt = MarginTwipsToPoints(width);
@@ -341,7 +344,8 @@ void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEntry*>& t
     QVector<QTextLength> constraints;
     for (int c = 0; c < colCount; ++c) {
         int width = (c == 0) ? tableRows[0]->cellxPositions[0] :
-            tableRows[0]->cellxPositions[c] - tableRows[0]->cellxPositions[c - 1];
+            tableRows[0]->cellxPositions[static_cast<std::size_t>(c)] -
+            tableRows[0]->cellxPositions[static_cast<std::size_t>(c - 1)];
         constraints.append(QTextLength(QTextLength::FixedLength,
             TwipsToHalfPt(width)));
     }
@@ -350,14 +354,15 @@ void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEntry*>& t
     QTextTable* qtTable = cursor.insertTable(rowCount, colCount, tableFmt);
 
     for (int r = 0; r < rowCount; ++r) {
-        const RtfTableRowEntry* rowEntry = tableRows[r];
+        const RtfTableRowEntry* rowEntry = tableRows[static_cast<std::size_t>(r)];
         for (int c = 0; c < colCount; ++c) {
             QTextTableCell cell = qtTable->cellAt(r, c);
             QTextCursor cellCursor = cell.firstCursorPosition();
 
             QTextTableCellFormat cellFmt;
             if (c < static_cast<int>(rowEntry->cells.size())) {
-                const auto& [runs, cellData] = rowEntry->cells[c];
+                const auto& [runs, cellData] =
+                    rowEntry->cells[static_cast<std::size_t>(c)];
                 switch (cellData.vertAlign) {
                     case 1: cellFmt.setVerticalAlignment(QTextCharFormat::AlignMiddle); break;
                     case 2: cellFmt.setVerticalAlignment(QTextCharFormat::AlignBottom); break;
@@ -414,7 +419,8 @@ void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
     if (!doc.fonts.empty()) {
         int fi = doc.defaultFontIndex;
         if (fi < 0 || fi >= static_cast<int>(doc.fonts.size())) fi = 0;
-        defaultFont.setFamily(QString::fromStdString(doc.fonts[fi].family));
+        defaultFont.setFamily(
+            QString::fromStdString(doc.fonts[static_cast<std::size_t>(fi)].family));
     }
     if (doc.defaultFontSize > 0) {
         defaultFont.setPointSizeF(doc.defaultFontSize / 2.0);
