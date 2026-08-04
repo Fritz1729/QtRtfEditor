@@ -44,7 +44,7 @@ Atomic unit tests for `CompareRtf()`. Each test constructs two `RtfDocument` str
 
 Linked against: `QtRtfEditor::QtRtfEditor`, `Qt6::Test`.
 
-**Note:** `CompareRtf()` uses a 1-second timeout via detached threads to catch parser hangs. CTest enforces a 60-second global timeout per test executable.
+**Note:** `CompareRtf()` uses a 1-second timeout; the worker thread is joined on timeout to ensure clean termination. CTest enforces a 60-second global timeout per test executable.
 
 ### test_roundtrip
 
