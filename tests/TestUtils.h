@@ -10,7 +10,8 @@ namespace Rte {
 
 /**
  * @brief Run a callable with a timeout. Returns std::nullopt on timeout.
- * The worker thread is detached; if timeout fires, it continues in the background.
+ * The worker thread is joined; if timeout fires, the worker continues
+ * until completion before join returns (safe across CRT boundaries).
  */
 template<typename F>
 auto RunWithTimeout(F func, std::chrono::seconds timeout)
@@ -18,13 +19,16 @@ auto RunWithTimeout(F func, std::chrono::seconds timeout)
     using R = std::invoke_result_t<F>;
     std::promise<R> promise;
     std::future<R> future = promise.get_future();
-    std::thread t([f = std::move(func), p = std::move(promise)]() mutable {
+    std::thread worker([f = std::move(func), p = std::move(promise)]() mutable {
         p.set_value(f());
     });
-    t.detach();
-    if (future.wait_for(timeout) != std::future_status::ready)
+    if (future.wait_for(timeout) != std::future_status::ready) {
+        worker.join();
         return std::nullopt;
-    return future.get();
+    }
+    R result = future.get();
+    worker.join();
+    return result;
 }
 
 } // namespace Rte

@@ -15,6 +15,8 @@ project(QtRtfEditor
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
 add_compile_options(-Wall)
 
 set(CMAKE_AUTOMOC ON)
