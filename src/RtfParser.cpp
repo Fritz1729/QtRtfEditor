@@ -608,14 +608,14 @@ private:
             _currentRow.cells.push_back({{}, {}});
         }
         _currentRow.cells[_currentCellIndex] =
-            {move(_currentCellRuns), _currentCellFormat};
+            {std::move(_currentCellRuns), _currentCellFormat};
         _currentCellRuns.clear();
         _currentCellFormat = {};
     }
 
     void EmitTableRow() {
         if (ParagraphHasNonWhitespaceContent(_currentRow)) {
-            _doc.elements.push_back(move(_currentRow));
+            _doc.elements.push_back(std::move(_currentRow));
         }
         _currentRow = {};
     }
@@ -651,7 +651,7 @@ private:
         _currentParagraph.listIndent = _para.leftIndent;
         _currentParagraph.defaultFontIndex = _currentDeff;
         _currentParagraph.defaultTabStopTwips = _currentDeftab;
-        _doc.elements.push_back(move(_currentParagraph));
+        _doc.elements.push_back(std::move(_currentParagraph));
         _currentParagraph = {};
     }
 
@@ -1238,7 +1238,7 @@ private:
             img.piccropb = _pictPiccropb;
             img.rtfPictHex = _pictData.toStdString();
             FlushCurrentParagraph();
-            _doc.elements.push_back(move(img));
+            _doc.elements.push_back(std::move(img));
         }
     }
 
@@ -1580,9 +1580,9 @@ private:
         if (_literalText.empty()) return;
 
         if (_inTableCell) {
-            _currentCellRuns.emplace_back(move(_literalText), _format);
+            _currentCellRuns.emplace_back(std::move(_literalText), _format);
         } else {
-            _currentParagraph.runs.emplace_back(move(_literalText), _format);
+            _currentParagraph.runs.emplace_back(std::move(_literalText), _format);
         }
      }
 
