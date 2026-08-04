@@ -151,6 +151,8 @@ private:
             case RtfControl::CharProp::Protect:
                 _format.protected_ = on;
                 break;
+            default:
+                break;
             }
             break;
         }
@@ -946,9 +948,10 @@ private:
             _pos++;
             _literalText += '}';
         } else if (c == '\\') {
-            // Escaped literal backslash: \\
-            // RTF spec: \\{ produces literal \{, \\} produces literal \}
-            // We handle these as single units to avoid { starting a group.
+            // Escaped literal backslash.
+            // RTF spec: \ followed by { or } produces the literal character
+            // (e.g. backslash-brace), handled as single units so { doesn't
+            // start a group.
             _literalText += '\\';
             if (_pos + 1 < _len && _rtf[_pos + 1] == '{') {
                 _literalText += '{';
@@ -1075,21 +1078,17 @@ private:
             SkipWhitespace();
 
             int r = 0, g = 0, b = 0;
-            bool haveR = false, haveG = false, haveB = false;
 
             while (_pos < _len && _rtf[_pos] != ';' && _rtf[_pos] != '}') {
                 if (Matches("\\red")) {
                     _pos += 4;
                     r = ParseInt();
-                    haveR = true;
                 } else if (Matches("\\green")) {
                     _pos += 6;
                     g = ParseInt();
-                    haveG = true;
                 } else if (Matches("\\blue")) {
                     _pos += 5;
                     b = ParseInt();
-                    haveB = true;
                 } else if (IsPrintable(_rtf[_pos])) {
                     _pos++;
                 } else {
@@ -1116,7 +1115,6 @@ private:
                 // Font entry group
                 _pos++;
 
-                int index = 0;
                 int fcharset = 0;
                 std::string family;
 
@@ -1127,7 +1125,7 @@ private:
                             fcharset = ParseInt();
                         } else if (Matches("\\f")) {
                             _pos += 2;
-                            index = ParseInt();
+                            ParseInt();
                         } else {
                             ParseControl();
                         }
@@ -1307,8 +1305,6 @@ private:
         while (_pos < _len && _rtf[_pos] != '}') {
             CheckIter();
             if (_rtf[_pos] == '\\') {
-                // Collect escaped characters and control words
-                size_t start = _pos;
                 _pos++;
                 if (_pos < _len) {
                     char c = _rtf[_pos];

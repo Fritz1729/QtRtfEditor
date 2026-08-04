@@ -107,17 +107,6 @@ static void WriteConditionalFormatOff(std::ostringstream& out, const RtfRunForma
     if (cur.ulColorIndex == 0 && lastEmitted.ulColorIndex != 0) out << "\\ulc0" << space;
 }
 
-static void WriteFormatOff(std::ostringstream& out, const RtfRunFormat& fmt, const RtfRunFormat& lastEmitted, bool trailingSpace) {
-    const char* space = trailingSpace ? " " : "";
-    if (fmt.underlineStyle != UnderlineStyle::None && lastEmitted.underlineStyle == UnderlineStyle::None)
-        out << "\\ul0" << space;
-    if (fmt.strikeOut && !lastEmitted.strikeOut) out << "\\strike0" << space;
-    if (fmt.capitalization == Capitalization::AllCaps && lastEmitted.capitalization != Capitalization::AllCaps)
-        out << "\\caps0" << space;
-    if (fmt.capitalization == Capitalization::SmallCaps && lastEmitted.capitalization != Capitalization::SmallCaps)
-        out << "\\scaps0" << space;
-}
-
 static bool IsFormatActive(const RtfRunFormat& fmt) {
     return fmt.bold || fmt.italic || fmt.superscript || fmt.subscript ||
         fmt.colorIndex > 0 || fmt.bgColorIndex > 0 ||
@@ -687,9 +676,6 @@ std::string ExportRtf(const QTextDocument& document) {
     std::map<const QTextList*, ListStyle> listStyleMap;
     int defaultFontIdx = 0;
     int listIdCounter = 1;
-    int lastDeff = defaultFontIdx;
-    int lastDeftab = defaultTabStopTwips > 0 ? defaultTabStopTwips : 180;
-    int deffDeftabGroupDepth = 0;
     int idx = 0;
     std::string defFamily = defaultFont.family().toStdString();
     fontMap[defFamily] = idx;

@@ -203,8 +203,6 @@ struct RtfParagraph : ParagraphFormatting {
     void setFormatting(ParagraphFormatting fmt) {
         *static_cast<ParagraphFormatting*>(this) = fmt;
     }
-
-    bool operator==(const RtfParagraph &) const = default;
 };
 
 enum class RtfImageFormat : uint8_t {
