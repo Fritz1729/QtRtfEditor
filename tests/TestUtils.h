@@ -12,8 +12,7 @@ namespace Rte {
 
 /**
  * @brief Run a callable with a timeout. Returns std::nullopt on timeout.
- * On timeout, the worker is detached (not joined) to avoid hanging when
- * the worker is deadlocked (e.g., Qt operations across CRT boundaries).
+ * On timeout, the worker is joined to ensure clean termination.
  */
 template<typename F>
 auto RunWithTimeout(F func, std::chrono::seconds timeout)
@@ -26,8 +25,8 @@ auto RunWithTimeout(F func, std::chrono::seconds timeout)
     });
     qDebug() << "[timeout] Spawning worker, timeout=" << timeout.count() << "s";
     if (future.wait_for(timeout) != std::future_status::ready) {
-        qDebug() << "[timeout] Timeout fired, detaching worker";
-        worker.detach();
+        qDebug() << "[timeout] Timeout fired, joining worker";
+        worker.join();
         return std::nullopt;
     }
     R result = future.get();

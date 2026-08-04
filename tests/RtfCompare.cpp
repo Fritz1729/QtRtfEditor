@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+std::string gDefaultFontFamily;
+
 namespace Rte {
 
 static RtfColorEntry ResolveColorFromTable(int idx, const RtfDocument& doc, bool* hasValue) {
@@ -121,9 +123,8 @@ static bool CompareFormatSemantic(const RtfRunFormat& fmtA, const RtfRunFormat& 
     if (ReportBoolDiff(loc, "underline", fmtA.underline, fmtB.underline, reason)) return false;
 
     // Font — resolve by family; missing \fonttbl ≡ Qt default font
-    qDebug() << "[compare] Before QFont().family() in CompareFormatSemantic";
-    static const std::string defaultFamily = QFont().family().toStdString();
-    qDebug() << "[compare] QFont().family() returned:" << defaultFamily.c_str();
+    // gDefaultFontFamily is set on the main thread before the worker is spawned.
+    const std::string& defaultFamily = gDefaultFontFamily;
     std::string familyA, familyB;
     bool hasFontA = fmtA.fontIndex >= 0 && fmtA.fontIndex < static_cast<int>(docA.fonts.size());
     bool hasFontB = fmtB.fontIndex >= 0 && fmtB.fontIndex < static_cast<int>(docB.fonts.size());

@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QApplication>
 #include <QDebug>
+#include <QFont>
 #include <QVector>
 #include <optional>
 #include <stdexcept>
@@ -218,7 +219,15 @@ std::optional<RoundtripResult> TestRoundtrip::RunRoundtripWithTimeout(
     }, std::chrono::seconds(1));
 }
 
+// Compute default font family on the main thread before any worker threads are spawned.
+// QFont() is not thread-safe and can deadlock when called from a non-main thread on Windows.
+static void InitDefaultFontFamily() {
+    extern std::string gDefaultFontFamily;
+    gDefaultFontFamily = QFont().family().toStdString();
+}
+
 static int CustomMain(int argc, char **argv) {
+    InitDefaultFontFamily();
     QStringList filtered;
     QString testDataDir;
     for (int i = 0; i < argc; ++i) {
