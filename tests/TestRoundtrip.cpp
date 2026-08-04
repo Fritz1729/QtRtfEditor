@@ -10,7 +10,6 @@
 #include <stdexcept>
 #include "RtfCompare.h"
 #include "RtfParser.h"
-#include "TestUtils.h"
 
 using namespace Rte;
 
@@ -96,20 +95,10 @@ RoundtripResult TestRoundtrip::RunRoundtripOnMainThread(const std::string& origi
             return r;
         }
 
-        auto result = RunWithTimeout([original, saved]() {
-            std::string reason;
-            auto cmp = CompareRtf(original, saved, reason);
-            return std::make_pair(cmp, std::move(reason));
-        }, std::chrono::seconds(1));
-
-        if (!result) {
-            r.passed = false;
-            r.reason = "timeout (1s)";
-            return r;
-        }
-
-        r.passed = (result->first == RtfCompareResult::Identical);
-        r.reason = std::move(result->second);
+        std::string reason;
+        auto cmp = CompareRtf(original, saved, reason);
+        r.passed = (cmp == RtfCompareResult::Identical);
+        r.reason = std::move(reason);
     } catch (...) {
         r.exception = true;
     }

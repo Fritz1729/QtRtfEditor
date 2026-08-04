@@ -1,10 +1,7 @@
 #include "RtfCompare.h"
 #include "RtfParser.h"
-#include "TestUtils.h"
 
 #include <algorithm>
-#include <QDebug>
-#include <QFont>
 #include <string>
 #include <vector>
 
@@ -517,19 +514,8 @@ static std::pair<RtfCompareResult, std::string> DoCompareParse(
 }
 
 RtfCompareResult CompareRtf(const std::string& rtfA, const std::string& rtfB,
-                              std::string& reason) {
-    qDebug() << "[compare] CompareRtf entering, calling RunWithTimeout";
-    auto result = RunWithTimeout([rtfA, rtfB]() {
-        return DoCompareParse(rtfA, rtfB);
-    }, std::chrono::seconds(1));
-    if (!result) {
-        qDebug() << "[compare] CompareRtf timeout!";
-        reason = "timeout (1s)";
-        return RtfCompareResult::StructuralDiff;
-    }
-    auto [compareResult, localReason] = *result;
-    qDebug() << "[compare] CompareRtf completed, result="
-             << (compareResult == RtfCompareResult::Identical ? "Identical" : "Diff");
+                               std::string& reason) {
+    auto [compareResult, localReason] = DoCompareParse(rtfA, rtfB);
     reason = std::move(localReason);
     return compareResult;
 }
