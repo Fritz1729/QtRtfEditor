@@ -3,12 +3,11 @@
 # QTextEdit subclass with partial RTF support.
 # LGPL-3.0-only.
 
-cmake_minimum_required(VERSION 3.27)
+cmake_minimum_required(VERSION 3.21)
 
 project(QtRtfEditor
     VERSION 0.1.4
     LANGUAGES CXX
-    LICENSE "LGPL-3.0-only"
     DESCRIPTION "QTextEdit subclass with partial RTF support"
     HOMEPAGE_URL https://github.com/Fritz1729/QtRtfEditor
 )
