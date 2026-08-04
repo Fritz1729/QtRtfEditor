@@ -822,10 +822,15 @@ string ExportRtf(const QTextDocument& document) {
     // Content export — iterate root frame to handle tables and paragraphs
     // Carry over persistent RTF format state (font, color, bgColor) across blocks.
     // RTF formatting is stream-global — \par does not reset it.
+    // GCC's IPA produces false-positive -Wmaybe-uninitialized for the nested
+    // string member in carriedOverFormat — suppress around this declaration.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
     BlockExportContext exportCtx{
         out, document, defaultFont, fontMap, colorList, bgColorList, listMap,
         defaultFontIdx, {}, QTextBlockFormat{}, false, defaultFontIdx, defaultTabStopTwips, 0, true
     };
+#pragma GCC diagnostic pop
 
     QTextFrame* rootFrame = document.rootFrame();
     bool justFinishedTable = false;

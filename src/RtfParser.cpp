@@ -615,7 +615,7 @@ private:
 
     void EmitTableRow() {
         if (ParagraphHasNonWhitespaceContent(_currentRow)) {
-            _doc.elements.push_back(std::move(_currentRow));
+            _doc.elements.emplace_back(std::move(_currentRow));
         }
         _currentRow = {};
     }
