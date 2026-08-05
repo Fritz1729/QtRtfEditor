@@ -1,9 +1,10 @@
+#include <QApplication>
+#include <QBuffer>
+#include <QImage>
 #include <QtTest>
+#include <fstream>
 #include "RtfCompare.h"
 #include "RtfParser.h"
-
-#include <QImage>
-#include <QBuffer>
 
 using namespace Rte;
 
@@ -1230,23 +1231,23 @@ void TestSemanticComparison::NegativeFirstLineIndent() {
     QCOMPARE(para.firstLineIndent, -200);
 }
 
-static int RunTest(int argc, char **argv) {
-    setvbuf(stderr, nullptr, _IONBF, 0);
-    fprintf(stderr, "[test_rtf_structural] main() entered\n");
-    fflush(stderr);
+static void LogStructural(const std::string& msg) {
+    std::ofstream dbg("test_rtf_structural.log", std::ios::app);
+    dbg << msg << "\n";
+    dbg.flush();
+}
 
-    fprintf(stderr, "[test_rtf_structural] QApplication() starting\n");
-    fflush(stderr);
+static int RunTest(int argc, char **argv) {
+    LogStructural("[test_rtf_structural] main() entered");
+
+    LogStructural("[test_rtf_structural] QApplication() starting");
     QApplication app(argc, argv);
-    fprintf(stderr, "[test_rtf_structural] QApplication() done\n");
-    fflush(stderr);
+    LogStructural("[test_rtf_structural] QApplication() done");
 
     TestSemanticComparison test;
-    fprintf(stderr, "[test_rtf_structural] QTest::qExec() starting\n");
-    fflush(stderr);
+    LogStructural("[test_rtf_structural] QTest::qExec() starting");
     int rc = QTest::qExec(&test, argc, argv);
-    fprintf(stderr, "[test_rtf_structural] QTest::qExec() done, rc=%d\n", rc);
-    fflush(stderr);
+    LogStructural("[test_rtf_structural] QTest::qExec() done, rc=" + std::to_string(rc));
     return rc;
 }
 
