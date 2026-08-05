@@ -1230,5 +1230,28 @@ void TestSemanticComparison::NegativeFirstLineIndent() {
     QCOMPARE(para.firstLineIndent, -200);
 }
 
-QTEST_MAIN(TestSemanticComparison)
+static int RunTest(int argc, char **argv) {
+    setvbuf(stderr, nullptr, _IONBF, 0);
+    fprintf(stderr, "[test_rtf_structural] main() entered\n");
+    fflush(stderr);
+
+    fprintf(stderr, "[test_rtf_structural] QApplication() starting\n");
+    fflush(stderr);
+    QApplication app(argc, argv);
+    fprintf(stderr, "[test_rtf_structural] QApplication() done\n");
+    fflush(stderr);
+
+    TestSemanticComparison test;
+    fprintf(stderr, "[test_rtf_structural] QTest::qExec() starting\n");
+    fflush(stderr);
+    int rc = QTest::qExec(&test, argc, argv);
+    fprintf(stderr, "[test_rtf_structural] QTest::qExec() done, rc=%d\n", rc);
+    fflush(stderr);
+    return rc;
+}
+
+int main(int argc, char **argv) {
+    return RunTest(argc, argv);
+}
+
 #include "TestSemanticComparison.moc"

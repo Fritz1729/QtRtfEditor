@@ -200,7 +200,11 @@ static void InitDefaultFontFamily() {
 }
 
 static int CustomMain(int argc, char **argv) {
+    fprintf(stderr, "[test_roundtrip] InitDefaultFontFamily()\n");
+    fflush(stderr);
     InitDefaultFontFamily();
+    fprintf(stderr, "[test_roundtrip] QFont() done\n");
+    fflush(stderr);
     QStringList filtered;
     QString testDataDir;
     for (int i = 0; i < argc; ++i) {
@@ -238,15 +242,27 @@ static int CustomMain(int argc, char **argv) {
     filteredArgv.append(nullptr);
 
     int adjustedArgc = filteredArgc;
+    fprintf(stderr, "[test_roundtrip] QApplication() starting\n");
+    fflush(stderr);
     QApplication app(adjustedArgc, filteredArgv.data());
+    fprintf(stderr, "[test_roundtrip] QApplication() done\n");
+    fflush(stderr);
     app.setApplicationName("test_roundtrip");
 
+    fprintf(stderr, "[test_roundtrip] QTest::qExec() starting\n");
+    fflush(stderr);
     TestRoundtrip test;
     test.SetCustomDir(testDataDir);
-    return QTest::qExec(&test, adjustedArgc, filteredArgv.data());
+    int rc = QTest::qExec(&test, adjustedArgc, filteredArgv.data());
+    fprintf(stderr, "[test_roundtrip] QTest::qExec() done, rc=%d\n", rc);
+    fflush(stderr);
+    return rc;
 }
 
 int main(int argc, char **argv) {
+    setvbuf(stderr, nullptr, _IONBF, 0);
+    fprintf(stderr, "[test_roundtrip] main() entered\n");
+    fflush(stderr);
     return CustomMain(argc, argv);
 }
 

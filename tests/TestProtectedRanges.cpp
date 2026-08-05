@@ -190,5 +190,28 @@ void TestProtectedRanges::TestProtectedRegionClicked() {
     QVERIFY(!editor.IsProtected(static_cast<std::size_t>(finalPos)));
 }
 
-QTEST_MAIN(TestProtectedRanges)
+static int RunTest(int argc, char **argv) {
+    setvbuf(stderr, nullptr, _IONBF, 0);
+    fprintf(stderr, "[test_protected_ranges] main() entered\n");
+    fflush(stderr);
+
+    fprintf(stderr, "[test_protected_ranges] QApplication() starting\n");
+    fflush(stderr);
+    QApplication app(argc, argv);
+    fprintf(stderr, "[test_protected_ranges] QApplication() done\n");
+    fflush(stderr);
+
+    TestProtectedRanges test;
+    fprintf(stderr, "[test_protected_ranges] QTest::qExec() starting\n");
+    fflush(stderr);
+    int rc = QTest::qExec(&test, argc, argv);
+    fprintf(stderr, "[test_protected_ranges] QTest::qExec() done, rc=%d\n", rc);
+    fflush(stderr);
+    return rc;
+}
+
+int main(int argc, char **argv) {
+    return RunTest(argc, argv);
+}
+
 #include "TestProtectedRanges.moc"
