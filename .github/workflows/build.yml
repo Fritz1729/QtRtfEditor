@@ -40,3 +40,16 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: ctest --output-on-failure --parallel -C Release
+
+      - name: Show test diagnostic logs
+        if: runner.os == 'Windows' && matrix.link == 'shared'
+        working-directory: build/tests
+        run: |
+          foreach ($f in @("test_protected_ranges.log", "test_rtf_structural.log", "test_roundtrip.log")) {
+            if (Test-Path $f) {
+              Write-Host "==== $f ===="
+              Get-Content $f
+            } else {
+              Write-Host "==== $f — not found ===="
+            }
+          }
