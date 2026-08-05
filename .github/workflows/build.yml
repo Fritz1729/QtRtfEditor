@@ -30,16 +30,22 @@ jobs:
           PIP_BREAK_SYSTEM_PACKAGES: "1"
 
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON ${{ matrix.link == 'shared' && '-DBUILD_SHARED_LIBS=ON' || '' }}
+        shell: bash
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QTDIR" -DBUILD_TESTING=ON ${{ matrix.link == 'shared' && '-DBUILD_SHARED_LIBS=ON' || '' }}
 
       - name: Build
         run: cmake --build build --config Release --parallel
 
       - name: Test
         working-directory: build
+        shell: bash
         env:
           QT_QPA_PLATFORM: offscreen
-        run: ctest --output-on-failure -V -j1 -C Release
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            export PATH="$QTDIR/bin:$PATH"
+          fi
+          ctest --output-on-failure -V -j1 -C Release
 
       - name: Show test diagnostic logs
         if: always()
