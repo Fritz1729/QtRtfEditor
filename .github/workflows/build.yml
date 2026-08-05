@@ -39,10 +39,10 @@ jobs:
         working-directory: build
         env:
           QT_QPA_PLATFORM: offscreen
-        run: ctest --output-on-failure --parallel -C Release
+        run: ctest --output-on-failure -V -j1 -C Release
 
       - name: Show test diagnostic logs
-        if: runner.os == 'Windows' && matrix.link == 'shared'
+        if: always()
         working-directory: build/tests
         run: |
           foreach ($f in @("test_protected_ranges.log", "test_rtf_structural.log", "test_roundtrip.log")) {
