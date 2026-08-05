@@ -46,17 +46,3 @@ jobs:
             export PATH="$QTDIR/bin:$PATH"
           fi
           ctest --output-on-failure -V -j1 -C Release
-
-      - name: Show test diagnostic logs
-        if: always()
-        working-directory: build/tests
-        shell: bash
-        run: |
-          for f in test_protected_ranges.log test_rtf_structural.log test_roundtrip.log; do
-            if [ -f "$f" ]; then
-              echo "==== $f ===="
-              cat "$f"
-            else
-              echo "==== $f — not found ===="
-            fi
-          done

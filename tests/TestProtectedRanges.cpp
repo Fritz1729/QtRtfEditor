@@ -1,7 +1,6 @@
 #include <RichTextEdit.h>
 #include <QApplication>
 #include <QtTest>
-#include <fstream>
 
 class TestProtectedRanges : public QObject {
     Q_OBJECT
@@ -191,25 +190,11 @@ void TestProtectedRanges::TestProtectedRegionClicked() {
     QVERIFY(!editor.IsProtected(static_cast<std::size_t>(finalPos)));
 }
 
-static void Log(const std::string& msg) {
-    std::ofstream dbg("test_protected_ranges.log", std::ios::app);
-    dbg << msg << "\n";
-    dbg.flush();
-}
-
 static int RunTest(int argc, char **argv) {
-    Log("[test_protected_ranges] main() entered");
-
-    Log("[test_protected_ranges] QApplication() starting");
     QApplication app(argc, argv);
-    Log("[test_protected_ranges] QApplication() done");
 
     TestProtectedRanges test;
-    Log("[test_protected_ranges] QTest::qExec() starting");
-    int rc = QTest::qExec(&test, argc, argv);
-    std::string done = "[test_protected_ranges] QTest::qExec() done, rc=" + std::to_string(rc);
-    Log(done);
-    return rc;
+    return QTest::qExec(&test, argc, argv);
 }
 
 int main(int argc, char **argv) {

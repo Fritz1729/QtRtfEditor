@@ -2,7 +2,6 @@
 #include <QBuffer>
 #include <QImage>
 #include <QtTest>
-#include <fstream>
 #include "RtfCompare.h"
 #include "RtfParser.h"
 
@@ -1231,24 +1230,11 @@ void TestSemanticComparison::NegativeFirstLineIndent() {
     QCOMPARE(para.firstLineIndent, -200);
 }
 
-static void LogStructural(const std::string& msg) {
-    std::ofstream dbg("test_rtf_structural.log", std::ios::app);
-    dbg << msg << "\n";
-    dbg.flush();
-}
-
 static int RunTest(int argc, char **argv) {
-    LogStructural("[test_rtf_structural] main() entered");
-
-    LogStructural("[test_rtf_structural] QApplication() starting");
     QApplication app(argc, argv);
-    LogStructural("[test_rtf_structural] QApplication() done");
 
     TestSemanticComparison test;
-    LogStructural("[test_rtf_structural] QTest::qExec() starting");
-    int rc = QTest::qExec(&test, argc, argv);
-    LogStructural("[test_rtf_structural] QTest::qExec() done, rc=" + std::to_string(rc));
-    return rc;
+    return QTest::qExec(&test, argc, argv);
 }
 
 int main(int argc, char **argv) {

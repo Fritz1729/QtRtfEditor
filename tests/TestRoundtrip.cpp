@@ -6,7 +6,6 @@
 #include <QFont>
 #include <QTest>
 #include <QVector>
-#include <fstream>
 #include <stdexcept>
 #include "RtfCompare.h"
 #include "RtfParser.h"
@@ -199,16 +198,8 @@ static void InitDefaultFontFamily() {
     gDefaultFontFamily = QFont().family().toStdString();
 }
 
-static void LogRoundtrip(const std::string& msg) {
-    std::ofstream dbg("test_roundtrip.log", std::ios::app);
-    dbg << msg << "\n";
-    dbg.flush();
-}
-
 static int CustomMain(int argc, char **argv) {
-    LogRoundtrip("[test_roundtrip] InitDefaultFontFamily()");
     InitDefaultFontFamily();
-    LogRoundtrip("[test_roundtrip] QFont() done");
     QStringList filtered;
     QString testDataDir;
     for (int i = 0; i < argc; ++i) {
@@ -227,7 +218,6 @@ static int CustomMain(int argc, char **argv) {
     if (!testDataDir.isEmpty()) {
         QDir dir(testDataDir);
         if (!dir.exists() || !dir.isReadable()) {
-            LogRoundtrip("--testdata-dir: " + testDataDir.toStdString() + " does not exist or is not readable");
             return 1;
         }
     }
@@ -246,21 +236,15 @@ static int CustomMain(int argc, char **argv) {
     filteredArgv.append(nullptr);
 
     int adjustedArgc = filteredArgc;
-    LogRoundtrip("[test_roundtrip] QApplication() starting");
     QApplication app(adjustedArgc, filteredArgv.data());
-    LogRoundtrip("[test_roundtrip] QApplication() done");
     app.setApplicationName("test_roundtrip");
 
-    LogRoundtrip("[test_roundtrip] QTest::qExec() starting");
     TestRoundtrip test;
     test.SetCustomDir(testDataDir);
-    int rc = QTest::qExec(&test, adjustedArgc, filteredArgv.data());
-    LogRoundtrip("[test_roundtrip] QTest::qExec() done, rc=" + std::to_string(rc));
-    return rc;
+    return QTest::qExec(&test, adjustedArgc, filteredArgv.data());
 }
 
 int main(int argc, char **argv) {
-    LogRoundtrip("[test_roundtrip] main() entered");
     return CustomMain(argc, argv);
 }
 
