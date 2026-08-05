@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.4.1
+
+Windows shared library build fixes (RTE_EXPORT, MSVC CRT /MD vs /MT, output directories), test hang fixes (Qt on main thread, parser decoupled from widgets), `-Wall` clean, CI hardening.
+
 ## v0.1.4
 
 Optional shared library builds via BUILD_SHARED_LIBS (static remains the CMake default). PKGBUILD defaults to shared.
