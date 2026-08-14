@@ -2,6 +2,7 @@
 #include "RtfParser.h"
 
 #include <algorithm>
+#include <cctype>
 #include <string>
 #include <vector>
 
@@ -39,6 +40,30 @@ static std::vector<TableGroup> GroupTables(const RtfDocument& d) {
         }
     }
     return tables;
+}
+
+static std::string NormalizePntextFonts(const std::string& pntextRtf,
+        const RtfDocument& doc) {
+    std::string result = pntextRtf;
+    size_t pos = 0;
+    while ((pos = result.find("\\f", pos)) != std::string::npos) {
+        size_t endNum = pos + 2;
+        while (endNum < result.size() && std::isdigit(static_cast<unsigned char>(result[endNum])))
+            endNum++;
+        if (endNum > pos + 2) {
+            int idx = std::stoi(result.substr(pos + 2, endNum - pos - 2));
+            std::string family;
+            if (idx >= 0 && idx < static_cast<int>(doc.fonts.size())) {
+                family = doc.fonts[static_cast<size_t>(idx)].family;
+            }
+            if (family.empty()) family = gDefaultFontFamily;
+            result.replace(pos, endNum - pos, "<font:" + family + ">");
+            pos += result.find(">", pos) - pos + 1;
+        } else {
+            pos += 2;
+        }
+    }
+    return result;
 }
 
 static size_t CountLogical(const RtfDocument& d, const std::vector<TableGroup>& tables) {
@@ -466,22 +491,26 @@ static RtfCompareResult DoCompareDocuments(const RtfDocument& a, const RtfDocume
                     }
                 }
 
-                // Compare pntext structural metadata
-                if (paraA.pntextRtf != paraB.pntextRtf) {
-                    if (!paraA.pntextRtf.empty() && paraB.pntextRtf.empty()) {
+                // Compare pntext structural metadata (font-index-independent)
+                {
+                    std::string normA = NormalizePntextFonts(paraA.pntextRtf, a);
+                    std::string normB = NormalizePntextFonts(paraB.pntextRtf, b);
+                    if (normA != normB) {
+                        if (!paraA.pntextRtf.empty() && paraB.pntextRtf.empty()) {
+                            reason = "Paragraph " + std::to_string(paraIdx) +
+                                     " \\pntext present in A but missing in B";
+                            return RtfCompareResult::StructuralDiff;
+                        }
+                        if (paraA.pntextRtf.empty() && !paraB.pntextRtf.empty()) {
+                            reason = "Paragraph " + std::to_string(paraIdx) +
+                                     " \\pntext missing in A but present in B";
+                            return RtfCompareResult::StructuralDiff;
+                        }
                         reason = "Paragraph " + std::to_string(paraIdx) +
-                                 " \\pntext present in A but missing in B";
+                                 " \\pntext content differs: '" + normA +
+                                 "' vs '" + normB + "'";
                         return RtfCompareResult::StructuralDiff;
                     }
-                    if (paraA.pntextRtf.empty() && !paraB.pntextRtf.empty()) {
-                        reason = "Paragraph " + std::to_string(paraIdx) +
-                                 " \\pntext missing in A but present in B";
-                        return RtfCompareResult::StructuralDiff;
-                    }
-                    reason = "Paragraph " + std::to_string(paraIdx) +
-                             " \\pntext content differs: '" + paraA.pntextRtf +
-                             "' vs '" + paraB.pntextRtf + "'";
-                    return RtfCompareResult::StructuralDiff;
                 }
 
                 if (CompareRunsSemantic(paraA.runs, paraB.runs, a, b,

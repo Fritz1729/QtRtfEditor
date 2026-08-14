@@ -145,19 +145,16 @@ void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
                              bool& inList, QTextList*& currentList) {
     QTextBlockFormat blockFmt;
     blockFmt.setAlignment(para.format.alignment);
-    if (para.format.leftIndent > 0 || para.format.firstLineIndent > 0) {
+    if (para.format.leftIndent != 0)
         blockFmt.setLeftMargin(MarginTwipsToPoints(para.format.leftIndent));
-        blockFmt.setIndent(para.format.firstLineIndent > 0 ? static_cast<int>(MarginTwipsToPoints(para.format.firstLineIndent)) : 0);
-    }
-    if (para.format.rightIndent > 0) {
+    if (para.format.firstLineIndent != 0)
+        blockFmt.setIndent(static_cast<int>(MarginTwipsToPoints(para.format.firstLineIndent)));
+    if (para.format.rightIndent != 0)
         blockFmt.setRightMargin(MarginTwipsToPoints(para.format.rightIndent));
-    }
-    if (para.format.spaceBefore > 0) {
+    if (para.format.spaceBefore != 0)
         blockFmt.setTopMargin(MarginTwipsToPoints(para.format.spaceBefore));
-    }
-    if (para.format.spaceAfter > 0) {
+    if (para.format.spaceAfter != 0)
         blockFmt.setBottomMargin(MarginTwipsToPoints(para.format.spaceAfter));
-    }
     if (para.format.lineHeight > 0) {
         blockFmt.setLineHeight(MarginTwipsToPoints(para.format.lineHeight),
                                 QTextBlockFormat::FixedHeight);

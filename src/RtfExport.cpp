@@ -260,7 +260,7 @@ static string EmitImageAsPict(const QTextDocument& doc, const QString& name,
 }
 
 static void EmitTwipsTag(ostringstream& out, double val, const char* tag) {
-    if (val > 0) {
+    if (val != 0) {
         int twips = PointsToHalfPtTwips(val);
         out << "\\" << tag << twips;
     }
@@ -319,9 +319,9 @@ static bool NeedsParaReset(const QTextBlockFormat& last, const QTextBlockFormat&
 static void EmitParaFormattingIfNeeded(ostringstream& out, const QTextBlockFormat& blockFmt,
     QTextBlockFormat& lastParaFmt, bool& lastParaFmtSet) {
     bool hasParaFormatting = blockFmt.alignment() != Qt::AlignLeft ||
-        blockFmt.leftMargin() > 0 || blockFmt.indent() > 0 ||
-        blockFmt.rightMargin() > 0 || blockFmt.topMargin() > 0 ||
-        blockFmt.bottomMargin() > 0 ||
+        blockFmt.leftMargin() != 0 || blockFmt.indent() != 0 ||
+        blockFmt.rightMargin() != 0 || blockFmt.topMargin() != 0 ||
+        blockFmt.bottomMargin() != 0 ||
         blockFmt.lineHeightType() == QTextBlockFormat::FixedHeight ||
         !blockFmt.tabPositions().isEmpty();
     bool reset = lastParaFmtSet && NeedsParaReset(lastParaFmt, blockFmt);

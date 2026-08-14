@@ -200,6 +200,8 @@ private slots:
 
     // \pntext structural preservation
     void DifferentPntext();
+    void PntextDifferentFontFamilies();
+    void PntextSameFamilyDifferentIndex();
 
     // \highlight structural preservation
     void DifferentHighlight();
@@ -1198,6 +1200,20 @@ void TestSemanticComparison::DifferentPntext() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\pntext\f0\'b7\tab}Bullet\par})";
     std::string rtfB = R"({\rtf1\ansi\deff0 Bullet\par})";
     AssertRtfDifferent(rtfA, rtfB);
+}
+
+void TestSemanticComparison::PntextDifferentFontFamilies() {
+    // Same \f0 index but different font families — must be detected as different
+    std::string rtfA = R"({\rtf1\ansi\deff0{\fonttbl{\f0\fswiss\fcharset0 Arial;}}{\pntext\f0\'b7\tab}Bullet\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\fonttbl{\f0\froman\fcharset0 Times New Roman;}}{\pntext\f0\'b7\tab}Bullet\par})";
+    AssertRtfDifferent(rtfA, rtfB);
+}
+
+void TestSemanticComparison::PntextSameFamilyDifferentIndex() {
+    // Different \f indices but same resolved family — must be identical
+    std::string rtfA = R"({\rtf1\ansi\deff0{\fonttbl{\f0\fswiss\fcharset0 Arial;}}{\pntext\f0\'b7\tab}\f0 Bullet\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\fonttbl{\f0\froman\fcharset0 Times;}{\f1\fswiss\fcharset0 Arial;}}{\pntext\f1\'b7\tab}\f1 Bullet\par})";
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentHighlight() {
