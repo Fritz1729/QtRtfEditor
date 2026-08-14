@@ -209,6 +209,12 @@ private slots:
 
     // Negative \fi (hanging indent)
     void NegativeFirstLineIndent();
+
+    // Unicode escape equivalence
+    void UnicodeCharIdenticalToLiteral();
+    void HexEscapeControlCharPresent();
+    void HexEscapeControlCharMissing();
+    void HexEscapeEquivalentToUnicode();
 };
 
 void TestSemanticComparison::IdenticalRtf() {
@@ -1244,6 +1250,41 @@ void TestSemanticComparison::NegativeFirstLineIndent() {
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
     QCOMPARE(para.format.firstLineIndent, -200);
+}
+
+void TestSemanticComparison::UnicodeCharIdenticalToLiteral() {
+    // \u97? is the RTF unicode escape for 'a' (decimal 97 = U+0061) — must be identical to literal 'a'
+    std::string rtfA = R"({\rtf1\ansi\deff0 a\par})";
+    std::string rtfB = R"({\rtf1\ansi\deff0 \u97?\par})";
+    AssertRtfIdentical(rtfA, rtfB);
+}
+
+void TestSemanticComparison::HexEscapeControlCharPresent() {
+    // \'1c is the hex escape for 0x1C — must produce text with that character
+    std::string rtf = R"({\rtf1\ansi\deff0 \'1c\par})";
+    auto doc = ParseRtf(rtf);
+    QCOMPARE(doc.elements.size(), 1u);
+    QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
+    const auto& para = std::get<RtfParagraph>(doc.elements[0]);
+    QVERIFY(!para.runs.empty());
+    std::string text;
+    for (const auto& run : para.runs) text += run.text;
+    QVERIFY(!text.empty());
+    QCOMPARE(static_cast<unsigned char>(text[0]), 0x1c);
+}
+
+void TestSemanticComparison::HexEscapeControlCharMissing() {
+    // \'1c must be different from empty text
+    std::string rtfWithCtrl = R"({\rtf1\ansi\deff0 \'1c\par})";
+    std::string rtfEmpty = R"({\rtf1\ansi\deff0 \par})";
+    AssertRtfDifferent(rtfWithCtrl, rtfEmpty);
+}
+
+void TestSemanticComparison::HexEscapeEquivalentToUnicode() {
+    // \'1c (hex) and \u28? (decimal 28 = 0x1C) represent the same codepoint
+    std::string rtfHex = R"({\rtf1\ansi\deff0 \'1c\par})";
+    std::string rtfUnicode = R"({\rtf1\ansi\deff0 \u28?\par})";
+    AssertRtfIdentical(rtfHex, rtfUnicode);
 }
 
 static int RunTest(int argc, char **argv) {

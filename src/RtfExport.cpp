@@ -160,6 +160,8 @@ static string RtfEscape(const QString& text) {
         } else if (code > 127) {
             int val = static_cast<int>(code);
             result += QString("\\u%1%2").arg(val).arg('?').toStdString();
+        } else if (code < 0x20 || code == 0x7F) {
+            result += QString("\\'%1").arg(code, 2, 16, QChar('0')).toStdString();
         } else {
             result += static_cast<char>(code);
         }
