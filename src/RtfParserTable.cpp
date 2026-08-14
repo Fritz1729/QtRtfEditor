@@ -59,11 +59,6 @@ constexpr TableSide CtrlWordToSide(RtfControl::TableCtrlWord ctrl) {
 
 } // namespace
 
-TableParser::TableParser(RtfDocument& doc)
-    : _doc(doc)
-{
-}
-
 bool TableParser::InTable() const { return _inTable; }
 bool TableParser::InRow() const { return _inRow; }
 bool TableParser::InCell() const { return _inCell; }

@@ -17,7 +17,7 @@ namespace Rte {
  */
 class TableParser {
 public:
-    explicit TableParser(RtfDocument& doc);
+    explicit TableParser(RtfDocument& doc) : _doc(doc) {}
 
     // State queries.
     [[nodiscard]] bool InTable() const;
