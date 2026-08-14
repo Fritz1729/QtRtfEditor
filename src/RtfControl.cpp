@@ -9,16 +9,11 @@ using Action = RtfControl::Action;
 using CharProp = RtfControl::CharProp;
 using CharSetProp = RtfControl::CharSetProp;
 using ParaProp = RtfControl::ParaProp;
-using Align = RtfControl::Align;
-using TabAlign = RtfControl::TabAlign;
 using UlStyle = RtfControl::RtfUlStyle;
-using Caps = RtfControl::RtfCaps;
 using TableCtrlWord = RtfControl::TableCtrlWord;
 
 #define DATA(keyword, action, prop) \
     { keyword, action, { .raw = static_cast<int>(prop) } }
-#define DATA_TAB(keyword, action, align) \
-    { keyword, action, { .tabAlign = align } }
 #define DATA_TABLE(keyword, ctrlWord) \
     { keyword, Action::TableControlWord, { .tableCtrlWord = ctrlWord } }
 #define DATA_SPECIAL(keyword, cp) \
@@ -74,22 +69,22 @@ constexpr RtfControl rtfControlTableEntries[] = {
     // \deftabN: group-persistent per RTF 1.5/1.9.1 spec (pushed/popped with groups).
     DATA("deftab",   Action::GroupPersistent,  0),
 
-    // Alignment
-    DATA("ql",       Action::SetAlignment,     Align::Left),
-    DATA("qj",       Action::SetAlignment,     Align::Justified),
-    DATA("qc",       Action::SetAlignment,     Align::Center),
-    DATA("qr",       Action::SetAlignment,     Align::Right),
+    // Alignment (value stored directly in raw)
+    DATA("ql",       Action::SetAlignment,     1),    // left
+    DATA("qj",       Action::SetAlignment,     4),    // justify
+    DATA("qc",       Action::SetAlignment,     128),  // center
+    DATA("qr",       Action::SetAlignment,     2),    // right
 
-    // Tab stop alignment
-    DATA_TAB("tqc",   Action::SetTabAlign,      TabAlign::Center),
-    DATA_TAB("tqd",   Action::SetTabAlign,      TabAlign::Decimal),
-    DATA_TAB("tqr",   Action::SetTabAlign,      TabAlign::Right),
-    DATA_TAB("tabcenter", Action::SetTabAlign,  TabAlign::Center),
-    DATA_TAB("tabright",  Action::SetTabAlign,  TabAlign::Right),
+    // Tab stop alignment (value stored directly in raw)
+    DATA("tqc",       Action::SetTabAlign,      128),  // center
+    DATA("tqd",       Action::SetTabAlign,      3),    // decimal
+    DATA("tqr",       Action::SetTabAlign,      2),    // right
+    DATA("tabcenter", Action::SetTabAlign,      128),  // center
+    DATA("tabright",  Action::SetTabAlign,      2),    // right
     DATA("tabgrid",   Action::TableControl,      0),
     DATA("tableft",   Action::TableControl,      0),
 
-    // Tab stop position
+    // Tab stop position (imperative — pushes to vector)
     DATA("tx",       Action::SetParaProp,      ParaProp::TabStop),
 
     // List controls
@@ -114,11 +109,11 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("uldb",       Action::SetUlStyle, UlStyle::UlDouble),
     DATA("ulth",       Action::SetUlStyle, UlStyle::UlThick),
 
-    // Capitalization
-    DATA("caps",     Action::SetCapitalization, Caps::CapsAll),
-    DATA("caps0",    Action::SetCapitalization, Caps::CapsNone),
-    DATA("scaps",    Action::SetCapitalization, Caps::CapsSmall),
-    DATA("scaps0",   Action::SetCapitalization, Caps::CapsNone),
+    // Capitalization (enum values: None=0, AllCaps=1, SmallCaps=2)
+    DATA("caps",     Action::SetCapitalization, 1),
+    DATA("caps0",    Action::SetCapitalization, 0),
+    DATA("scaps",    Action::SetCapitalization, 2),
+    DATA("scaps0",   Action::SetCapitalization, 0),
 
     // Paragraph break
     DATA("par",      Action::EmitParagraph,    0),
@@ -132,7 +127,7 @@ constexpr RtfControl rtfControlTableEntries[] = {
     // \deffN: group-persistent per RTF 1.5/1.9.1 spec (pushed/popped with groups).
     DATA("deff",     Action::GroupPersistent,  0),
     DATA("deff0",    Action::GroupPersistent,  0),
-    DATA("qi",       Action::SetAlignment,     Align::Justified),
+    DATA("qi",       Action::SetAlignment,     4),  // justified
 
     // Header metadata (roundtrip preservation)
     DATA("pard",     Action::HeaderMetadata,   0),

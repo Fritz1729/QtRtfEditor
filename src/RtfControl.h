@@ -39,7 +39,6 @@ struct RtfControl {
         Bold, Italic, Underline, Subscript, Superscript, Strike, Kerning,
         Protect,
     };
-    enum class Align : uint8_t { Left, Center, Right, Justified };
     enum class ParaProp : uint8_t {
         LeftIndent, FirstLineIndent, RightIndent, SpaceBefore, SpaceAfter,
         LineHeight, SlMult, TabStop, ListLevel,
@@ -52,8 +51,6 @@ struct RtfControl {
         UlNone, UlSolid, UlDotted, UlDashed, UlDashDot, UlDashDotDot,
         UlDouble, UlThick,
     };
-    enum class RtfCaps : uint8_t { CapsNone, CapsAll, CapsSmall };
-    enum class TabAlign : uint8_t { Left, Center, Right, Decimal };
     enum class TableCtrlWord : uint8_t {
         Trowd, Cellx, Cell, Row, Intbl,
         ClShading, ClVertAlignTop, ClVertAlignCenter, ClVertAlignBottom,
@@ -74,10 +71,7 @@ struct RtfControl {
         CharProp charProp;
         CharSetProp charSetProp;
         ParaProp paraProp;
-        Align align;
         RtfUlStyle ulStyle;
-        RtfCaps caps;
-        TabAlign tabAlign;
         TableCtrlWord tableCtrlWord;
         uint32_t specialChar;
     };

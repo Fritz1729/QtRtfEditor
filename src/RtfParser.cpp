@@ -307,29 +307,11 @@ private:
             break;
         }
         case RtfControl::Action::SetAlignment: {
-            const RtfControl::Align align = ctrl.value.align;
-            if (align == RtfControl::Align::Center) _paraScope.get().alignment = 128;
-            else if (align == RtfControl::Align::Right) _paraScope.get().alignment = 2;
-            else if (align == RtfControl::Align::Justified) _paraScope.get().alignment = 4;
-            else _paraScope.get().alignment = 1;
+            _paraScope.get().alignment = ctrl.value.raw;
             break;
         }
         case RtfControl::Action::SetTabAlign: {
-            const RtfControl::TabAlign tabAlign = ctrl.value.tabAlign;
-            switch (tabAlign) {
-            case RtfControl::TabAlign::Left:
-                _tabAlignScope.get() = 1;
-                break;
-            case RtfControl::TabAlign::Center:
-                _tabAlignScope.get() = 128;
-                break;
-            case RtfControl::TabAlign::Right:
-                _tabAlignScope.get() = 2;
-                break;
-            case RtfControl::TabAlign::Decimal:
-                _tabAlignScope.get() = 3;
-                break;
-            }
+            _tabAlignScope.get() = ctrl.value.raw;
             break;
         }
         case RtfControl::Action::SetUlStyle: {
@@ -378,18 +360,7 @@ private:
         }
         case RtfControl::Action::SetCapitalization: {
             FinalizeRun();
-            const RtfControl::RtfCaps caps = ctrl.value.caps;
-            switch (caps) {
-            case RtfControl::RtfCaps::CapsAll:
-                _formatScope.get().capitalization = Capitalization::AllCaps;
-                break;
-            case RtfControl::RtfCaps::CapsSmall:
-                _formatScope.get().capitalization = Capitalization::SmallCaps;
-                break;
-            case RtfControl::RtfCaps::CapsNone:
-                _formatScope.get().capitalization = Capitalization::None;
-                break;
-            }
+            _formatScope.get().capitalization = static_cast<Capitalization>(ctrl.value.raw);
             break;
         }
         case RtfControl::Action::EmitParagraph:

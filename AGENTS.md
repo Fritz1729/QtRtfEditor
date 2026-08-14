@@ -53,7 +53,7 @@ Out-of-source into `build/`. Convenience wrapper: `./build.sh`. `-Wall` always e
 ## Commit messages
 
 - One-liner unless the change clearly needs explanation.
-- **AI-assisted commits** — add a footer: `Co-developed-with: opencode (${MODEL})`
+- **AI-assisted commits** — add a footer: `Co-developed with: opencode (${MODEL})`
 
 ## Working Practices
 
