@@ -431,7 +431,8 @@ struct BlockExportContext {
 };
 
 void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, bool justAfterTable) {
-    if (block.text().isEmpty()) {
+    bool hasPntext = !block.blockFormat().property(UserPropBlockPntextRtf).toString().isEmpty();
+    if (block.text().isEmpty() && !hasPntext) {
         if (firstBlock || justAfterTable) {
             firstBlock = false;
             return;
