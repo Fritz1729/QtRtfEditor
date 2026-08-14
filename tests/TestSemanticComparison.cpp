@@ -181,6 +181,8 @@ private slots:
     void DifferentCellVertAlign();
     void DifferentCellBorders();
     void TableWithEmptyCell();
+    void TableWithLeadingEmptyCell();
+    void TableWithMiddleEmptyCell();
     void TableWithFormatting();
     void TableOrderingParagraphTableParagraph();
     void TableOrderingPTPTP();
@@ -964,6 +966,35 @@ void TestSemanticComparison::TableWithEmptyCell() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl A\cell \cell \row}})";
     AssertRtfIdentical(rtfA, rtfB);
+}
+
+void TestSemanticComparison::TableWithLeadingEmptyCell() {
+    // Per the RTF grammar a cell is "<textpar>+ \cell", so a canonical empty
+    // cell is "\intbl \cell". This pins the 2-cell [empty, B] result.
+    std::string rtf = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl \cell \intbl B\cell \row}})";
+    auto doc = ParseRtf(rtf);
+    QCOMPARE(doc.elements.size(), 1u);
+    QVERIFY(std::holds_alternative<RtfTableRowEntry>(doc.elements[0]));
+    const auto& row = std::get<RtfTableRowEntry>(doc.elements[0]);
+    QCOMPARE(row.cells.size(), 2u);
+    QCOMPARE(row.cells[0].first.size(), 0u);
+    QCOMPARE(row.cells[1].first.size(), 1u);
+    QCOMPARE(row.cells[1].first[0].text, std::string("B"));
+}
+
+void TestSemanticComparison::TableWithMiddleEmptyCell() {
+    // Canonical middle empty cell: [A, empty, C]
+    std::string rtf = R"({\rtf1\ansi\deff0{\trowd \cellx1000 \cellx2000 \cellx3000 \intbl A\cell \intbl \cell \intbl C\cell \row}})";
+    auto doc = ParseRtf(rtf);
+    QCOMPARE(doc.elements.size(), 1u);
+    QVERIFY(std::holds_alternative<RtfTableRowEntry>(doc.elements[0]));
+    const auto& row = std::get<RtfTableRowEntry>(doc.elements[0]);
+    QCOMPARE(row.cells.size(), 3u);
+    QCOMPARE(row.cells[0].first.size(), 1u);
+    QCOMPARE(row.cells[0].first[0].text, std::string("A"));
+    QCOMPARE(row.cells[1].first.size(), 0u);
+    QCOMPARE(row.cells[2].first.size(), 1u);
+    QCOMPARE(row.cells[2].first[0].text, std::string("C"));
 }
 
 void TestSemanticComparison::TableWithFormatting() {
