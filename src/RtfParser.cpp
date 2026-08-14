@@ -19,6 +19,22 @@ namespace Rte {
 
 namespace {
 
+[[nodiscard]] constexpr bool IsWordChar(char c) {
+    return std::isalpha(static_cast<unsigned char>(c));
+}
+
+[[nodiscard]] constexpr bool IsDigit(char c) {
+    return std::isdigit(static_cast<unsigned char>(c));
+}
+
+[[nodiscard]] constexpr bool IsWhitespace(char c) {
+    return std::isspace(static_cast<unsigned char>(c));
+}
+
+[[nodiscard]] constexpr bool IsPrintable(char c) {
+    return std::isprint(static_cast<unsigned char>(c));
+}
+
 static_assert(static_cast<int>(RtfControl::TableCtrlWord::ClVertAlignCenter) -
               static_cast<int>(RtfControl::TableCtrlWord::ClVertAlignTop) == 1);
 static_assert(static_cast<int>(RtfControl::TableCtrlWord::ClVertAlignBottom) -
@@ -1149,7 +1165,7 @@ private:
                         } else {
                             ParseControl();
                         }
-                    } else if (IsPrintable(_rtf[_pos])) {
+                    } else if (_rtf[_pos] != ';' && IsPrintable(_rtf[_pos])) {
                         family += _rtf[_pos++];
                     } else {
                         _pos++;
@@ -1641,23 +1657,6 @@ private:
         while (_pos < _len && IsWhitespace(_rtf[_pos])) {
             _pos++;
         }
-    }
-
-    [[nodiscard]] bool IsWordChar(char c) const {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-    }
-
-    [[nodiscard]] bool IsDigit(char c) const {
-        return c >= '0' && c <= '9';
-    }
-
-    [[nodiscard]] bool IsWhitespace(char c) const {
-        return c == ' ' || c == '\t' || c == '\n' || c == '\r';
-    }
-
-    [[nodiscard]] bool IsPrintable(char c) const {
-        return c != ';' && static_cast<unsigned char>(c) >= 32 &&
-                static_cast<unsigned char>(c) <= 126;
     }
 };
 
