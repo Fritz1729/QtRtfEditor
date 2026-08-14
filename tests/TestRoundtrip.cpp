@@ -178,6 +178,7 @@ void TestRoundtrip::RunFromCustomDir(const QString& dirPath) {
     }
 
     QVERIFY(_fail == 0);
+    QVERIFY(_exception == 0);
 }
 
 void TestRoundtrip::cleanupTestCase() {

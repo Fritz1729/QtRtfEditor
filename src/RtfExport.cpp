@@ -484,20 +484,21 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
     }
 
     {
-        int paraDeff = blockFmt.property(UserPropParaDefaultFontIndex).toInt();
-        int paraDeftab = blockFmt.property(UserPropParaDefaultTabStopTwips).toInt();
-        bool deffChanged = (paraDeff != lastDeff);
-        bool deftabChanged = (paraDeftab != lastDeftab);
+        // Absent property (blocks not created by import, e.g. image blocks) means no override
+        QVariant deffVar = blockFmt.property(UserPropParaDefaultFontIndex);
+        QVariant deftabVar = blockFmt.property(UserPropParaDefaultTabStopTwips);
+        bool deffChanged = deffVar.isValid() && (deffVar.toInt() != lastDeff);
+        bool deftabChanged = deftabVar.isValid() && (deftabVar.toInt() != lastDeftab);
         if (deffChanged || deftabChanged) {
             out << "{";
             deffDeftabGroupDepth++;
             if (deffChanged) {
-                out << "\\deff" << paraDeff;
-                lastDeff = paraDeff;
+                out << "\\deff" << deffVar.toInt();
+                lastDeff = deffVar.toInt();
             }
             if (deftabChanged) {
-                out << "\\deftab" << paraDeftab;
-                lastDeftab = paraDeftab;
+                out << "\\deftab" << deftabVar.toInt();
+                lastDeftab = deftabVar.toInt();
             }
         }
     }
@@ -532,7 +533,11 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
             itImg++;
         }
         if (inListGroup) out << '}';
-        out << "\\plain\\par\n";
+        out << "\\plain\\par";
+        for (int i = 0; i < deffDeftabGroupDepth; i++)
+            out << '}';
+        deffDeftabGroupDepth = 0;
+        out << "\n";
         carriedOverFormat.fontIndex = defaultFontIdx;
     } else {
         // Pre-scan fragments to find anchor ranges
