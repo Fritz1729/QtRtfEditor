@@ -195,7 +195,7 @@ void RichTextEdit::ClampCursor(bool forward) {
             pos--;
         }
     }
-    cursor.setPosition(pos < document()->characterCount() ? pos : document()->characterCount());
+    cursor.setPosition(pos);
     setTextCursor(cursor);
 }
 

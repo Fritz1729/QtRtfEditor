@@ -3,8 +3,6 @@
 #include <cstdint>
 #include <string>
 
-#include "RichTextEdit.h"
-
 namespace Rte {
 
 int MapSymbolByte(int byte);
