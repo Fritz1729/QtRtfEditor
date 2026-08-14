@@ -19,7 +19,6 @@
 #include <QByteArray>
 #include <QImage>
 #include <QBuffer>
-#include <QDebug>
 #include <QtGlobal>
 
 #include <algorithm>
@@ -715,7 +714,6 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
 string ExportRtf(const QTextDocument& document) {
     ostringstream out;
 
-    qDebug() << "[export] ExportRtf start, collecting fonts";
     QFont defaultFont = document.defaultFont();
 
     // Read default tab stop twips (stored during import)
@@ -770,8 +768,6 @@ string ExportRtf(const QTextDocument& document) {
                 fontMap[pntextFam.toStdString()] = ++idx;
             }
         }
-    qDebug() << "[export] Font collection done, count=" << fontMap.size();
-
     out << "{\\rtf1\\ansi\\deff" << defaultFontIdx;
     if (defaultTabStopTwips != kDefaultTabStopTwips)
         out << "\\deftab" << defaultTabStopTwips;
@@ -830,9 +826,7 @@ string ExportRtf(const QTextDocument& document) {
     fonttblOut << "}";
 
     // Emit fonttbl only if it contains fonts other than Qt's default
-    qDebug() << "[export] Before QFont().family()";
     string defaultFamily = QFont().family().toStdString();
-    qDebug() << "[export] QFont().family() returned:" << defaultFamily.c_str();
     bool hasNonDefaultFont = false;
     for (const auto& [family, _] : fontMap) {
         if (family != defaultFamily) {

@@ -1,7 +1,6 @@
 #include "RtfCompare.h"
 #include "RtfParser.h"
 
-#include <QDebug>
 #include <algorithm>
 #include <string>
 #include <vector>
@@ -506,12 +505,8 @@ static RtfCompareResult DoCompareDocuments(const RtfDocument& a, const RtfDocume
 static std::pair<RtfCompareResult, std::string> DoCompareParse(
         const std::string& rtfA, const std::string& rtfB) {
     std::string localReason;
-    qDebug() << "[compare] Before ParseRtf(docA)";
     RtfDocument docA = ParseRtf(rtfA);
-    qDebug() << "[compare] After ParseRtf(docA), elements=" << docA.elements.size();
-    qDebug() << "[compare] Before ParseRtf(docB)";
     RtfDocument docB = ParseRtf(rtfB);
-    qDebug() << "[compare] After ParseRtf(docB), elements=" << docB.elements.size();
     RtfCompareResult result = DoCompareDocuments(docA, docB, localReason);
     return {result, std::move(localReason)};
 }

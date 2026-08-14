@@ -129,7 +129,6 @@ void TestRoundtrip::RunFromCustomDir(const QString& dirPath) {
 
     for (int i = 0; i < files.size(); ++i) {
         const QString& filename = files[i];
-        qDebug().noquote() << "[" << i + 1 << "/" << files.size() << "]" << filename;
 
         if (IsSkipped(filename)) {
             ReportCase(filename, "SKIP (no Qt roundtrip)");
