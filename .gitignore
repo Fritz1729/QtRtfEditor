@@ -64,3 +64,4 @@ archive.tar.gz
 .qmake.stash
 *.pro
 
+build-shared/
