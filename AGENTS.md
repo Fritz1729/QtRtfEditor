@@ -30,6 +30,7 @@ Out-of-source into `build/`. Convenience wrapper: `./build.sh`. `-Wall` always e
 - Use `const` wherever possible; `const_cast` only to add const
 - Avoid `auto`; exceptions: structured binding and iterator declarations
 - Raw pointers only as non-owning views; ownership always in `unique_ptr`; avoid `shared_ptr`
+- `using namespace std` is acceptable in `.cpp` files
 
 ### Formatting
 

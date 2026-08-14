@@ -1,7 +1,7 @@
 #include "RtfParser.h"
 #include "RtfCharset.h"
 #include "RtfControl.h"
-#include "RtfQtConversions.h"
+
 #include "RtfTypes.h"
 
 #include <algorithm>
@@ -11,6 +11,7 @@
 #include <cstring>
 #include <map>
 #include <stdexcept>
+#include <string_view>
 
 using namespace std;
 
@@ -70,8 +71,24 @@ constexpr TableSide CtrlWordToSide(RtfControl::TableCtrlWord ctrl) {
         case RtfControl::TableCtrlWord::TrLeft:
         case RtfControl::TableCtrlWord::TrWidth:
         default:
-            return Side_Undefined;
+             return Side_Undefined;
     }
+}
+
+static uint8_t HexDigit(char c) {
+    if (c >= '0' && c <= '9') return static_cast<uint8_t>(c - '0');
+    if (c >= 'A' && c <= 'F') return static_cast<uint8_t>(c - 'A' + 10);
+    if (c >= 'a' && c <= 'f') return static_cast<uint8_t>(c - 'a' + 10);
+    return 0;
+}
+
+static vector<uint8_t> HexToBytes(const string& hex) {
+    vector<uint8_t> result;
+    result.reserve(hex.size() / 2);
+    for (size_t i = 0; i + 1 < hex.size(); i += 2) {
+        result.push_back(HexDigit(hex[i]) << 4 | HexDigit(hex[i + 1]));
+    }
+    return result;
 }
 
 template<typename T>
@@ -749,7 +766,7 @@ private:
     ListStyle _listStyle = ListStyle::None;
 
     // Pict state
-    QByteArray _pictData;
+    string _pictData;
     string _pictFormat;  // "jpg", "png", "bmp"
     int _pictPicw = 0;
     int _pictPich = 0;
@@ -1198,10 +1215,9 @@ private:
         }
 
         // Finalize image
-        if (!_pictFormat.empty() && !_pictData.isEmpty()) {
-            QByteArray rawBytes = QByteArray::fromHex(_pictData.toUpper());
+        if (!_pictFormat.empty() && !_pictData.empty()) {
             RtfImage img;
-            img.data = ByteArrayToVector(rawBytes);
+            img.data = HexToBytes(_pictData);
             if (_pictFormat == "jpg") img.format = RtfImageFormat::Jpeg;
             else if (_pictFormat == "png") img.format = RtfImageFormat::Png;
             else if (_pictFormat == "bmp") img.format = RtfImageFormat::Bmp;
@@ -1215,7 +1231,7 @@ private:
             img.piccropr = _pictPiccropr;
             img.piccropt = _pictPiccropt;
             img.piccropb = _pictPiccropb;
-            img.rtfPictHex = _pictData.toStdString();
+            img.rtfPictHex = _pictData;
             FlushCurrentParagraph();
             _doc.elements.push_back(std::move(img));
         }
@@ -1580,18 +1596,10 @@ private:
         }
     }
 
-    bool Matches(const char* s) {
-        size_t len = strlen(s);
-        if (_pos + len > _len) return false;
-        for (size_t i = 0; i < len; ++i) {
-            if (static_cast<unsigned char>(_rtf[_pos + i]) !=
-                static_cast<unsigned char>(s[i]))
-            {
-                return false;
-            }
-        }
-        // Verify it's a proper control word boundary
-        if (_pos + len < _len && IsWordChar(_rtf[_pos + len])) return false;
+    [[nodiscard]] bool Matches(std::string_view s) {
+        if (_pos + s.size() > _len) return false;
+        if (_rtf.compare(_pos, s.size(), s) != 0) return false;
+        if (_pos + s.size() < _len && IsWordChar(_rtf[_pos + s.size()])) return false;
         return true;
     }
 
@@ -1635,21 +1643,21 @@ private:
         }
     }
 
-    bool IsWordChar(char c) const {
+    [[nodiscard]] bool IsWordChar(char c) const {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
     }
 
-    bool IsDigit(char c) const {
+    [[nodiscard]] bool IsDigit(char c) const {
         return c >= '0' && c <= '9';
     }
 
-    bool IsWhitespace(char c) const {
+    [[nodiscard]] bool IsWhitespace(char c) const {
         return c == ' ' || c == '\t' || c == '\n' || c == '\r';
     }
 
-    bool IsPrintable(char c) const {
+    [[nodiscard]] bool IsPrintable(char c) const {
         return c != ';' && static_cast<unsigned char>(c) >= 32 &&
-               static_cast<unsigned char>(c) <= 126;
+                static_cast<unsigned char>(c) <= 126;
     }
 };
 
