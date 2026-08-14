@@ -2,8 +2,6 @@
 
 #include <string>
 
-#include "RteExport.h"
-
 class QTextDocument;
 
 namespace Rte {
@@ -14,6 +12,6 @@ namespace Rte {
  * @param rtf       RTF string (UTF-8).
  * @param codePage  Default code page for ANSI hex escapes (default 1252).
  */
-RTE_EXPORT void ImportRtf(QTextDocument* document, const std::string& rtf, int codePage = 1252);
+void ImportRtf(QTextDocument* document, const std::string& rtf, int codePage = 1252);
 
 } // namespace Rte

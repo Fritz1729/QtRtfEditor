@@ -13,12 +13,18 @@ add_library(QtRtfEditor ${_rte_lib_type}
     RtfTypes.h
     RtfQtConversions.h
     RtfParser.h
+    RtfParserContext.h
+    RtfParserContext.cpp
+    RtfParser.cpp
+    RtfParserColortbl.cpp
+    RtfParserFonttbl.cpp
+    RtfParserListtable.cpp
+    RtfParserPict.cpp
     RtfInputReader.h
     RtfInputReader.cpp
     RtfCharset.h
     RtfCharset.cpp
     RtfControl.cpp
-    RtfParser.cpp
     RtfImport.h
     RtfImport.cpp
 )
@@ -59,8 +65,11 @@ set_target_properties(QtRtfEditor PROPERTIES
 # --- Installation ---
 include(GNUInstallDirs)
 
-file(GLOB PUBLIC_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
-install(FILES ${PUBLIC_HEADERS}
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/RichTextEdit.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/RtfTypes.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/RtfQtConversions.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/RteExport.h"
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/RichTextEdit
 )
 

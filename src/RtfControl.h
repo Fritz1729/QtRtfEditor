@@ -3,8 +3,6 @@
 #include <array>
 #include <cstdint>
 
-#include "RteExport.h"
-
 namespace Rte {
 
 /**
@@ -78,6 +76,6 @@ struct RtfControl {
  * @brief Look up a control by keyword. O(1) via static unordered_map.
  * @return Pointer to the control entry, or nullptr if not found.
  */
-RTE_EXPORT const RtfControl* FindControl(const char* keyword);
+const RtfControl* FindControl(const char* keyword);
 
 } // namespace Rte

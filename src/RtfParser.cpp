@@ -1,4 +1,6 @@
 #include "RtfParser.h"
+#include "RtfParserContext.h"
+
 #include "RtfCharset.h"
 #include "RtfControl.h"
 #include "RtfInputReader.h"
@@ -19,10 +21,6 @@ using namespace std;
 namespace Rte {
 
 namespace {
-
-[[nodiscard]] constexpr bool IsPrintable(char c) {
-    return std::isprint(static_cast<unsigned char>(c));
-}
 
 static_assert(static_cast<int>(RtfControl::TableCtrlWord::ClVertAlignCenter) -
               static_cast<int>(RtfControl::TableCtrlWord::ClVertAlignTop) == 1);
@@ -80,41 +78,6 @@ constexpr TableSide CtrlWordToSide(RtfControl::TableCtrlWord ctrl) {
     }
 }
 
-static uint8_t HexDigit(char c) {
-    if (c >= '0' && c <= '9') return static_cast<uint8_t>(c - '0');
-    if (c >= 'A' && c <= 'F') return static_cast<uint8_t>(c - 'A' + 10);
-    if (c >= 'a' && c <= 'f') return static_cast<uint8_t>(c - 'a' + 10);
-    return 0;
-}
-
-static vector<uint8_t> HexToBytes(const string& hex) {
-    vector<uint8_t> result;
-    result.reserve(hex.size() / 2);
-    for (size_t i = 0; i + 1 < hex.size(); i += 2) {
-        result.push_back(HexDigit(hex[i]) << 4 | HexDigit(hex[i + 1]));
-    }
-    return result;
-}
-
-template<typename T>
-struct ScopeStack {
-    vector<T> stack;
-    T current;
-
-    ScopeStack() = default;
-    explicit ScopeStack(T initial) : current(std::move(initial)) {}
-
-    void enterScope() { stack.push_back(current); }
-    void leaveScope() {
-        if (!stack.empty()) {
-            current = std::move(stack.back());
-            stack.pop_back();
-        }
-    }
-    const T& get() const { return current; }
-    T& get() { return current; }
-};
-
 class RtfParserImpl {
 private:
     struct ParserScope {
@@ -137,10 +100,6 @@ public:
         _skipLeadingWsTrim = false;
         _paragraphFlushed = false;
         _iter = 0;
-        _inColortbl = false;
-        _inFonttbl = false;
-        _inPict = false;
-        _inListtable = false;
         _listIdToStyle.clear();
         _inTable = false;
         _inRow = false;
@@ -164,21 +123,9 @@ public:
     }
 
 private:
-    static constexpr size_t kMaxIter = 10'000'000;
-
-    void CheckIter() {
-        if (++_iter > kMaxIter) throw runtime_error("parser iteration limit");
-    }
-
     void SkipGroup() {
         // The group's own "{" has already been consumed by the caller.
-        int depth = 1;
-        while (!_input.IsEof() && depth > 0) {
-            CheckIter();
-            char c = _input.Advance();
-            if (c == '{') depth++;
-            else if (c == '}') depth--;
-        }
+        Rte::SkipGroup(_input, _iter);
     }
 
     const RtfControl* FindControl(const char* word) const {
@@ -602,7 +549,7 @@ private:
     }
 
     void EmitTableRow() {
-        if (ParagraphHasNonWhitespaceContent(_currentRow)) {
+        if (TableRowHasNonWhitespaceContent(_currentRow)) {
             _doc.elements.emplace_back(std::move(_currentRow));
         }
         _currentRow = {};
@@ -625,47 +572,19 @@ private:
     }
 
     void FlushCurrentParagraph() {
-        // Skip the initial empty paragraph before any content has been flushed.
-        // Empty paragraphs after the first flush are preserved (blank lines).
-        if (!_paragraphFlushed && !ParagraphHasNonWhitespaceContent(_currentParagraph)) {
-            _currentParagraph = {};
-            return;
-        }
-        _paragraphFlushed = true;
-        _currentParagraph.format = _paraScope.get();
-        _currentParagraph.listId = _listId;
-        _currentParagraph.listLevel = _listLevel;
-        _currentParagraph.listStyle = _listStyle;
-        _currentParagraph.listIndent = _paraScope.get().leftIndent;
-        _currentParagraph.defaultFontIndex = _deffScope.get();
-        _currentParagraph.defaultTabStopTwips = _deftabScope.get();
-        _doc.elements.push_back(std::move(_currentParagraph));
-        _currentParagraph = {};
+        RtfParserScopeContext ctx(_input, _doc, _currentParagraph, _iter,
+                             {_formatScope, _paraScope, _tabAlignScope, _deffScope, _deftabScope, _ucScope},
+                             {_listId, _listLevel, _listStyle, _paragraphFlushed, _listIdToStyle});
+        Rte::FlushCurrentParagraph(ctx);
     }
 
-    static bool RunHasNonWhitespaceContent(const RtfRun& run) {
-        if (!run.text.empty()) {
-            for (char c : run.text) {
-                if (!isspace(static_cast<unsigned char>(c))) return true;
-            }
-        }
-        return false;
-    }
-
-    static bool RunsHaveNonWhitespaceContent(const vector<RtfRun>& runs) {
-        for (const RtfRun& r : runs) {
-            if (RunHasNonWhitespaceContent(r)) return true;
-        }
-        return false;
-    }
-
-    static bool ParagraphHasNonWhitespaceContent(const RtfParagraph& p) {
-        return RunsHaveNonWhitespaceContent(p.runs);
-    }
-
-    static bool ParagraphHasNonWhitespaceContent(const RtfTableRowEntry& r) {
+    static bool TableRowHasNonWhitespaceContent(const RtfTableRowEntry& r) {
         for (const auto& [runs, _] : r.cells) {
-            if (RunsHaveNonWhitespaceContent(runs)) return true;
+            for (const auto& run : runs) {
+                for (char c : run.text) {
+                    if (!isspace(static_cast<unsigned char>(c))) return true;
+                }
+            }
         }
         return false;
     }
@@ -675,7 +594,7 @@ private:
             bool hasText = visit([](const auto& elem) -> bool {
                 using T = decay_t<decltype(elem)>;
                 if constexpr (is_same_v<T, RtfParagraph>) return ParagraphHasNonWhitespaceContent(elem);
-                else if constexpr (is_same_v<T, RtfTableRowEntry>) return ParagraphHasNonWhitespaceContent(elem);
+                else if constexpr (is_same_v<T, RtfTableRowEntry>) return TableRowHasNonWhitespaceContent(elem);
                 else return true;
             }, _doc.elements.back());
             if (!hasText) _doc.elements.pop_back();
@@ -693,10 +612,6 @@ private:
     int _codePage = 1252;
     ScopeStack<RtfRunFormat> _formatScope;
     ScopeStack<ParagraphFormat> _paraScope;
-    bool _inColortbl = false;
-    bool _inFonttbl = false;
-    bool _inPict = false;
-    bool _inListtable = false;
     bool _inPntext = false;
     map<int, RtfListStyle> _listIdToStyle;
     ScopeStack<Qt::Alignment> _tabAlignScope{Qt::AlignLeft};
@@ -708,20 +623,6 @@ private:
     int _listId = 0;
     int _listLevel = 0;
     RtfListStyle _listStyle = RtfListStyle::None;
-
-    // Pict state
-    string _pictData;
-    string _pictFormat;  // "jpg", "png", "bmp"
-    int _pictPicw = 0;
-    int _pictPich = 0;
-    int _pictPicwgoal = 0;
-    int _pictPichgoal = 0;
-    int _pictPicscalex = 100;
-    int _pictPicscaley = 100;
-    int _pictPiccropl = 0;
-    int _pictPiccropr = 0;
-    int _pictPiccropt = 0;
-    int _pictPiccropb = 0;
 
     // Group nesting depth for document-level save
     int _groupDepth = 0;
@@ -746,7 +647,7 @@ private:
 
     void Parse() {
         while (!_input.IsEof()) {
-            CheckIter();
+            CheckIter(_iter);
             char c = _input.Peek();
             if (c == '{') {
                 ParseGroup();
@@ -776,33 +677,31 @@ private:
             if (_input.ConsumeMatch("\\colortbl")) {
                 _input.SkipDigits();
                 _input.SkipWhitespace();
-                _inColortbl = true;
-                ParseColortbl();
-                _inColortbl = false;
+                RtfParserContext ctx{_input, _doc, _iter};
+                ParseColortbl(ctx);
                 return;
             }
             if (_input.ConsumeMatch("\\fonttbl")) {
                 _input.SkipDigits();
                 _input.SkipWhitespace();
-                _inFonttbl = true;
-                ParseFonttbl();
-                _inFonttbl = false;
+                RtfParserContext ctx{_input, _doc, _iter};
+                ParseFonttbl(ctx);
                 return;
             }
 
             if (_input.ConsumeMatch("\\listtable")) {
                 _input.SkipWhitespace();
-                _inListtable = true;
-                ParseListtable();
-                _inListtable = false;
+                RtfListtableContext ctx{_input, _iter, _listIdToStyle};
+                ParseListtable(ctx);
                 return;
             }
 
             if (_input.ConsumeMatch("\\pict")) {
                 _input.SkipWhitespace();
-                _inPict = true;
-                ParsePict();
-                _inPict = false;
+                RtfParserScopeContext ctx(_input, _doc, _currentParagraph, _iter,
+                                          {_formatScope, _paraScope, _tabAlignScope, _deffScope, _deftabScope, _ucScope},
+                                          {_listId, _listLevel, _listStyle, _paragraphFlushed, _listIdToStyle});
+                ParsePict(ctx);
                 return;
             }
 
@@ -959,22 +858,7 @@ private:
     }
 
     void ParseControlWord() {
-        auto [word, arg] = _input.ReadControlWord();
-        bool hasArg = arg >= 0;
-
-        // Handle negative arguments: \word-NNN (no space between - and digits)
-        // RTF spec: minus sign must be followed immediately by one or more digits
-        if (!hasArg && _input.PeekIs('-') && _input.PeekIf(Rte::IsDigit, 1)) {
-            _input.SkipAs('-');
-            arg = 0;
-            while (!_input.IsEof() && Rte::IsDigit(_input.Peek())) {
-                arg = arg * 10 + (_input.Advance() - '0');
-            }
-            arg = -arg;
-            hasArg = true;
-        }
-
-        _input.ConsumeControlDelimiter(arg, hasArg);
+        auto [word, arg] = ParseControlWordWithArg(_input);
         if (word.empty()) {
             // Consume lone \* — RTF star modifier, no-op when not followed by a control word
             _input.AdvanceIf('*');
@@ -1020,153 +904,13 @@ private:
         }
     }
 
-    void ParseColortbl() {
-        // {\colortbl ;\red255\green0\blue0;\red0\green128\blue0;}
-        // Each ';' separates a color entry. First entry is "auto" (may be empty).
-        while (!_input.IsEof() && !_input.PeekIs('}')) {
-            CheckIter();
-            _input.SkipWhitespace();
-
-            int r = 0, g = 0, b = 0;
-
-            while (!_input.IsEof() && !_input.PeekIs(';') && !_input.PeekIs('}')) {
-                if (_input.ConsumeMatch("\\red")) {
-                    r = _input.ParseInt();
-                } else if (_input.ConsumeMatch("\\green")) {
-                    g = _input.ParseInt();
-                } else if (_input.ConsumeMatch("\\blue")) {
-                    b = _input.ParseInt();
-                } else if (IsPrintable(_input.Peek())) {
-                    _input.Advance();
-                } else {
-                    break;
-                }
-            }
-
-            // Always add color entry (first entry may be empty "auto" color)
-            _doc.colors.push_back({r, g, b});
-
-            if (!_input.IsEof()) _input.Advance(); // skip ';' or '}'
-        }
-        _input.SkipAs('}');
-    }
-
-    void ParseFonttbl() {
-        // {\fonttbl{\f0\froman\fcharset0 Times New Roman;}
-        //        {\f1\fswiss\fcharset0 Arial;}}
-        // Each font entry is a group containing \fN and the family name
-        while (!_input.IsEof() && !_input.PeekIs('}')) {
-            CheckIter();
-            if (_input.PeekIs('{')) {
-                // Font entry group
-                _input.SkipAs('{');
-
-                int fcharset = 0;
-                string family;
-
-                while (!_input.IsEof() && !_input.PeekIs('}')) {
-                    if (_input.PeekIs('\\')) {
-                        if (_input.ConsumeMatch("\\fcharset")) {
-                            fcharset = _input.ParseInt();
-                        } else if (_input.ConsumeMatch("\\f")) {
-                            _input.ParseInt();
-                        } else {
-                            ParseControl();
-                        }
-                    } else if (_input.PeekIs('{')) {
-                        // Nested group — skip all (e.g. {\*\fname ...} or any sub-group)
-                        _input.SkipAs('{');
-                        SkipGroup();
-                    } else if (!_input.PeekIs(';') && IsPrintable(_input.Peek())) {
-                        family += _input.Advance();
-                    } else {
-                        _input.Advance();
-                    }
-                }
-
-                if (!_input.IsEof()) _input.SkipAs('}');
-
-                // Remove leading/trailing whitespace from family
-                while (!family.empty() && family.back() == ' ') family.pop_back();
-                size_t firstNonSpace = 0;
-                while (firstNonSpace < family.size() && family[firstNonSpace] == ' ') firstNonSpace++;
-                if (firstNonSpace > 0) family.erase(family.begin(), family.begin() + static_cast<ptrdiff_t>(firstNonSpace));
-
-                if (!family.empty()) {
-                    _doc.fonts.push_back({family, fcharset});
-                }
-            } else {
-                _input.Advance();
-            }
-        }
-        _input.SkipAs('}');
-    }
-
-    void ParsePict() {
-        // {\pict\pngblip\picw500\pich500\picscalex500\picwgoal250 <hex-data>}
-        // Collect hex-encoded image data between control words
-        _pictData.clear();
-        _pictFormat.clear();
-        _pictPicw = 0;
-        _pictPich = 0;
-        _pictPicwgoal = 0;
-        _pictPichgoal = 0;
-        _pictPicscalex = 100;
-        _pictPicscaley = 100;
-        _pictPiccropl = 0;
-        _pictPiccropr = 0;
-        _pictPiccropt = 0;
-        _pictPiccropb = 0;
-
-        while (!_input.IsEof() && !_input.PeekIs('}')) {
-            CheckIter();
-            if (_input.PeekIs('\\')) {
-                ParsePictControl();
-                // Skip whitespace after control words
-                while (!_input.IsEof() && !_input.PeekIs('}') && Rte::IsWhitespace(_input.Peek())) {
-                    _input.Advance();
-                }
-            } else {
-                // Hex data — but skip any non-hex characters (whitespace, etc.)
-                char c = _input.Peek();
-                // Only collect uppercase/lowercase hex digits
-                if (Rte::IsHexDigit(c)) {
-                    _pictData += c;
-                }
-                _input.Advance();
-            }
-        }
-
-        _input.SkipAs('}');
-        if (!_pictFormat.empty() && !_pictData.empty()) {
-            RtfImage img;
-            img.data = HexToBytes(_pictData);
-            if (_pictFormat == "jpg") img.format = RtfImageFormat::Jpeg;
-            else if (_pictFormat == "png") img.format = RtfImageFormat::Png;
-            else if (_pictFormat == "bmp") img.format = RtfImageFormat::Bmp;
-            img.picw = _pictPicw;
-            img.pich = _pictPich;
-            img.picwgoal = _pictPicwgoal;
-            img.pichgoal = _pictPichgoal;
-            img.picscalex = _pictPicscalex;
-            img.picscaley = _pictPicscaley;
-            img.piccropl = _pictPiccropl;
-            img.piccropr = _pictPiccropr;
-            img.piccropt = _pictPiccropt;
-            img.piccropb = _pictPiccropb;
-            img.rtfPictHex = _pictData;
-            FlushCurrentParagraph();
-            _doc.elements.push_back(std::move(img));
-        }
-    }
-
     void ParseField() {
         // {\field{\*\fldinst HYPERLINK "URL"}{\*\fldrslt display text}}
         _fieldAnchorHref.clear();
         _inFieldRslt = false;
 
         while (!_input.IsEof() && !_input.PeekIs('}')) {
-            CheckIter();
+            CheckIter(_iter);
 
             if (_input.PeekIs('{')) {
                 _input.SkipAs('{');
@@ -1238,7 +982,7 @@ private:
         // Collect instruction text to extract HYPERLINK target
         string inst;
         while (!_input.IsEof() && !_input.PeekIs('}')) {
-            CheckIter();
+            CheckIter(_iter);
             if (_input.PeekIs('\\')) {
                 _input.SkipAs('\\');
                 if (!_input.IsEof()) {
@@ -1340,127 +1084,6 @@ private:
         return result;
     }
 
-    void ParseListtable() {
-        while (!_input.IsEof() && !_input.PeekIs('}')) {
-            CheckIter();
-            if (_input.PeekIs('{')) {
-                _input.SkipAs('{');
-                while (!_input.IsEof() && !_input.PeekIs('}')) {
-                    if (_input.PeekIs('\\')) {
-                        ParseListtableControl();
-                    } else {
-                        _input.Advance();
-                    }
-                }
-                _input.SkipAs('}');
-            } else if (_input.PeekIs('\\')) {
-                ParseListtableControl();
-            } else {
-                _input.Advance();
-            }
-        }
-        _input.SkipAs('}');
-    }
-
-    void ParseListtableControl() {
-        _input.SkipAs('\\');
-        if (_input.IsEof()) return;
-
-        auto [word, arg] = _input.ReadControlWord();
-        bool hasArg = arg >= 0;
-
-        if (word == "list" || word == "listoverride") {
-            if (_currentListId > 0 && _currentListStyle != RtfListStyle::None) {
-                _listIdToStyle[_currentListId] = _currentListStyle;
-            }
-            _currentListId = 0;
-            _currentListStyle = RtfListStyle::None;
-        } else if (word == "listid" && hasArg) {
-            _currentListId = arg;
-            _currentListStyle = RtfListStyle::None;
-        } else if (word == "listlevel") {
-            // \listlevel opens a group {\listlevel ... \levelnfcN ...}
-            // Parse the group contents looking for \levelnfc
-            _input.SkipWhitespace();
-            if (!_input.IsEof() && _input.PeekIs('{')) {
-                _input.SkipAs('{');
-                while (!_input.IsEof() && !_input.PeekIs('}')) {
-                    if (_input.PeekIs('\\')) {
-                        _input.SkipAs('\\');
-                        auto [innerWord, innerArg] = _input.ReadControlWord();
-                        if (innerWord == "levelnfc" && innerArg >= 0) {
-                            if (_currentListId > 0) {
-                                _currentListStyle = RtfLevelNfcToListStyle(innerArg);
-                                _listIdToStyle[_currentListId] = _currentListStyle;
-                            }
-                        }
-                    } else {
-                        _input.Advance();
-                    }
-                }
-                _input.SkipAs('}');
-            }
-        } else if (word == "listname") {
-            while (!_input.IsEof() && !_input.PeekIs('"')) _input.Advance();
-            while (!_input.IsEof() && !_input.PeekIs('"')) _input.Advance();
-        }
-    }
-
-    static RtfListStyle RtfLevelNfcToListStyle(int nfc) {
-        switch (static_cast<RtfLevelNfc>(nfc)) {
-            case RtfLevelNfc::Arabic:           return RtfListStyle::Number;
-            case RtfLevelNfc::UpperRoman:       return RtfListStyle::Roman;
-            case RtfLevelNfc::LowerRoman:       return RtfListStyle::Roman;
-            case RtfLevelNfc::UpperAlpha:       return RtfListStyle::Letter;
-            case RtfLevelNfc::LowerAlpha:       return RtfListStyle::Letter;
-            case RtfLevelNfc::Ordinal:          return RtfListStyle::Number;
-            case RtfLevelNfc::CardinalText:     return RtfListStyle::Number;
-            case RtfLevelNfc::OrdinalText:      return RtfListStyle::Number;
-            case RtfLevelNfc::ArabicLeadingZero: return RtfListStyle::Number;
-            case RtfLevelNfc::Bullet:           return RtfListStyle::Disc;
-            case RtfLevelNfc::NoNumber:         return RtfListStyle::None;
-        }
-        return RtfListStyle::Number;
-    }
-
-    int _currentListId = 0;
-    RtfListStyle _currentListStyle = RtfListStyle::None;
-
-    void ParsePictControl() {
-        _input.SkipAs('\\');
-
-        if (_input.IsEof()) return;
-
-        char c = _input.Peek();
-        if (Rte::IsWordChar(c)) {
-            auto [word, arg] = _input.ReadControlWord();
-            bool hasArg = arg >= 0;
-            if (word.empty()) return;
-
-            // Known pict control words
-            if (word == "jpegblip") { _pictFormat = "jpg"; }
-            else if (word == "pngblip") { _pictFormat = "png"; }
-            else if (word == "dibitmap") { _pictFormat = "bmp"; }
-            else if (word == "picw" && hasArg) { _pictPicw = arg; }
-            else if (word == "pich" && hasArg) { _pictPich = arg; }
-            else if (word == "picwgoal" && hasArg) { _pictPicwgoal = arg; }
-            else if (word == "pichgoal" && hasArg) { _pictPichgoal = arg; }
-            else if (word == "picscalex" && hasArg) { _pictPicscalex = arg; }
-            else if (word == "picscaley" && hasArg) { _pictPicscaley = arg; }
-            else if (word == "piccropl" && hasArg) { _pictPiccropl = arg; }
-            else if (word == "piccropr" && hasArg) { _pictPiccropr = arg; }
-            else if (word == "piccropt" && hasArg) { _pictPiccropt = arg; }
-            else if (word == "piccropb" && hasArg) { _pictPiccropb = arg; }
-            // Unknown pict control words are silently ignored
-            return;
-        }
-
-        // Skip other control symbols (digits, etc.)
-        if (Rte::IsDigit(c)) {
-            _input.Advance();
-        }
-    }
-
     void ProcessControlWord(const string& word, int arg) {
         // Table group markers (should have been caught in parseGroup)
         if (word == "colortbl" || word == "fonttbl") return;
@@ -1515,6 +1138,25 @@ private:
 };
 
 } // namespace
+
+void FlushCurrentParagraph(RtfParserScopeContext& ctx) {
+    // Skip the initial empty paragraph before any content has been flushed.
+    // Empty paragraphs after the first flush are preserved (blank lines).
+    if (!ctx.listState.paragraphFlushed && !ParagraphHasNonWhitespaceContent(ctx.currentParagraph)) {
+        ctx.currentParagraph = {};
+        return;
+    }
+    ctx.listState.paragraphFlushed = true;
+    ctx.currentParagraph.format = ctx.scopes.paraScope.get();
+    ctx.currentParagraph.listId = ctx.listState.listId;
+    ctx.currentParagraph.listLevel = ctx.listState.listLevel;
+    ctx.currentParagraph.listStyle = ctx.listState.listStyle;
+    ctx.currentParagraph.listIndent = ctx.scopes.paraScope.get().leftIndent;
+    ctx.currentParagraph.defaultFontIndex = ctx.scopes.deffScope.get();
+    ctx.currentParagraph.defaultTabStopTwips = ctx.scopes.deftabScope.get();
+    ctx.doc.elements.push_back(std::move(ctx.currentParagraph));
+    ctx.currentParagraph = {};
+}
 
 RtfDocument ParseRtf(const string& rtf, int codePage) {
     RtfParserImpl impl;
