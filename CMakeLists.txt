@@ -24,7 +24,7 @@ if(MSVC)
 endif()
 
 if(NOT MSVC)
-    add_compile_options(-Wall -Wextra -Wtype-limits -Wsign-conversion -Wshadow -Wswitch-enum)
+    add_compile_options(-Wall -Wextra -Wtype-limits -Wsign-conversion -Wshadow -Wswitch-enum -Wpedantic -Wformat=2 -Wimplicit-fallthrough=3 -Wrestrict)
 endif()
 
 set(CMAKE_AUTOMOC ON)
