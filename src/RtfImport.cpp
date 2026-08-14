@@ -474,7 +474,7 @@ void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
 } // namespace
 
 void ImportRtf(QTextDocument* document, const std::string& rtf, int codePage) {
-    RtfDocument doc = ParseRtf(rtf, codePage);
+    RtfDocument doc = RtfParser{}.Parse(rtf, codePage);
     BuildDocument(document, doc);
 
     // Store metadata for roundtrip

@@ -2,7 +2,7 @@
 
 **File:** [Source](../src/RtfParser.h) | [Previous](rtf_charset.md) | [Next](rtf_import.md)
 
-`RtfParser` provides `ParseRtf()` -- the entry point for converting an RTF string into an `RtfDocument` structure. The parser is a recursive descent tokenizer with group-aware state management.
+`RtfParser` provides `Parse()` -- the entry point for converting an RTF string into an `RtfDocument` structure. The parser is a recursive descent tokenizer with group-aware state management.
 
 ## Role
 
@@ -10,13 +10,13 @@ The parser is the bridge between raw RTF text and the structured `RtfDocument` m
 
 ## Public API
 
-| Function | Signature | Purpose |
-|----------|-----------|---------|
-| `ParseRtf` | `RtfDocument(rtf, codePage = 1252)` | Parse RTF string into document structure |
+| Method | Signature | Purpose |
+|--------|-----------|---------|
+| `Parse` | `RtfDocument(rtf, codePage = 1252)` | Parse RTF string into document structure |
 
 ## Parser Architecture
 
-The parser is implemented as `RtfParserImpl`, a private class. It uses a single-pass, recursive descent approach:
+The parser is the `RtfParser` class. It uses a single-pass, recursive descent approach:
 
 ### Core Methods
 
@@ -130,5 +130,5 @@ Hex data is collected as literal characters (0-9, A-F, a-f), then decoded via `Q
 
 | File | Purpose |
 |------|---------|
-| `RtfParser.h` | `ParseRtf()` declaration |
-| `RtfParser.cpp` | `RtfParserImpl` class: tokenizer, group handling, table/image parsing |
+| `RtfParser.h` | `RtfParser` class declaration |
+| `RtfParser.cpp` | `RtfParser` implementation: tokenizer, group handling, table/image parsing |

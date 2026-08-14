@@ -397,7 +397,7 @@ void TestSemanticComparison::DifferentLangId() {
 
 void TestSemanticComparison::ConsecutiveUlColorIndex() {
     // \ulc0\ulc1 — no intervening text — the format should be ulColorIndex=1
-    auto doc = ParseRtf(R"({\rtf1\ansi\deff0{\ul\ulc0\ulc1 Underlined}\ul0\ulc0\par})");
+    auto doc = RtfParser{}.Parse(R"({\rtf1\ansi\deff0{\ul\ulc0\ulc1 Underlined}\ul0\ulc0\par})");
     QVERIFY(doc.elements.size() >= 1);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
@@ -411,7 +411,7 @@ void TestSemanticComparison::ConsecutiveUlColorIndex() {
 
 void TestSemanticComparison::ConsecutiveUlColorIndexWithText() {
     // \ulc0 A\ulc1 B — two separate runs with different underline colors
-    auto doc = ParseRtf(R"({\rtf1\ansi\deff0{\ul\ulc0 A \ulc1 B}\ul0\ulc0\par})");
+    auto doc = RtfParser{}.Parse(R"({\rtf1\ansi\deff0{\ul\ulc0 A \ulc1 B}\ul0\ulc0\par})");
     QVERIFY(doc.elements.size() >= 1);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
@@ -433,7 +433,7 @@ void TestSemanticComparison::ConsecutiveUlColorIndexWithText() {
 
 void TestSemanticComparison::ConsecutiveLangId() {
     // \lang1033\lang2057 — no intervening text — the format should be langId=2057
-    auto doc = ParseRtf(R"({\rtf1\ansi\deff0{\lang1033\lang2057 English}\lang0\par})");
+    auto doc = RtfParser{}.Parse(R"({\rtf1\ansi\deff0{\lang1033\lang2057 English}\lang0\par})");
     QVERIFY(doc.elements.size() >= 1);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
@@ -446,7 +446,7 @@ void TestSemanticComparison::ConsecutiveLangId() {
 
 void TestSemanticComparison::ConsecutiveLangIdWithText() {
     // \lang1033 A\lang2057 B — two separate runs with different language IDs
-    auto doc = ParseRtf(R"({\rtf1\ansi\deff0{\lang1033 US \lang2057 UK}\lang0\par})");
+    auto doc = RtfParser{}.Parse(R"({\rtf1\ansi\deff0{\lang1033 US \lang2057 UK}\lang0\par})");
     QVERIFY(doc.elements.size() >= 1);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
@@ -467,7 +467,7 @@ void TestSemanticComparison::ConsecutiveLangIdWithText() {
 
 void TestSemanticComparison::ConsecutiveHighlightIndex() {
     // \highlight0\highlight2 — no intervening text — the format should be highlightIndex=2
-    auto doc = ParseRtf(R"({\rtf1\ansi\deff0{\highlight0\highlight2 Highlighted}\highlight0\par})");
+    auto doc = RtfParser{}.Parse(R"({\rtf1\ansi\deff0{\highlight0\highlight2 Highlighted}\highlight0\par})");
     QVERIFY(doc.elements.size() >= 1);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
@@ -480,7 +480,7 @@ void TestSemanticComparison::ConsecutiveHighlightIndex() {
 
 void TestSemanticComparison::ConsecutiveHighlightIndexWithText() {
     // \highlight1 A\highlight2 B — two separate runs with different highlight colors
-    auto doc = ParseRtf(R"({\rtf1\ansi\deff0{\highlight1 First \highlight2 Second}\highlight0\par})");
+    auto doc = RtfParser{}.Parse(R"({\rtf1\ansi\deff0{\highlight1 First \highlight2 Second}\highlight0\par})");
     QVERIFY(doc.elements.size() >= 1);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
@@ -752,7 +752,7 @@ void TestSemanticComparison::UnknownTags() {
 void TestSemanticComparison::EscapedBackslash() {
     // \\ produces a literal backslash character
     std::string rtfA = R"({\rtf1\ansi\deff0 Path: C:\\Users\\test\par})";
-    auto doc = ParseRtf(rtfA);
+    auto doc = RtfParser{}.Parse(rtfA);
     QVERIFY(doc.elements.size() >= 1);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
@@ -769,7 +769,7 @@ void TestSemanticComparison::EscapedBackslash() {
 void TestSemanticComparison::EscapedBackslashWithBraces() {
     // \\{ and \\} produce literal \{ and \} (not backslash + group delimiter)
     std::string rtfA = R"({\rtf1\ansi\deff0 Set: K[x]\\{0\\}\par})";
-    auto doc = ParseRtf(rtfA);
+    auto doc = RtfParser{}.Parse(rtfA);
     QVERIFY(doc.elements.size() >= 1);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
@@ -786,7 +786,7 @@ void TestSemanticComparison::EscapedBackslashWithBraces() {
 void TestSemanticComparison::EscapedBackslashRoundtrip() {
     // RTF with \\ should roundtrip: parse → save → parse should yield identical structure
     std::string rtfA = R"({\rtf1\ansi\deff0 Path: C:\\Users\\test\par})";
-    auto doc = ParseRtf(rtfA);
+    auto doc = RtfParser{}.Parse(rtfA);
     QVERIFY(doc.elements.size() >= 1);
     AssertRtfIdentical(rtfA, rtfA);
 }
@@ -796,7 +796,7 @@ void TestSemanticComparison::EmptyParagraphsPreserved() {
     // The parser must preserve the empty paragraph; both \par tokens
     // produce distinct paragraphs in the element list.
     std::string rtf = R"({\rtf1\ansi\deff0 Para1\par\par Para3\par})";
-    auto doc = ParseRtf(rtf);
+    auto doc = RtfParser{}.Parse(rtf);
     QCOMPARE(doc.elements.size(), 3u);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[1]));
@@ -811,7 +811,7 @@ void TestSemanticComparison::WhitespaceAfterToggleOff() {
     // is consumed as the RTF delimiter (per spec), so one space
     // remains as content.
     std::string rtf = R"({\rtf1\ansi\deff0 Test \b bold\b0  regular\par})";
-    auto doc = ParseRtf(rtf);
+    auto doc = RtfParser{}.Parse(rtf);
     QVERIFY(doc.elements.size() >= 1);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
@@ -832,7 +832,7 @@ void TestSemanticComparison::WhitespaceAfterToggleOff() {
 void TestSemanticComparison::UlNone() {
     // \ulnone must turn off underline, not turn it on
     std::string rtf = R"({\rtf1\ansi\deff0 Text {\ul underlined\ulnone} normal\par})";
-    auto doc = ParseRtf(rtf);
+    auto doc = RtfParser{}.Parse(rtf);
     QVERIFY(doc.elements.size() >= 1);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
@@ -865,7 +865,7 @@ void TestSemanticComparison::UcSkipChars() {
     // \uc2\u252 ?? — the two fallback bytes after \u252 should be skipped
     // without being treated as content. \u252 is ì (Latin small i with grave).
     // The fallback "???" here is 2 bytes that should be consumed.
-    auto doc = ParseRtf(R"({\rtf1\ansi\deff0\uc2\u252 AB\par})");
+    auto doc = RtfParser{}.Parse(R"({\rtf1\ansi\deff0\uc2\u252 AB\par})");
     QCOMPARE(doc.elements.size(), 1u);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
@@ -881,7 +881,7 @@ void TestSemanticComparison::UcSkipCharsGroupScoped() {
     // \u252 AB — \uc2 skips "AB" (2 bytes)
     // \u33C — \uc1 skips "C" (1 byte)
     std::string rtfA = R"({\rtf1\ansi\deff0\uc2\u252 AB {\uc1\u33C}\par})";
-    auto docA = ParseRtf(rtfA);
+    auto docA = RtfParser{}.Parse(rtfA);
     // "AB" should be skipped (2 bytes), "C" should be skipped (1 byte)
     // Only the two Unicode chars should appear
     QCOMPARE(docA.elements.size(), 1u);
@@ -895,7 +895,7 @@ void TestSemanticComparison::UcSkipCharsGroupScoped() {
 void TestSemanticComparison::StarGroupSkippedSilently() {
     // Unknown star-prefixed groups like {\*\unknownword ...} should be
     // silently skipped — not recorded as unknown tags
-    auto doc = ParseRtf(R"({\rtf1\ansi\deff0{\*\unknownword garbage} Text\par})");
+    auto doc = RtfParser{}.Parse(R"({\rtf1\ansi\deff0{\*\unknownword garbage} Text\par})");
     QVERIFY(doc.unknownTags.empty());
     QCOMPARE(doc.elements.size(), 1u);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
@@ -908,7 +908,7 @@ void TestSemanticComparison::StarGroupSkippedSilently() {
 
 void TestSemanticComparison::NegativeArgNoSpace() {
     // \li-500 should be parsed as negative indent (-500 twips)
-    auto doc = ParseRtf(R"({\rtf1\ansi\deff0\li-500 Text\par})");
+    auto doc = RtfParser{}.Parse(R"({\rtf1\ansi\deff0\li-500 Text\par})");
     QCOMPARE(doc.elements.size(), 1u);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
@@ -917,7 +917,7 @@ void TestSemanticComparison::NegativeArgNoSpace() {
 
 void TestSemanticComparison::NegativeArgUnicode() {
     // \u-500 should normalize to 65036 (0xFE0C) via 65536-500
-    auto doc = ParseRtf(R"({\rtf1\ansi\deff0\uc0\u-500 Text\par})");
+    auto doc = RtfParser{}.Parse(R"({\rtf1\ansi\deff0\uc0\u-500 Text\par})");
     QCOMPARE(doc.elements.size(), 1u);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
@@ -975,7 +975,7 @@ void TestSemanticComparison::TableWithLeadingEmptyCell() {
     // Per the RTF grammar a cell is "<textpar>+ \cell", so a canonical empty
     // cell is "\intbl \cell". This pins the 2-cell [empty, B] result.
     std::string rtf = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \cellx4000 \intbl \cell \intbl B\cell \row}})";
-    auto doc = ParseRtf(rtf);
+    auto doc = RtfParser{}.Parse(rtf);
     QCOMPARE(doc.elements.size(), 1u);
     QVERIFY(std::holds_alternative<RtfTableRowEntry>(doc.elements[0]));
     const auto& row = std::get<RtfTableRowEntry>(doc.elements[0]);
@@ -988,7 +988,7 @@ void TestSemanticComparison::TableWithLeadingEmptyCell() {
 void TestSemanticComparison::TableWithMiddleEmptyCell() {
     // Canonical middle empty cell: [A, empty, C]
     std::string rtf = R"({\rtf1\ansi\deff0{\trowd \cellx1000 \cellx2000 \cellx3000 \intbl A\cell \intbl \cell \intbl C\cell \row}})";
-    auto doc = ParseRtf(rtf);
+    auto doc = RtfParser{}.Parse(rtf);
     QCOMPARE(doc.elements.size(), 1u);
     QVERIFY(std::holds_alternative<RtfTableRowEntry>(doc.elements[0]));
     const auto& row = std::get<RtfTableRowEntry>(doc.elements[0]);
@@ -1028,7 +1028,7 @@ void TestSemanticComparison::SameCellShadingColorDifferentIndex() {
 
 void TestSemanticComparison::TableOrderingParagraphTableParagraph() {
     std::string rtf = R"({\rtf1\ansi\deff0 Para A\par{\trowd \cellx2000 \intbl T\cell \row}Para B\par})";
-    auto doc = ParseRtf(rtf);
+    auto doc = RtfParser{}.Parse(rtf);
     QCOMPARE(doc.elements.size(), 3u);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     QVERIFY(std::holds_alternative<RtfTableRowEntry>(doc.elements[1]));
@@ -1037,7 +1037,7 @@ void TestSemanticComparison::TableOrderingParagraphTableParagraph() {
 
 void TestSemanticComparison::TableOrderingPTPTP() {
     std::string rtf = R"({\rtf1\ansi\deff0 P1\par{\trowd \cellx2000 \intbl T1\cell \row}P2\par{\trowd \cellx3000 \intbl T2\cell \row}P3\par})";
-    auto doc = ParseRtf(rtf);
+    auto doc = RtfParser{}.Parse(rtf);
     QCOMPARE(doc.elements.size(), 5u);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     QVERIFY(std::holds_alternative<RtfTableRowEntry>(doc.elements[1]));
@@ -1192,7 +1192,7 @@ void TestSemanticComparison::DeftabNestedGroupReverted() {
 void TestSemanticComparison::HyperlinkExternalUrl() {
     // Parse a field group with HYPERLINK instruction
     std::string rtf = R"({\rtf1\ansi\deff0{\field{\*\fldinst HYPERLINK "https://example.com"}{\*\fldrslt Click here}}\par})";
-    auto doc = ParseRtf(rtf);
+    auto doc = RtfParser{}.Parse(rtf);
     QCOMPARE(doc.elements.size(), 1u);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
@@ -1212,7 +1212,7 @@ void TestSemanticComparison::HyperlinkExternalUrl() {
 void TestSemanticComparison::HyperlinkInternalBookmark() {
     // Parse a field group with internal bookmark link
     std::string rtf = R"({\rtf1\ansi\deff0{\field{\*\fldinst HYPERLINK "#MyBookmark"}{\*\fldrslt Go to section}}\par})";
-    auto doc = ParseRtf(rtf);
+    auto doc = RtfParser{}.Parse(rtf);
     QCOMPARE(doc.elements.size(), 1u);
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
     bool found = false;
@@ -1243,7 +1243,7 @@ void TestSemanticComparison::HyperlinkDifferentUrl() {
 void TestSemanticComparison::HyperlinkWithBold() {
     // Hyperlink with bold formatting inside fldrslt
     std::string rtf = R"({\rtf1\ansi\deff0{\field{\*\fldinst HYPERLINK "https://example.com"}{\*\fldrslt{\b Bold link}}}}\par})";
-    auto doc = ParseRtf(rtf);
+    auto doc = RtfParser{}.Parse(rtf);
     QCOMPARE(doc.elements.size(), 1u);
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
     bool found = false;
@@ -1301,7 +1301,7 @@ void TestSemanticComparison::SemanticHighlight() {
 }
 
 void TestSemanticComparison::NegativeFirstLineIndent() {
-    auto doc = ParseRtf(R"({\rtf1\ansi\deff0\fi-200 Text\par})");
+    auto doc = RtfParser{}.Parse(R"({\rtf1\ansi\deff0\fi-200 Text\par})");
     QCOMPARE(doc.elements.size(), 1u);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
@@ -1318,7 +1318,7 @@ void TestSemanticComparison::UnicodeCharIdenticalToLiteral() {
 void TestSemanticComparison::HexEscapeControlCharPresent() {
     // \'1c is the hex escape for 0x1C — must produce text with that character
     std::string rtf = R"({\rtf1\ansi\deff0 \'1c\par})";
-    auto doc = ParseRtf(rtf);
+    auto doc = RtfParser{}.Parse(rtf);
     QCOMPARE(doc.elements.size(), 1u);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);

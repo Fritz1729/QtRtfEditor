@@ -56,7 +56,7 @@ private:
 
 static bool HasUnknownTags(const std::string& rtf) {
     try {
-        RtfDocument doc = ParseRtf(rtf);
+        RtfDocument doc = RtfParser{}.Parse(rtf);
         if (!doc.unknownTags.empty()) {
             for (const auto& tag : doc.unknownTags) {
                 qDebug() << "  UNKNOWN TAG:" << QString::fromStdString(tag);
@@ -65,7 +65,7 @@ static bool HasUnknownTags(const std::string& rtf) {
         return !doc.unknownTags.empty();
     } catch (...) {
         // Iteration limit or crash — counts as unsupported
-        qDebug() << "  UNKNOWN TAG: exception during ParseRtf";
+        qDebug() << "  UNKNOWN TAG: exception during Parse";
         return true;
     }
 }
@@ -88,7 +88,7 @@ RoundtripResult TestRoundtrip::RunRoundtripOnMainThread(const std::string& origi
         editor.Load(original, Rte::FormatMode::Rtf);
         std::string saved = editor.Save(Rte::FormatMode::Rtf);
 
-        auto doc = ParseRtf(saved);
+        auto doc = RtfParser{}.Parse(saved);
         if (!doc.unknownTags.empty()) {
             r.outputUnsupported = true;
             return r;

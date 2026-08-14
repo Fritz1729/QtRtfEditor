@@ -2,7 +2,7 @@
 
 **File:** [Source](../src/RtfImport.h) | [Previous](rtf_parser.md) | [Next](rtf_export.md)
 
-`RtfImport` provides `ImportRtf()` -- the function that converts an `RtfDocument` (produced by `ParseRtf()`) into a populated `QTextDocument`. It walks the document model tree and inserts content using Qt's text APIs.
+`RtfImport` provides `ImportRtf()` -- the function that converts an `RtfDocument` (produced by `RtfParser::Parse()`) into a populated `QTextDocument`. It walks the document model tree and inserts content using Qt's text APIs.
 
 ## Role
 
@@ -19,7 +19,7 @@
 
 ```
 ImportRtf()
-  -> ParseRtf() -> RtfDocument
+  -> RtfParser::Parse() -> RtfDocument
   -> BuildDocument(document, rtfDoc)
     -> Walk elements vector
     -> BuildParagraph(), FlushTableRows(), BuildImage()

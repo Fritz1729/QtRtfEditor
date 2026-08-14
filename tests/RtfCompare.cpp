@@ -560,8 +560,8 @@ static RtfCompareResult DoCompareDocuments(const RtfDocument& a, const RtfDocume
 static std::pair<RtfCompareResult, std::string> DoCompareParse(
         const std::string& rtfA, const std::string& rtfB) {
     std::string localReason;
-    RtfDocument docA = ParseRtf(rtfA);
-    RtfDocument docB = ParseRtf(rtfB);
+    RtfDocument docA = RtfParser{}.Parse(rtfA);
+    RtfDocument docB = RtfParser{}.Parse(rtfB);
     RtfCompareResult result = DoCompareDocuments(docA, docB, localReason);
     return {result, std::move(localReason)};
 }
