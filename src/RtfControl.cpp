@@ -1,5 +1,8 @@
 #include "RtfControl.h"
 
+#include "RtfTypes.h"
+
+#include <QtGlobal>
 #include <string>
 #include <unordered_map>
 
@@ -9,7 +12,6 @@ using Action = RtfControl::Action;
 using CharProp = RtfControl::CharProp;
 using CharSetProp = RtfControl::CharSetProp;
 using ParaProp = RtfControl::ParaProp;
-using UlStyle = RtfControl::RtfUlStyle;
 using TableCtrlWord = RtfControl::TableCtrlWord;
 
 #define DATA(keyword, action, prop) \
@@ -27,9 +29,9 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("b0",       Action::ToggleCharProp,   CharProp::Bold),
     DATA("i",        Action::ToggleCharProp,   CharProp::Italic),
     DATA("i0",       Action::ToggleCharProp,   CharProp::Italic),
-    DATA("ul",       Action::SetUlStyle,       UlStyle::UlSolid),
-    DATA("ul0",      Action::SetUlStyle,       UlStyle::UlNone),
-    DATA("ulnone",   Action::SetUlStyle,       UlStyle::UlNone),
+    DATA("ul",       Action::SetUlStyle,       int(RtfUnderlineStyle::Single)),
+    DATA("ul0",      Action::SetUlStyle,       int(RtfUnderlineStyle::NoUnderline)),
+    DATA("ulnone",   Action::SetUlStyle,       int(RtfUnderlineStyle::NoUnderline)),
     DATA("sub",      Action::ToggleCharProp,   CharProp::Subscript),
     DATA("sub0",     Action::ToggleCharProp,   CharProp::Subscript),
     DATA("super",    Action::ToggleCharProp,   CharProp::Superscript),
@@ -69,18 +71,18 @@ constexpr RtfControl rtfControlTableEntries[] = {
     // \deftabN: group-persistent per RTF 1.5/1.9.1 spec (pushed/popped with groups).
     DATA("deftab",   Action::GroupPersistent,  0),
 
-    // Alignment (value stored directly in raw)
-    DATA("ql",       Action::SetAlignment,     1),    // left
-    DATA("qj",       Action::SetAlignment,     4),    // justify
-    DATA("qc",       Action::SetAlignment,     128),  // center
-    DATA("qr",       Action::SetAlignment,     2),    // right
+    // Alignment (Qt::Alignment values stored directly in raw)
+    DATA("ql",       Action::SetAlignment,     int(Qt::AlignLeft)),
+    DATA("qj",       Action::SetAlignment,     int(Qt::AlignJustify)),
+    DATA("qc",       Action::SetAlignment,     int(Qt::AlignHCenter)),
+    DATA("qr",       Action::SetAlignment,     int(Qt::AlignRight)),
 
-    // Tab stop alignment (value stored directly in raw)
-    DATA("tqc",       Action::SetTabAlign,      128),  // center
-    DATA("tqd",       Action::SetTabAlign,      3),    // decimal
-    DATA("tqr",       Action::SetTabAlign,      2),    // right
-    DATA("tabcenter", Action::SetTabAlign,      128),  // center
-    DATA("tabright",  Action::SetTabAlign,      2),    // right
+    // Tab stop alignment (Qt::Alignment values stored directly in raw)
+    DATA("tqc",       Action::SetTabAlign,      int(Qt::AlignHCenter)),
+    DATA("tqd",       Action::SetTabAlign,      int(Qt::AlignJustify)),
+    DATA("tqr",       Action::SetTabAlign,      int(Qt::AlignRight)),
+    DATA("tabcenter", Action::SetTabAlign,      int(Qt::AlignHCenter)),
+    DATA("tabright",  Action::SetTabAlign,      int(Qt::AlignRight)),
     DATA("tabgrid",   Action::TableControl,      0),
     DATA("tableft",   Action::TableControl,      0),
 
@@ -101,19 +103,19 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("listname", Action::HeaderControl,    0),
     DATA("pntext",   Action::HeaderControl,    0),
 
-    // Underline styles
-    DATA("uld",        Action::SetUlStyle, UlStyle::UlDotted),
-    DATA("uldash",     Action::SetUlStyle, UlStyle::UlDashed),
-    DATA("uldashd",    Action::SetUlStyle, UlStyle::UlDashDot),
-    DATA("uldashdd",   Action::SetUlStyle, UlStyle::UlDashDotDot),
-    DATA("uldb",       Action::SetUlStyle, UlStyle::UlDouble),
-    DATA("ulth",       Action::SetUlStyle, UlStyle::UlThick),
+    // Underline styles (RtfUnderlineStyle values)
+    DATA("uld",        Action::SetUlStyle, int(RtfUnderlineStyle::DotLine)),
+    DATA("uldash",     Action::SetUlStyle, int(RtfUnderlineStyle::Dash)),
+    DATA("uldashd",    Action::SetUlStyle, int(RtfUnderlineStyle::DashDotLine)),
+    DATA("uldashdd",   Action::SetUlStyle, int(RtfUnderlineStyle::DashDotDotLine)),
+    DATA("uldb",       Action::SetUlStyle, int(RtfUnderlineStyle::Double)),
+    DATA("ulth",       Action::SetUlStyle, int(RtfUnderlineStyle::Thick)),
 
-    // Capitalization (enum values: None=0, AllCaps=1, SmallCaps=2)
-    DATA("caps",     Action::SetCapitalization, 1),
-    DATA("caps0",    Action::SetCapitalization, 0),
-    DATA("scaps",    Action::SetCapitalization, 2),
-    DATA("scaps0",   Action::SetCapitalization, 0),
+    // Capitalization (QFont::Capitalization values)
+    DATA("caps",     Action::SetCapitalization, int(QFont::AllUppercase)),
+    DATA("caps0",    Action::SetCapitalization, int(QFont::MixedCase)),
+    DATA("scaps",    Action::SetCapitalization, int(QFont::SmallCaps)),
+    DATA("scaps0",   Action::SetCapitalization, int(QFont::MixedCase)),
 
     // Paragraph break
     DATA("par",      Action::EmitParagraph,    0),
@@ -127,7 +129,7 @@ constexpr RtfControl rtfControlTableEntries[] = {
     // \deffN: group-persistent per RTF 1.5/1.9.1 spec (pushed/popped with groups).
     DATA("deff",     Action::GroupPersistent,  0),
     DATA("deff0",    Action::GroupPersistent,  0),
-    DATA("qi",       Action::SetAlignment,     4),  // justified
+    DATA("qi",       Action::SetAlignment,     int(Qt::AlignJustify)),
 
     // Header metadata (roundtrip preservation)
     DATA("pard",     Action::HeaderMetadata,   0),

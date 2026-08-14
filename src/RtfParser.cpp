@@ -149,7 +149,7 @@ public:
         _pendingBorderSide = Side_Undefined;
         _listId = 0;
         _listLevel = 0;
-        _listStyle = ListStyle::None;
+        _listStyle = RtfListStyle::None;
         _inFieldRslt = false;
         _fieldAnchorHref.clear();
 
@@ -255,7 +255,7 @@ private:
                 _listId = arg;
                 {
                     auto it = _listIdToStyle.find(arg);
-                    _listStyle = (it != _listIdToStyle.end()) ? it->second : ListStyle::Number;
+                    _listStyle = (it != _listIdToStyle.end()) ? it->second : RtfListStyle::Number;
                 }
                 break;
             case RtfControl::CharSetProp::UlColorIndex:
@@ -297,7 +297,7 @@ private:
             case RtfControl::ParaProp::TabStop:
                 if (arg >= 0) {
                     _paraScope.get().tabStops.push_back({arg, _tabAlignScope.get()});
-                    _tabAlignScope.get() = 1;
+                    _tabAlignScope.get() = Qt::AlignLeft;
                 }
                 break;
             case RtfControl::ParaProp::ListLevel:
@@ -307,60 +307,31 @@ private:
             break;
         }
         case RtfControl::Action::SetAlignment: {
-            _paraScope.get().alignment = ctrl.value.raw;
+            _paraScope.get().alignment = static_cast<Qt::Alignment>(ctrl.value.raw);
             break;
         }
         case RtfControl::Action::SetTabAlign: {
-            _tabAlignScope.get() = ctrl.value.raw;
+            _tabAlignScope.get() = static_cast<Qt::Alignment>(ctrl.value.raw);
             break;
         }
         case RtfControl::Action::SetUlStyle: {
             FinalizeRun();
-            const RtfControl::RtfUlStyle style = ctrl.value.ulStyle;
-            switch (style) {
-            case RtfControl::RtfUlStyle::UlSolid:
-                if (arg == 0) {
-                    _formatScope.get().underlineStyle = UnderlineStyle::None;
-                    _formatScope.get().underline = false;
-                } else {
-                    _formatScope.get().underlineStyle = UnderlineStyle::Solid;
-                    _formatScope.get().underline = true;
-                }
-                break;
-            case RtfControl::RtfUlStyle::UlDotted:
-                _formatScope.get().underlineStyle = UnderlineStyle::Dotted;
-                _formatScope.get().underline = true;
-                break;
-            case RtfControl::RtfUlStyle::UlDashed:
-                _formatScope.get().underlineStyle = UnderlineStyle::Dashed;
-                _formatScope.get().underline = true;
-                break;
-            case RtfControl::RtfUlStyle::UlDashDot:
-                _formatScope.get().underlineStyle = UnderlineStyle::DashDot;
-                _formatScope.get().underline = true;
-                break;
-            case RtfControl::RtfUlStyle::UlDashDotDot:
-                _formatScope.get().underlineStyle = UnderlineStyle::DashDotDot;
-                _formatScope.get().underline = true;
-                break;
-            case RtfControl::RtfUlStyle::UlDouble:
-                _formatScope.get().underlineStyle = UnderlineStyle::Double;
-                _formatScope.get().underline = true;
-                break;
-            case RtfControl::RtfUlStyle::UlThick:
-                _formatScope.get().underlineStyle = UnderlineStyle::Thick;
-                _formatScope.get().underline = true;
-                break;
-            case RtfControl::RtfUlStyle::UlNone:
-                _formatScope.get().underlineStyle = UnderlineStyle::None;
+            const auto style = static_cast<RtfUnderlineStyle>(ctrl.value.raw);
+            if (style == RtfUnderlineStyle::NoUnderline) {
+                _formatScope.get().underlineStyle = RtfUnderlineStyle::NoUnderline;
                 _formatScope.get().underline = false;
-                break;
+            } else if (style == RtfUnderlineStyle::Single && arg == 0) {
+                _formatScope.get().underlineStyle = RtfUnderlineStyle::NoUnderline;
+                _formatScope.get().underline = false;
+            } else {
+                _formatScope.get().underlineStyle = style;
+                _formatScope.get().underline = (style != RtfUnderlineStyle::NoUnderline);
             }
             break;
         }
         case RtfControl::Action::SetCapitalization: {
             FinalizeRun();
-            _formatScope.get().capitalization = static_cast<Capitalization>(ctrl.value.raw);
+            _formatScope.get().capitalization = static_cast<QFont::Capitalization>(ctrl.value.raw);
             break;
         }
         case RtfControl::Action::EmitParagraph:
@@ -375,13 +346,11 @@ private:
             break;
         case RtfControl::Action::HeaderMetadata:
             if (strcmp(ctrl.keyword, "pard") == 0) {
-                // \pard resets paragraph formatting to defaults without creating
-                // a new paragraph. Formatting applies to the current paragraph.
                 _paraScope.get() = ParagraphFormat{};
-                _tabAlignScope.get() = 1;
+                _tabAlignScope.get() = Qt::AlignLeft;
                 _listId = 0;
                 _listLevel = 0;
-                _listStyle = ListStyle::None;
+                _listStyle = RtfListStyle::None;
                 return;
             }
             if (strcmp(ctrl.keyword, "plain") == 0) {
@@ -442,10 +411,10 @@ private:
         // alignment, indents, and spacing (which persist across paragraphs).
         _currentParagraph = {};
         _paraScope.get().tabStops.clear();
-        _tabAlignScope.get() = 1;
+        _tabAlignScope.get() = Qt::AlignLeft;
         _listId = 0;
         _listLevel = 0;
-        _listStyle = ListStyle::None;
+        _listStyle = RtfListStyle::None;
     }
 
     void HandleTableControl(const RtfControl& ctrl, int arg) {
@@ -464,7 +433,7 @@ private:
             _currentCellFormat = {};
             ResetPendingBorder();
             _currentRow = {};
-            _currentRow.tableAlignment = 0;
+            _currentRow.tableAlignment = Qt::AlignLeft;
             break;
 
         case RtfControl::TableCtrlWord::Cellx:
@@ -567,10 +536,13 @@ private:
             break;
 
         case RtfControl::TableCtrlWord::TrAlignLeft:
+            _currentRow.tableAlignment = Qt::AlignLeft;
+            break;
         case RtfControl::TableCtrlWord::TrAlignCenter:
+            _currentRow.tableAlignment = Qt::AlignHCenter;
+            break;
         case RtfControl::TableCtrlWord::TrAlignRight:
-            _currentRow.tableAlignment = static_cast<int>(ctrl.value.tableCtrlWord) -
-                static_cast<int>(RtfControl::TableCtrlWord::TrAlignLeft);
+            _currentRow.tableAlignment = Qt::AlignRight;
             break;
 
         case RtfControl::TableCtrlWord::TrLeft:
@@ -726,8 +698,8 @@ private:
     bool _inPict = false;
     bool _inListtable = false;
     bool _inPntext = false;
-    map<int, ListStyle> _listIdToStyle;
-    ScopeStack<int> _tabAlignScope{1};
+    map<int, RtfListStyle> _listIdToStyle;
+    ScopeStack<Qt::Alignment> _tabAlignScope{Qt::AlignLeft};
 
     // Group-persistent control words: push on group enter, pop on group exit
     ScopeStack<int> _deffScope{0};
@@ -735,7 +707,7 @@ private:
     ScopeStack<int> _ucScope{1};  // RTF spec default = 1 fallback byte after \uXXXX
     int _listId = 0;
     int _listLevel = 0;
-    ListStyle _listStyle = ListStyle::None;
+    RtfListStyle _listStyle = RtfListStyle::None;
 
     // Pict state
     string _pictData;
@@ -1393,14 +1365,14 @@ private:
         bool hasArg = arg >= 0;
 
         if (word == "list" || word == "listoverride") {
-            if (_currentListId > 0 && _currentListStyle != ListStyle::None) {
+            if (_currentListId > 0 && _currentListStyle != RtfListStyle::None) {
                 _listIdToStyle[_currentListId] = _currentListStyle;
             }
             _currentListId = 0;
-            _currentListStyle = ListStyle::None;
+            _currentListStyle = RtfListStyle::None;
         } else if (word == "listid" && hasArg) {
             _currentListId = arg;
-            _currentListStyle = ListStyle::None;
+            _currentListStyle = RtfListStyle::None;
         } else if (word == "liststylenum" || word == "liststyletype") {
             if (hasArg && _currentListId > 0) {
                 _currentListStyle = RtfStyleTypeToListStyle(arg);
@@ -1408,42 +1380,42 @@ private:
             }
         } else if (word == "liststylebulletsimple") {
             if (_currentListId > 0) {
-                _currentListStyle = ListStyle::Disc;
+                _currentListStyle = RtfListStyle::Disc;
                 _listIdToStyle[_currentListId] = _currentListStyle;
             }
         } else if (word == "liststylenumberinparen") {
             if (_currentListId > 0) {
-                _currentListStyle = ListStyle::Number;
+                _currentListStyle = RtfListStyle::Number;
                 _listIdToStyle[_currentListId] = _currentListStyle;
             }
         } else if (word == "listname") {
             while (!_input.IsEof() && !_input.PeekIs('"')) _input.Advance();
             while (!_input.IsEof() && !_input.PeekIs('"')) _input.Advance();
         } else if (word == "listlevel" && hasArg) {
-            if (_currentListId > 0 && _currentListStyle != ListStyle::None) {
+            if (_currentListId > 0 && _currentListStyle != RtfListStyle::None) {
                 _listIdToStyle[_currentListId] = _currentListStyle;
             }
         }
     }
 
-    static ListStyle RtfStyleTypeToListStyle(int type) {
+    static RtfListStyle RtfStyleTypeToListStyle(int type) {
         switch (type) {
-            case 0: return ListStyle::Bullet;
-            case 1: return ListStyle::Disc;
-            case 2: return ListStyle::Box;
-            case 3: return ListStyle::Number;
-            case 4: return ListStyle::Roman;
-            case 5: return ListStyle::Roman;
-            case 6: return ListStyle::Letter;
-            case 7: return ListStyle::Letter;
-            case 8: return ListStyle::Check;
-            case 9: return ListStyle::Check;
-            default: return ListStyle::Number;
+            case 0: return RtfListStyle::Circle;
+            case 1: return RtfListStyle::Disc;
+            case 2: return RtfListStyle::Square;
+            case 3: return RtfListStyle::Number;
+            case 4: return RtfListStyle::Roman;
+            case 5: return RtfListStyle::Roman;
+            case 6: return RtfListStyle::Letter;
+            case 7: return RtfListStyle::Letter;
+            case 8: return RtfListStyle::Check;
+            case 9: return RtfListStyle::Check;
+            default: return RtfListStyle::Number;
         }
     }
 
     int _currentListId = 0;
-    ListStyle _currentListStyle = ListStyle::None;
+    RtfListStyle _currentListStyle = RtfListStyle::None;
 
     void ParsePictControl() {
         _input.SkipAs('\\');

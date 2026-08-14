@@ -4,95 +4,41 @@
 #include <cmath>
 #include <cstdint>
 #include <string>
-#include <variant>
 #include <vector>
+#include <variant>
+
+#include <QFont>
+#include <QTextCharFormat>
+#include <QTextListFormat>
+#include <QtGlobal>
 
 namespace Rte {
 
-enum class UnderlineStyle : uint8_t {
-    None,
-    Solid,
-    Dotted,
-    Dashed,
-    DashDot,
-    DashDotDot,
-    Double,
-    Thick,
+enum class RtfUnderlineStyle : int {
+    NoUnderline = 0, Single = 1, Dash = 2, DotLine = 3, DashDotLine = 4,
+    DashDotDotLine = 5, Wave = 6, SpellCheck = 7,
+    Double = 8, Thick = 9,
+    COUNT
 };
 
-enum class Capitalization : uint8_t {
-    None,
-    AllCaps,
-    SmallCaps,
+// Verify RtfUnderlineStyle values 0-7 match QTextCharFormat::UnderlineStyle
+static_assert(static_cast<int>(RtfUnderlineStyle::NoUnderline) == static_cast<int>(QTextCharFormat::NoUnderline));
+static_assert(static_cast<int>(RtfUnderlineStyle::Single) == static_cast<int>(QTextCharFormat::SingleUnderline));
+static_assert(static_cast<int>(RtfUnderlineStyle::Dash) == static_cast<int>(QTextCharFormat::DashUnderline));
+static_assert(static_cast<int>(RtfUnderlineStyle::DotLine) == static_cast<int>(QTextCharFormat::DotLine));
+static_assert(static_cast<int>(RtfUnderlineStyle::DashDotLine) == static_cast<int>(QTextCharFormat::DashDotLine));
+static_assert(static_cast<int>(RtfUnderlineStyle::DashDotDotLine) == static_cast<int>(QTextCharFormat::DashDotDotLine));
+static_assert(static_cast<int>(RtfUnderlineStyle::Wave) == static_cast<int>(QTextCharFormat::WaveUnderline));
+static_assert(static_cast<int>(RtfUnderlineStyle::SpellCheck) == static_cast<int>(QTextCharFormat::SpellCheckUnderline));
+
+enum class RtfListStyle : int {
+    None = 0,
+    Disc = 1, Circle = 2, Square = 3, Box = 4, Check = 5,
+    Number = 6, Letter = 7, Roman = 8,
 };
 
-enum class ListStyle : uint8_t {
-    None,
-    Disc,
-    Bullet,
-    Box,
-    Check,
-    Number,
-    Letter,
-    Roman,
-};
-
-struct RtfRunFormat {
-    bool bold = false;
-    bool italic = false;
-    bool underline = false;
-    bool strikeOut = false;
-    bool protected_ = false;
-    int fontIndex = 0;
-    int fontSize = 24;
-    int colorIndex = -1;
-    int bgColorIndex = -1;
-    bool superscript = false;
-    bool subscript = false;
-    bool kerning = false;
-    int expnd = 0;
-    UnderlineStyle underlineStyle = UnderlineStyle::None;
-    Capitalization capitalization = Capitalization::None;
-    int upOffset = 0;
-    int dnOffset = 0;
-    int ulColorIndex = 0;
-    int highlightIndex = 0;
-    int langId = 0;
-    bool isAnchor = false;
-    std::string anchorHref;
-    bool inPntext = false;
-
-    bool operator==(const RtfRunFormat& other) const = default;
-};
-
-struct RtfRun {
-    std::string text;
-    RtfRunFormat format;
-
-    RtfRun() = default;
-    RtfRun(std::string t, RtfRunFormat f) : text(std::move(t)), format(std::move(f)) {}
-
-    bool operator==(const RtfRun &) const = default;
-};
-
-struct TabStop {
-    int position;
-    int alignment; // 1=left, 128=center, 2=right
-
-    bool operator==(const TabStop& other) const = default;
-};
-
-struct ParagraphFormat {
-    int alignment = 1;
-    int leftIndent = 0;
-    int firstLineIndent = 0;
-    int rightIndent = 0;
-    int spaceBefore = 0;
-    int spaceAfter = 0;
-    int lineHeight = 0;
-    int slMult = 1;
-    std::vector<TabStop> tabStops;
-};
+// Verify RtfListStyle values match QTextListFormat::Style where applicable
+static_assert(static_cast<int>(RtfListStyle::None) == static_cast<int>(QTextListFormat::ListStyleUndefined));
 
 enum TableSide : size_t {
     Side_Left = 0,
@@ -152,34 +98,6 @@ struct TableCellFormat {
     bool operator==(const TableCellFormat& other) const = default;
 };
 
-struct RtfTableRowEntry {
-    std::vector<int> cellxPositions;
-    std::vector<std::pair<std::vector<RtfRun>, TableCellFormat>> cells;
-    TableCellBorders rowBorders;
-    std::array<int, 4> rowPadding = {{0, 0, 0, 0}};
-    int tableAlignment = 0;
-    int tableLeftPosition = 0;
-    int tableWidth = 0;
-
-    bool operator==(const RtfTableRowEntry& other) const = default;
-};
-
-struct RtfParagraph {
-    ParagraphFormat format;
-    std::vector<RtfRun> runs;
-    int listId = 0;
-    int listLevel = 0;
-    ListStyle listStyle = ListStyle::None;
-    int listIndent = 0;
-    int defaultFontIndex = 0;       // \deffN group-persistent
-    int defaultTabStopTwips = 180;  // \deftabN group-persistent
-    // Original \pntext RTF fragment for structural roundtrip preservation.
-    // Empty when the paragraph has no \pntext group.
-    std::string pntextRtf;
-
-    bool operator==(const RtfParagraph& other) const = default;
-};
-
 enum class RtfImageFormat : uint8_t {
     Jpeg,
     Png,
@@ -200,8 +118,6 @@ struct RtfImage {
     int piccropr = 0;
     int piccropt = 0;
     int piccropb = 0;
-
-    // Original hex-encoded binary data from the RTF {\pict ...} group
     std::string rtfPictHex;
 
     bool operator==(const RtfImage &) const = default;
@@ -212,41 +128,23 @@ struct RtfColorEntry {
     bool operator==(const RtfColorEntry &) const = default;
 };
 
-inline int EffectiveCellPadding(int cellPad, int rowPad) {
-    return (cellPad > 0 || rowPad > 0) ? std::max(cellPad, rowPad) : 0;
-}
-
 struct RtfFontEntry {
     std::string family;
     int fcharset = 0;
     bool operator==(const RtfFontEntry &) const = default;
 };
 
-struct RtfDocument {
-    int defaultFontIndex = 0;
-    int defaultFontSize = 0;       // half-points (\fs in header)
-    int defaultLangId = 0;         // \deflangN (0 = not present)
-    int viewKind = 0;              // \viewkindN (0 = not present)
-    int ucByteCount = 1;           // \ucN (default 1)
-    int codePage = 1252;           // \ansicpgN (default 1252)
-    int defaultTabStopTwips = 180; // \deftabN (RTF spec default = 180 twips = 1/8 inch)
-    std::vector<RtfColorEntry> colors;
-    std::vector<RtfFontEntry> fonts;
-    std::vector<std::variant<RtfParagraph, RtfTableRowEntry, RtfImage>> elements;
-    std::vector<std::string> unknownTags;
-};
-
-inline const RtfColorEntry* ResolveColorEntry(int idx, const RtfDocument& doc) {
-    if (idx >= 0 && idx < static_cast<int>(doc.colors.size()))
-        return &doc.colors[static_cast<std::size_t>(idx)];
+inline const RtfColorEntry* ResolveColorEntry(int idx, const std::vector<RtfColorEntry>& colors) {
+    if (idx >= 0 && idx < static_cast<int>(colors.size()))
+        return &colors[static_cast<std::size_t>(idx)];
     return nullptr;
 }
 
 inline TableCellBorders NormalizeCellBorders(const TableCellBorders& cellBorders,
-                                                const TableCellBorders& rowBorders) {
+                                                 const TableCellBorders& rowBorders) {
     TableCellBorders normalized = cellBorders;
     auto FillFromRow = [](int& cellVal, int& cellColor, BorderStyle& cellStyle,
-                                     int rowVal, int rowColor, BorderStyle rowStyle) {
+                                      int rowVal, int rowColor, BorderStyle rowStyle) {
         if (cellVal <= 0 && cellStyle == BorderStyle::None) {
             cellVal = rowVal;
             cellColor = rowColor;
@@ -264,26 +162,119 @@ inline TableCellBorders NormalizeCellBorders(const TableCellBorders& cellBorders
     return normalized;
 }
 
-inline std::string AlignmentToString(int align) {
-    switch (align) {
-        case 1: return "left";
-        case 128: return "center";
-        case 2: return "right";
-        case 3: return "decimal";
-        case 4: return "justified";
-        default: return "unknown(" + std::to_string(align) + ")";
-    }
+inline int EffectiveCellPadding(int cellPad, int rowPad) {
+    return (cellPad > 0 || rowPad > 0) ? std::max(cellPad, rowPad) : 0;
 }
-
-// \highlightN is intentionally not supported:
-// - RTF 1.5 spec defines names (Black, Blue, Cyan, …) but no RGB values
-// - RTF 1.9.1 spec says "index of the color table" but defines no palette
-// - The old hardcoded 17-entry table did not match the 1.5 spec names
-// - No reliable source for RGB values exists in the spec files
 
 inline double TwipsToHalfPt(double twips) { return twips / 20.0; }
 inline double MarginTwipsToPoints(double twips) { return twips / 2.0; }
 inline int PointsToTwips(double pts) { return lround(pts * 20.0); }
 inline int PointsToHalfPtTwips(double pts) { return lround(pts * 2.0); }
+
+// Unit conversion constants
+constexpr double kTwipsToHalfPt = 20.0;
+constexpr double kHalfPtToPoint = 2.0;
+constexpr double kExpndToEm = 20.0;
+constexpr double kDpiToPoints = 96.0 / 72.0;
+constexpr int kDefaultTabStopTwips = 180;
+
+struct TabStop {
+    int position;
+    Qt::Alignment alignment = Qt::AlignLeft;
+
+    bool operator==(const TabStop& other) const = default;
+};
+
+struct ParagraphFormat {
+    Qt::Alignment alignment = Qt::AlignLeft;
+    int leftIndent = 0;
+    int firstLineIndent = 0;
+    int rightIndent = 0;
+    int spaceBefore = 0;
+    int spaceAfter = 0;
+    int lineHeight = 0;
+    int slMult = 1;
+    std::vector<TabStop> tabStops;
+
+    bool operator==(const ParagraphFormat& other) const = default;
+};
+
+struct RtfRunFormat {
+    bool bold = false;
+    bool italic = false;
+    bool underline = false;
+    bool strikeOut = false;
+    bool protected_ = false;
+    int fontIndex = 0;
+    int fontSize = 24;
+    int colorIndex = -1;
+    int bgColorIndex = -1;
+    bool superscript = false;
+    bool subscript = false;
+    bool kerning = false;
+    int expnd = 0;
+    RtfUnderlineStyle underlineStyle = RtfUnderlineStyle::NoUnderline;
+    QFont::Capitalization capitalization = QFont::MixedCase;
+    int upOffset = 0;
+    int dnOffset = 0;
+    int ulColorIndex = 0;
+    int highlightIndex = 0;
+    int langId = 0;
+    bool isAnchor = false;
+    std::string anchorHref;
+    bool inPntext = false;
+
+    bool operator==(const RtfRunFormat& other) const = default;
+};
+
+struct RtfRun {
+    std::string text;
+    RtfRunFormat format;
+
+    RtfRun() = default;
+    RtfRun(std::string t, RtfRunFormat f) : text(std::move(t)), format(std::move(f)) {}
+
+    bool operator==(const RtfRun &) const = default;
+};
+
+struct RtfParagraph {
+    ParagraphFormat format;
+    std::vector<RtfRun> runs;
+    int listId = 0;
+    int listLevel = 0;
+    RtfListStyle listStyle = RtfListStyle::None;
+    int listIndent = 0;
+    int defaultFontIndex = 0;
+    int defaultTabStopTwips = 180;
+    std::string pntextRtf;
+
+    bool operator==(const RtfParagraph& other) const = default;
+};
+
+struct RtfTableRowEntry {
+    std::vector<int> cellxPositions;
+    std::vector<std::pair<std::vector<RtfRun>, TableCellFormat>> cells;
+    TableCellBorders rowBorders;
+    std::array<int, 4> rowPadding = {{0, 0, 0, 0}};
+    Qt::Alignment tableAlignment = Qt::AlignLeft;
+    int tableLeftPosition = 0;
+    int tableWidth = 0;
+
+    bool operator==(const RtfTableRowEntry& other) const = default;
+};
+
+struct RtfDocument {
+    int defaultFontIndex = 0;
+    int defaultFontSize = 0;
+    int defaultLangId = 0;
+    int viewKind = 0;
+    int ucByteCount = 1;
+    int codePage = 1252;
+    int defaultTabStopTwips = 180;
+    std::vector<RtfColorEntry> colors;
+    std::vector<RtfFontEntry> fonts;
+    std::vector<std::variant<RtfParagraph, RtfTableRowEntry, RtfImage>> elements;
+    std::vector<std::string> unknownTags;
+};
 
 } // namespace Rte

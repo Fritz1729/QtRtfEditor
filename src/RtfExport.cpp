@@ -1,6 +1,5 @@
 #include "RtfExport.h"
 #include "RtfQtConversions.h"
-#include "RtfTypes.h"
 
 #include <QTextDocument>
 #include <QTextBlock>
@@ -24,6 +23,7 @@
 #include <QtGlobal>
 
 #include <algorithm>
+#include <stdexcept>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -75,18 +75,20 @@ constexpr array<const char*, 4> kCellPaddingTags = {{
     "clpadl", "clpadt", "clpadr", "clpadb"
 }};
 
-static const char* UnderlineStyleTag(UnderlineStyle style) {
+static const char* UnderlineStyleTag(RtfUnderlineStyle style) {
     switch (style) {
-        case UnderlineStyle::None:       return "";
-        case UnderlineStyle::Solid:      return "\\ul";
-        case UnderlineStyle::Dotted:     return "\\uld";
-        case UnderlineStyle::Dashed:     return "\\uldash";
-        case UnderlineStyle::DashDot:    return "\\uldashd";
-        case UnderlineStyle::DashDotDot: return "\\uldashdd";
-        case UnderlineStyle::Double:     return "\\uldb";
-        case UnderlineStyle::Thick:      return "\\ulth";
+        case RtfUnderlineStyle::NoUnderline:    return "";
+        case RtfUnderlineStyle::Single:         return "\\ul";
+        case RtfUnderlineStyle::Dash:           return "\\uldash";
+        case RtfUnderlineStyle::DotLine:        return "\\uld";
+        case RtfUnderlineStyle::DashDotLine:    return "\\uldashd";
+        case RtfUnderlineStyle::DashDotDotLine: return "\\uldashdd";
+        case RtfUnderlineStyle::Wave:           return "\\ulth";
+        case RtfUnderlineStyle::SpellCheck:     return "";
+        case RtfUnderlineStyle::Double:         return "\\uldb";
+        case RtfUnderlineStyle::Thick:          return "\\ulth";
+        default: throw std::runtime_error("unknown RtfUnderlineStyle");
     }
-    return "";
 }
 
 static void WriteConditionalFormatOff(ostringstream& out, const RtfRunFormat& cur, const RtfRunFormat& lastEmitted, bool trailingSpace) {
@@ -97,12 +99,12 @@ static void WriteConditionalFormatOff(ostringstream& out, const RtfRunFormat& cu
     if (!cur.subscript && lastEmitted.subscript) out << "\\sub0" << space;
     if (cur.colorIndex == 0 && lastEmitted.colorIndex != 0) out << "\\cf0" << space;
     if (cur.bgColorIndex == 0 && lastEmitted.bgColorIndex != 0) out << "\\cb0" << space;
-    if (cur.underlineStyle == UnderlineStyle::None && lastEmitted.underlineStyle != UnderlineStyle::None)
+    if (cur.underlineStyle == RtfUnderlineStyle::NoUnderline && lastEmitted.underlineStyle != RtfUnderlineStyle::NoUnderline)
         out << "\\ul0" << space;
     if (!cur.strikeOut && lastEmitted.strikeOut) out << "\\strike0" << space;
-    if (cur.capitalization == Capitalization::None && lastEmitted.capitalization == Capitalization::AllCaps)
+    if (cur.capitalization == QFont::MixedCase && lastEmitted.capitalization == QFont::AllUppercase)
         out << "\\caps0" << space;
-    if (cur.capitalization == Capitalization::None && lastEmitted.capitalization == Capitalization::SmallCaps)
+    if (cur.capitalization == QFont::MixedCase && lastEmitted.capitalization == QFont::SmallCaps)
         out << "\\scaps0" << space;
     if (!cur.kerning && lastEmitted.kerning) out << "\\kerning0" << space;
     if (!cur.protected_ && lastEmitted.protected_) out << "\\protect0" << space;
@@ -114,8 +116,8 @@ static void WriteConditionalFormatOff(ostringstream& out, const RtfRunFormat& cu
 static bool IsFormatActive(const RtfRunFormat& fmt) {
     return fmt.bold || fmt.italic || fmt.superscript || fmt.subscript ||
         fmt.colorIndex > 0 || fmt.bgColorIndex > 0 ||
-        fmt.underlineStyle != UnderlineStyle::None || fmt.strikeOut ||
-        fmt.capitalization != Capitalization::None || fmt.kerning || fmt.protected_ ||
+        fmt.underlineStyle != RtfUnderlineStyle::NoUnderline || fmt.strikeOut ||
+        fmt.capitalization != QFont::MixedCase || fmt.kerning || fmt.protected_ ||
         fmt.upOffset != 0 || fmt.dnOffset != 0 || fmt.langId != 0 ||
         fmt.highlightIndex != 0 || fmt.ulColorIndex != 0;
 }
@@ -128,14 +130,11 @@ static bool WritePlainTextOff(ostringstream& out, const RtfRunFormat& fmt) {
     return false;
 }
 
-static UnderlineStyle EffectiveUnderlineStyle(const QTextCharFormat& fmt) {
-    if (fmt.property(UserPropUlStyle).isValid()) {
-        return static_cast<UnderlineStyle>(fmt.property(UserPropUlStyle).toInt());
-    }
-    UnderlineStyle style = toUnderlineStyle(fmt.underlineStyle());
-    if (style != UnderlineStyle::None) return style;
-    if (fmt.fontUnderline()) return UnderlineStyle::Solid;
-    return UnderlineStyle::None;
+static RtfUnderlineStyle EffectiveUnderlineStyle(const QTextCharFormat& fmt) {
+    int raw = fmt.property(UserPropUlStyle).toInt();
+    if (raw > static_cast<int>(RtfUnderlineStyle::SpellCheck))
+        return static_cast<RtfUnderlineStyle>(raw);
+    return RtfUlStyleFor(fmt.underlineStyle());
 }
 
 static int FindColorIndex(const vector<QColor>& colorList, const QColor& color) {
@@ -176,10 +175,25 @@ static string AlignmentToRtf(Qt::Alignment alignment) {
     return "";
 }
 
+static int ListStyleTypeValue(RtfListStyle style) {
+    switch (style) {
+        case RtfListStyle::Disc:   return 1;
+        case RtfListStyle::Circle: return 0;
+        case RtfListStyle::Square: return 2;
+        case RtfListStyle::Number: return 3;
+        case RtfListStyle::Roman:  return 4;
+        case RtfListStyle::Letter: return 6;
+        case RtfListStyle::Box:
+        case RtfListStyle::Check:
+        case RtfListStyle::None:
+        default:                   return 1;
+    }
+}
+
 static void EmitPictHeader(ostringstream& out, const QString& blipTag, qreal width, qreal height) {
     out << "{\\pict\\" << blipTag.toStdString() << " ";
-    int picwgoal = static_cast<int>(width * 2.0);
-    int pichgoal = static_cast<int>(height * 2.0);
+    int picwgoal = static_cast<int>(width * kHalfPtToPoint);
+    int pichgoal = static_cast<int>(height * kHalfPtToPoint);
     if (picwgoal > 0) out << "\\picwgoal" << picwgoal;
     if (pichgoal > 0) out << "\\pichgoal" << pichgoal;
     out << ' ';
@@ -410,7 +424,7 @@ struct BlockExportContext {
     QTextBlockFormat lastParaFmt{};
     bool lastParaFmtSet = false;
     int lastDeff = 0;
-    int lastDeftab = 180;
+    int lastDeftab = kDefaultTabStopTwips;
     int deffDeftabGroupDepth = 0;
     bool firstBlock = true;
 
@@ -592,7 +606,7 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
             RtfRunFormat cur;
             qreal ptSize = charFmt.fontPointSize();
             if (ptSize <= 0) ptSize = defaultFont.pointSizeF();
-            cur.fontSize = static_cast<int>(ptSize * 2);
+            cur.fontSize = static_cast<int>(ptSize * kHalfPtToPoint);
 
             QString fam;
             QStringList fFams = charFmt.fontFamilies().toStringList();
@@ -607,13 +621,13 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
             else
                 cur.bgColorIndex = 0;
 
-            cur.bold = charFmt.fontWeight() >= 700;
+            cur.bold = charFmt.fontWeight() >= QFont::Bold;
             cur.italic = charFmt.fontItalic();
             cur.strikeOut = charFmt.fontStrikeOut();
             cur.superscript = charFmt.verticalAlignment() == QTextCharFormat::AlignSuperScript;
             cur.subscript = charFmt.verticalAlignment() == QTextCharFormat::AlignSubScript;
             cur.underlineStyle = EffectiveUnderlineStyle(charFmt);
-            cur.capitalization = toCapitalization(charFmt.fontCapitalization());
+            cur.capitalization = charFmt.fontCapitalization();
             cur.kerning = charFmt.fontKerning();
             cur.protected_ = charFmt.property(UserPropProtect).toBool();
             cur.upOffset = charFmt.property(UserPropUpOffset).toInt();
@@ -625,7 +639,7 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
                 cur.ulColorIndex = LookupColorIndex(ulCol, colorList);
             qreal spacing = charFmt.fontLetterSpacing();
             if (spacing > 0) {
-                cur.expnd = lround(spacing * 20.0 / ptSize);
+                cur.expnd = lround(spacing * kExpndToEm / ptSize);
             }
 
             if (firstRun || cur != prev) {
@@ -644,13 +658,13 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
                 if (cur.bold && !lastEmitted.bold) out << "\\b ";
                 if (cur.italic && !lastEmitted.italic) out << "\\i ";
                 if (cur.strikeOut && !lastEmitted.strikeOut) out << "\\strike ";
-                if (cur.underlineStyle != UnderlineStyle::None && cur.underlineStyle != lastEmitted.underlineStyle)
+                if (cur.underlineStyle != RtfUnderlineStyle::NoUnderline && cur.underlineStyle != lastEmitted.underlineStyle)
                     out << UnderlineStyleTag(cur.underlineStyle) << ' ';
                 if (cur.superscript && !lastEmitted.superscript) out << "\\super ";
                 if (cur.subscript && !lastEmitted.subscript) out << "\\sub ";
-                if (cur.capitalization != Capitalization::None && cur.capitalization != lastEmitted.capitalization) {
-                    if (cur.capitalization == Capitalization::AllCaps) out << "\\caps ";
-                    if (cur.capitalization == Capitalization::SmallCaps) out << "\\scaps ";
+                if (cur.capitalization != QFont::MixedCase && cur.capitalization != lastEmitted.capitalization) {
+                    if (cur.capitalization == QFont::AllUppercase) out << "\\caps ";
+                    if (cur.capitalization == QFont::SmallCaps) out << "\\scaps ";
                 }
                 if (cur.kerning && !lastEmitted.kerning) out << "\\kerning ";
                 if (cur.expnd != lastEmitted.expnd) out << "\\expnd" << cur.expnd << ' ';
@@ -706,13 +720,13 @@ string ExportRtf(const QTextDocument& document) {
 
     // Read default tab stop twips (stored during import)
     int defaultTabStopTwips = document.property(UserPropMetaDefaultTabStopTwips).toInt();
-    if (defaultTabStopTwips <= 0) defaultTabStopTwips = 180;  // RTF spec default
+    if (defaultTabStopTwips <= 0) defaultTabStopTwips = kDefaultTabStopTwips;
 
     map<string, int> fontMap;
     vector<QColor> colorList;
     vector<QColor> bgColorList;
     map<const QTextList*, int> listMap;
-    map<const QTextList*, ListStyle> listStyleMap;
+    map<const QTextList*, RtfListStyle> listStyleMap;
     int defaultFontIdx = 0;
     int listIdCounter = 1;
     int idx = 0;
@@ -725,7 +739,7 @@ string ExportRtf(const QTextDocument& document) {
                 const QTextList* list = block.textList();
                 if (listMap.find(list) == listMap.end()) {
                     listMap[list] = listIdCounter++;
-                    listStyleMap[list] = QtListStyleToRtf(list->format().style());
+                    listStyleMap[list] = RtfListStyleFor(list->format().style());
                 }
             }
 
@@ -759,7 +773,7 @@ string ExportRtf(const QTextDocument& document) {
     qDebug() << "[export] Font collection done, count=" << fontMap.size();
 
     out << "{\\rtf1\\ansi\\deff" << defaultFontIdx;
-    if (defaultTabStopTwips != 180)
+    if (defaultTabStopTwips != kDefaultTabStopTwips)
         out << "\\deftab" << defaultTabStopTwips;
 
     if (!colorList.empty() || !bgColorList.empty()) {
@@ -782,9 +796,7 @@ string ExportRtf(const QTextDocument& document) {
         for (const auto& [list, id] : listMap) {
             out << "\\list\\listid" << id
                 << "\\liststylebulletsimple\\liststyletype"
-                << static_cast<int>(listStyleMap[list] == ListStyle::Number ? 3 :
-                    listStyleMap[list] == ListStyle::Letter ? 6 :
-                    listStyleMap[list] == ListStyle::Roman ? 4 : 1);
+                << ListStyleTypeValue(listStyleMap[list]);
         }
         out << "}";
     }

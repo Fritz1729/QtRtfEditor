@@ -51,7 +51,7 @@ ImportRtf()
 | `fontIndex` | `setFontFamilies(...)` | Look up from font table |
 | `colorIndex` | `setForeground(QColor)` | Look up from color table |
 | `bgColorIndex` | `setBackground(QBrush)` | Look up from color table |
-| `underlineStyle` | `setUnderlineStyle(...)` | Map via `qtUnderlineStyleFor()` |
+| `underlineStyle` | `setUnderlineStyle(...)` | Map via `QtUlStyleFor()`; Double/Thick stored in `UserPropUlStyle` |
 | `capitalization` | `setFontCapitalization(...)` | AllCaps / SmallCaps |
 | `kerning` | `setFontKerning(true)` | |
 | `expnd` | `setFontLetterSpacing(...)` | Percentage-based expansion |
@@ -72,7 +72,7 @@ ImportRtf()
 
 | RTF Property | Qt API | Notes |
 |-------------|--------|-------|
-| `alignment` | `setAlignment(...)` | Via `RtfAlignmentToQt()` |
+| `alignment` | `setAlignment(...)` | `Qt::Alignment` stored directly |
 | `leftIndent` | `setLeftMargin(indent / 2.0)` | Twips to points |
 | `firstLineIndent` | `setIndent(indent / 2.0)` | Twips to points |
 | `rightIndent` | `setRightMargin(indent / 2.0)` | Twips to points |
@@ -90,7 +90,7 @@ Lists are handled by tracking list state across paragraphs:
 2. If same `listId` as previous, add block to existing list
 3. If `listId == 0`, exit list context
 
-List style is mapped via `RtfListStyleToQt()` (Disc, Circle, Square, Decimal, LowerAlpha, LowerRoman).
+List style is mapped via `QtListStyleFor()` (Disc, Circle, Square, Number, LowerAlpha, LowerRoman).
 
 ## Pntext Handling
 

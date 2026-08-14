@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdexcept>
+
 #include <QByteArray>
 #include <QFont>
 #include <QTextCharFormat>
@@ -27,84 +29,6 @@ constexpr int UserPropUlStyle = 1011;
 constexpr int UserPropUlColorIndex = 1012;
 constexpr int UserPropSlMult = 1013;
 
-inline UnderlineStyle toUnderlineStyle(QTextCharFormat::UnderlineStyle qtStyle) {
-    switch (qtStyle) {
-        case QTextCharFormat::NoUnderline:     return UnderlineStyle::None;
-        case QTextCharFormat::SingleUnderline: return UnderlineStyle::Solid;
-        case QTextCharFormat::DotLine:         return UnderlineStyle::Dotted;
-        case QTextCharFormat::DashUnderline:   return UnderlineStyle::Dashed;
-        case QTextCharFormat::DashDotLine:     return UnderlineStyle::DashDot;
-        case QTextCharFormat::DashDotDotLine:  return UnderlineStyle::DashDotDot;
-        case QTextCharFormat::WaveUnderline:   return UnderlineStyle::Thick;
-        case QTextCharFormat::SpellCheckUnderline:
-        default:                               return UnderlineStyle::None;
-    }
-}
-
-inline QTextCharFormat::UnderlineStyle qtUnderlineStyleFor(UnderlineStyle style) {
-    switch (style) {
-        case UnderlineStyle::None:          return QTextCharFormat::NoUnderline;
-        case UnderlineStyle::Solid:         return QTextCharFormat::SingleUnderline;
-        case UnderlineStyle::Dotted:        return QTextCharFormat::DotLine;
-        case UnderlineStyle::Dashed:        return QTextCharFormat::DashUnderline;
-        case UnderlineStyle::DashDot:       return QTextCharFormat::DashDotLine;
-        case UnderlineStyle::DashDotDot:    return QTextCharFormat::DashDotDotLine;
-        case UnderlineStyle::Double:        return QTextCharFormat::SingleUnderline;
-        case UnderlineStyle::Thick:         return QTextCharFormat::WaveUnderline;
-        default:                            return QTextCharFormat::SingleUnderline;
-    }
-}
-
-inline Capitalization toCapitalization(QFont::Capitalization qtCaps) {
-    switch (qtCaps) {
-        case QFont::MixedCase:
-        case QFont::AllLowercase:
-        case QFont::Capitalize:
-        default:                    return Capitalization::None;
-        case QFont::AllUppercase:   return Capitalization::AllCaps;
-        case QFont::SmallCaps:      return Capitalization::SmallCaps;
-    }
-}
-
-inline QTextListFormat::Style RtfListStyleToQt(ListStyle style) {
-    switch (style) {
-        case ListStyle::None:
-        default:                return QTextListFormat::ListDisc;
-        case ListStyle::Disc:   return QTextListFormat::ListDisc;
-        case ListStyle::Bullet: return QTextListFormat::ListCircle;
-        case ListStyle::Box:    return QTextListFormat::ListSquare;
-        case ListStyle::Check:  return QTextListFormat::ListDisc;
-        case ListStyle::Number: return QTextListFormat::ListDecimal;
-        case ListStyle::Letter: return QTextListFormat::ListLowerAlpha;
-        case ListStyle::Roman:  return QTextListFormat::ListLowerRoman;
-    }
-}
-
-inline ListStyle QtListStyleToRtf(QTextListFormat::Style style) {
-    switch (style) {
-        case QTextListFormat::ListDisc:            return ListStyle::Disc;
-        case QTextListFormat::ListCircle:          return ListStyle::Bullet;
-        case QTextListFormat::ListSquare:          return ListStyle::Box;
-        case QTextListFormat::ListDecimal:         return ListStyle::Number;
-        case QTextListFormat::ListLowerAlpha:      return ListStyle::Letter;
-        case QTextListFormat::ListLowerRoman:      return ListStyle::Roman;
-        case QTextListFormat::ListUpperAlpha:
-        case QTextListFormat::ListUpperRoman:
-        case QTextListFormat::ListStyleUndefined:
-        default:                                   return ListStyle::None;
-    }
-}
-
-inline Qt::Alignment RtfAlignmentToQt(int align) {
-    switch (align) {
-        case 1: return Qt::AlignLeft;
-        case 128: return Qt::AlignHCenter;
-        case 2: return Qt::AlignRight;
-        case 4: return Qt::AlignJustify;
-        default: return Qt::AlignLeft;
-    }
-}
-
 // QByteArray <-> std::vector<uint8_t> conversion helpers (for RtfImage::data)
 inline std::vector<uint8_t> ByteArrayToVector(const QByteArray& ba) {
     return {ba.begin(), ba.end()};
@@ -112,6 +36,48 @@ inline std::vector<uint8_t> ByteArrayToVector(const QByteArray& ba) {
 
 inline QByteArray VectorToByteArray(const std::vector<uint8_t>& v) {
     return QByteArray(reinterpret_cast<const char*>(v.data()), static_cast<int>(v.size()));
+}
+
+// RtfUnderlineStyle <-> QTextCharFormat::UnderlineStyle
+inline QTextCharFormat::UnderlineStyle QtUlStyleFor(RtfUnderlineStyle v) {
+    if (v > RtfUnderlineStyle::SpellCheck) return QTextCharFormat::SingleUnderline;
+    return static_cast<QTextCharFormat::UnderlineStyle>(v);
+}
+
+inline RtfUnderlineStyle RtfUlStyleFor(QTextCharFormat::UnderlineStyle v) {
+    if (v >= static_cast<QTextCharFormat::UnderlineStyle>(RtfUnderlineStyle::COUNT)) throw std::runtime_error("unknown QTextCharFormat::UnderlineStyle");
+    return static_cast<RtfUnderlineStyle>(v);
+}
+
+// RtfListStyle <-> QTextListFormat::Style
+inline QTextListFormat::Style QtListStyleFor(RtfListStyle v) {
+    switch (v) {
+        case RtfListStyle::Disc:   return QTextListFormat::ListDisc;
+        case RtfListStyle::Circle: return QTextListFormat::ListCircle;
+        case RtfListStyle::Square: return QTextListFormat::ListSquare;
+        case RtfListStyle::Box:    return QTextListFormat::ListDisc;
+        case RtfListStyle::Check:  return QTextListFormat::ListDisc;
+        case RtfListStyle::Number: return QTextListFormat::ListDecimal;
+        case RtfListStyle::Letter: return QTextListFormat::ListLowerAlpha;
+        case RtfListStyle::Roman:  return QTextListFormat::ListLowerRoman;
+        case RtfListStyle::None:
+        default:                   return QTextListFormat::ListStyleUndefined;
+    }
+}
+
+inline RtfListStyle RtfListStyleFor(QTextListFormat::Style v) {
+    switch (v) {
+        case QTextListFormat::ListDisc:           return RtfListStyle::Disc;
+        case QTextListFormat::ListCircle:         return RtfListStyle::Circle;
+        case QTextListFormat::ListSquare:         return RtfListStyle::Square;
+        case QTextListFormat::ListDecimal:        return RtfListStyle::Number;
+        case QTextListFormat::ListLowerRoman:     return RtfListStyle::Roman;
+        case QTextListFormat::ListUpperRoman:     return RtfListStyle::Roman;
+        case QTextListFormat::ListLowerAlpha:     return RtfListStyle::Letter;
+        case QTextListFormat::ListUpperAlpha:     return RtfListStyle::Letter;
+        case QTextListFormat::ListStyleUndefined:
+        default:                                  return RtfListStyle::None;
+    }
 }
 
 } // namespace Rte

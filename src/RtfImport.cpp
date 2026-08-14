@@ -2,7 +2,6 @@
 
 #include "RtfParser.h"
 #include "RtfQtConversions.h"
-#include "RtfTypes.h"
 
 #include <algorithm>
 #include <array>
@@ -27,7 +26,7 @@ namespace Rte {
 namespace {
 
 QColor ResolveColor(int idx, const RtfDocument& doc) {
-    const RtfColorEntry* col = ResolveColorEntry(idx, doc);
+    const RtfColorEntry* col = ResolveColorEntry(idx, doc.colors);
     return col ? QColor(col->red, col->green, col->blue) : QColor();
 }
 
@@ -39,7 +38,7 @@ void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
         QTextCharFormat charFmt;
 
         if (run.format.fontSize > 0) {
-            charFmt.setFontPointSize(run.format.fontSize / 2.0);
+            charFmt.setFontPointSize(run.format.fontSize / kHalfPtToPoint);
         }
         if (run.format.bold) {
             charFmt.setFontWeight(QFont::Bold);
@@ -75,13 +74,16 @@ void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
         if (bgColor.isValid()) charFmt.setBackground(QBrush(bgColor));
 
         if (run.format.underline) {
-            if (run.format.underlineStyle == UnderlineStyle::Solid ||
-                run.format.underlineStyle == UnderlineStyle::None) {
+            auto qtUlStyle = QtUlStyleFor(run.format.underlineStyle);
+            if (qtUlStyle == QTextCharFormat::SingleUnderline ||
+                qtUlStyle == QTextCharFormat::NoUnderline) {
                 charFmt.setFontUnderline(true);
             } else {
-                charFmt.setUnderlineStyle(qtUnderlineStyleFor(run.format.underlineStyle));
+                charFmt.setUnderlineStyle(qtUlStyle);
             }
-            charFmt.setProperty(UserPropUlStyle, static_cast<int>(run.format.underlineStyle));
+            int ulRaw = static_cast<int>(run.format.underlineStyle);
+            if (ulRaw > static_cast<int>(RtfUnderlineStyle::SpellCheck))
+                charFmt.setProperty(UserPropUlStyle, ulRaw);
         }
         if (run.format.ulColorIndex > 0) {
             QColor ulColor = ResolveColor(run.format.ulColorIndex, doc);
@@ -91,9 +93,9 @@ void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
             }
         }
 
-        if (run.format.capitalization == Capitalization::AllCaps) {
+        if (run.format.capitalization == QFont::AllUppercase) {
             charFmt.setFontCapitalization(QFont::AllUppercase);
-        } else if (run.format.capitalization == Capitalization::SmallCaps) {
+        } else if (run.format.capitalization == QFont::SmallCaps) {
             charFmt.setFontCapitalization(QFont::SmallCaps);
         }
 
@@ -101,8 +103,8 @@ void InsertRuns(QTextCursor& cursor, const std::vector<RtfRun>& runs,
             charFmt.setFontKerning(true);
         }
         if (run.format.expnd != 0) {
-            double ptSize = run.format.fontSize > 0 ? run.format.fontSize / 2.0 : defaultFont.pointSizeF();
-            charFmt.setFontLetterSpacing(run.format.expnd / 20.0 * ptSize);
+            double ptSize = run.format.fontSize > 0 ? run.format.fontSize / kHalfPtToPoint : defaultFont.pointSizeF();
+            charFmt.setFontLetterSpacing(run.format.expnd / kExpndToEm * ptSize);
         }
 
         if (run.format.superscript) {
@@ -142,7 +144,7 @@ void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
                              int& prevListId, int& prevListLevel,
                              bool& inList, QTextList*& currentList) {
     QTextBlockFormat blockFmt;
-    blockFmt.setAlignment(RtfAlignmentToQt(para.format.alignment));
+    blockFmt.setAlignment(para.format.alignment);
     if (para.format.leftIndent > 0 || para.format.firstLineIndent > 0) {
         blockFmt.setLeftMargin(MarginTwipsToPoints(para.format.leftIndent));
         blockFmt.setIndent(para.format.firstLineIndent > 0 ? static_cast<int>(MarginTwipsToPoints(para.format.firstLineIndent)) : 0);
@@ -165,11 +167,11 @@ void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
         for (const TabStop& ts : para.format.tabStops) {
             QTextOption::TabType type;
             switch (ts.alignment) {
-            case 1: type = QTextOption::LeftTab; break;
-            case 128: type = QTextOption::CenterTab; break;
-            case 2: type = QTextOption::RightTab; break;
-            case 3: type = QTextOption::LeftTab; break;
-            default: type = QTextOption::LeftTab; break;
+            case Qt::AlignLeft:   type = QTextOption::LeftTab; break;
+            case Qt::AlignHCenter: type = QTextOption::CenterTab; break;
+            case Qt::AlignRight:  type = QTextOption::RightTab; break;
+            case Qt::AlignJustify: type = QTextOption::LeftTab; break;
+            default:              type = QTextOption::LeftTab; break;
             }
             tabs << QTextOption::Tab(MarginTwipsToPoints(ts.position), type);
         }
@@ -179,7 +181,7 @@ void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
     // Handle list insertion
     if (para.listId > 0 && (!inList || para.listId != prevListId)) {
         QTextListFormat listFmt;
-        listFmt.setStyle(RtfListStyleToQt(para.listStyle));
+        listFmt.setStyle(QtListStyleFor(para.listStyle));
         if (para.listIndent > 0) {
             listFmt.setIndent(static_cast<int>(MarginTwipsToPoints(para.listIndent)));
         }
@@ -232,8 +234,8 @@ void BuildImage(QTextCursor& cursor, const RtfImage& img,
     QImageReader reader(&buffer);
     QSize size = reader.size();
     if (size.isValid() && size.width() > 0 && size.height() > 0) {
-        widthPx = size.width() * 96.0 / 72.0;
-        heightPx = size.height() * 96.0 / 72.0;
+        widthPx = size.width() * kDpiToPoints;
+        heightPx = size.height() * kDpiToPoints;
     }
 
     if (widthPx <= 0 || heightPx <= 0) {
@@ -301,7 +303,7 @@ constexpr std::array<BorderBrushSetter, 4> kBorderBrushSetters = {{
 }};
 
 QColor ResolveBorderColor(int colorIdx, const RtfDocument& doc) {
-    const RtfColorEntry* col = ResolveColorEntry(colorIdx, doc);
+    const RtfColorEntry* col = ResolveColorEntry(colorIdx, doc.colors);
     return col && colorIdx > 0 ? QColor(col->red, col->green, col->blue) : QColor();
 }
 
@@ -344,10 +346,8 @@ void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEntry*>& t
     tableFmt.setCellSpacing(0);
 
     // Table alignment from first row
-    int align = tableRows[0]->tableAlignment;
-    if (align == 1) tableFmt.setAlignment(Qt::AlignHCenter);
-    else if (align == 2) tableFmt.setAlignment(Qt::AlignRight);
-    else tableFmt.setAlignment(Qt::AlignLeft);
+    Qt::Alignment align = tableRows[0]->tableAlignment;
+    tableFmt.setAlignment(align);
 
     // Set column widths from \cellx positions
     QVector<QTextLength> constraints;
@@ -432,7 +432,7 @@ void BuildDocument(QTextDocument* document, const RtfDocument& doc) {
             QString::fromStdString(doc.fonts[static_cast<std::size_t>(fi)].family));
     }
     if (doc.defaultFontSize > 0) {
-        defaultFont.setPointSizeF(doc.defaultFontSize / 2.0);
+        defaultFont.setPointSizeF(doc.defaultFontSize / kHalfPtToPoint);
     } else {
         defaultFont.setPointSizeF(12);
     }
@@ -478,7 +478,7 @@ void ImportRtf(QTextDocument* document, const std::string& rtf, int codePage) {
         document->setProperty(UserPropMetaViewKind, doc.viewKind);
     if (doc.ucByteCount != 1)
         document->setProperty(UserPropMetaUcByteCount, doc.ucByteCount);
-    if (doc.defaultTabStopTwips != 180)  // 180 = RTF spec default
+    if (doc.defaultTabStopTwips != kDefaultTabStopTwips)
         document->setProperty(UserPropMetaDefaultTabStopTwips, doc.defaultTabStopTwips);
 }
 

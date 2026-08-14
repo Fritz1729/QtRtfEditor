@@ -47,10 +47,6 @@ struct RtfControl {
         FontIndex, FontSize, ColorIndex, BgColorIndex, UpOffset,
         DnOffset, Expnd, ListId, UlColorIndex, HighlightIndex, LangId,
     };
-    enum class RtfUlStyle : uint8_t {
-        UlNone, UlSolid, UlDotted, UlDashed, UlDashDot, UlDashDotDot,
-        UlDouble, UlThick,
-    };
     enum class TableCtrlWord : uint8_t {
         Trowd, Cellx, Cell, Row, Intbl,
         ClShading, ClVertAlignTop, ClVertAlignCenter, ClVertAlignBottom,
@@ -71,7 +67,6 @@ struct RtfControl {
         CharProp charProp;
         CharSetProp charSetProp;
         ParaProp paraProp;
-        RtfUlStyle ulStyle;
         TableCtrlWord tableCtrlWord;
         uint32_t specialChar;
     };

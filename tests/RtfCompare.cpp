@@ -11,7 +11,7 @@ std::string gDefaultFontFamily;
 namespace Rte {
 
 static RtfColorEntry ResolveColorFromTable(int idx, const RtfDocument& doc, bool* hasValue) {
-    const RtfColorEntry* col = ResolveColorEntry(idx, doc);
+    const RtfColorEntry* col = ResolveColorEntry(idx, doc.colors);
     *hasValue = (col != nullptr);
     return col ? *col : RtfColorEntry{0, 0, 0};
 }
@@ -313,9 +313,9 @@ static RtfCompareResult DoCompareDocuments(const RtfDocument& a, const RtfDocume
             // Compare table alignment
             {
                 int alignA = rowCountA > 0 ?
-                    std::get<RtfTableRowEntry>(a.elements[tablesA[tableIdxA].startIdx]).tableAlignment : 0;
+                    static_cast<int>(std::get<RtfTableRowEntry>(a.elements[tablesA[tableIdxA].startIdx]).tableAlignment) : 0;
                 int alignB = rowCountB > 0 ?
-                    std::get<RtfTableRowEntry>(b.elements[tablesB[tableIdxB].startIdx]).tableAlignment : 0;
+                    static_cast<int>(std::get<RtfTableRowEntry>(b.elements[tablesB[tableIdxB].startIdx]).tableAlignment) : 0;
                 if (alignA != alignB) {
                     reason = "Table " + std::to_string(tableIdxA) +
                              " alignment: " + std::to_string(alignA) +

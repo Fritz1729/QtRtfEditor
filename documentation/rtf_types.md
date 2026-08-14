@@ -6,7 +6,7 @@
 
 ## Role
 
-`RtfTypes.h` is the only header that all other modules depend on. It contains no implementation -- only declarations. The structures form a tree: `RtfDocument` contains a vector of `std::variant<RtfParagraph, RtfTableRowEntry, RtfImage>`, paragraphs contain runs, and table rows contain cells with runs.
+`RtfTypes.h` is the central header for all shared types. It contains no implementation -- only declarations. The structures form a tree: `RtfDocument` contains a vector of `std::variant<RtfParagraph, RtfTableRowEntry, RtfImage>`, paragraphs contain runs, and table rows contain cells with runs.
 
 ## Data Structures
 
@@ -90,8 +90,8 @@ RtfRunFormat {
     superscript, subscript,   // boolean toggles
     kerning,                  // \kerning
     expnd,                    // \expndN (character expansion percentage)
-    underlineStyle,           // UnderlineStyle enum
-    capitalization,           // Capitalization enum
+    underlineStyle,           // RtfUnderlineStyle enum
+    capitalization,           // QFont::Capitalization
     upOffset, dnOffset,       // \upN, \dnN (positional offset)
     ulColorIndex,             // \ulcN (underline color)
     langId,                   // \langN
@@ -145,9 +145,8 @@ RtfFontEntry  { family (string), fcharset (int) };
 
 | Enum | Values |
 |------|--------|
-| `UnderlineStyle` | None, Solid, Dotted, Dashed, DashDot, DashDotDot, Double, Thick |
-| `Capitalization` | None, AllCaps, SmallCaps |
-| `ListStyle` | None, Disc, Bullet, Box, Check, Number, Letter, Roman |
+| `RtfUnderlineStyle` | NoUnderline(0), Single(1), Dash(2), DotLine(3), DashDotLine(4), DashDotDotLine(5), Wave(6), SpellCheck(7), Double(8), Thick(9) |
+| `RtfListStyle` | None(0), Disc(1), Circle(2), Square(3), Box(4), Check(5), Number(6), Letter(7), Roman(8) |
 | `BorderStyle` | None, Solid, Dashed |
 | `RtfImageFormat` | Jpeg, Png, Bmp, Unknown |
 | `TableSide` | Side_Left, Side_Top, Side_Right, Side_Bottom, Side_Undefined |
@@ -174,16 +173,22 @@ Qt user property IDs used to store RTF metadata in `QTextDocument`:
 
 | Function | Purpose |
 |----------|---------|
-| `AlignmentToString(int)` | RTF alignment value to human-readable string |
-| `RtfAlignmentToQt(int)` | RTF alignment to `Qt::Alignment` |
-| `toUnderlineStyle(QTextCharFormat::UnderlineStyle)` | Qt to RTF underline style |
-| `qtUnderlineStyleFor(UnderlineStyle)` | RTF to Qt underline style (lossy for Double/Thick) |
-| `toCapitalization(QFont::Capitalization)` | Qt to RTF capitalization |
-| `RtfListStyleToQt(ListStyle)` | RTF to Qt list style |
-| `QtListStyleToRtf(QTextListFormat::Style)` | Qt to RTF list style |
+| `ResolveColorEntry(idx, colors)` | Look up color by index |
+| `NormalizeCellBorders(cell, row)` | Merge row borders into cell borders |
+| `EffectiveCellPadding(cellPad, rowPad)` | Compute max(cellPad, rowPad) |
+| `TwipsToHalfPt(twips)` | Twips to half-points |
+| `MarginTwipsToPoints(twips)` | Twips to points |
+| `PointsToTwips(pts)` | Points to twips |
+| `PointsToHalfPtTwips(pts)` | Points to half-point twips |
+| `ByteArrayToVector(ba)` | QByteArray to std::vector<uint8_t> |
+| `VectorToByteArray(v)` | std::vector<uint8_t> to QByteArray |
+| `QtUlStyleFor(rtfStyle)` | RtfUnderlineStyle to QTextCharFormat::UnderlineStyle |
+| `RtfUlStyleFor(qtStyle)` | QTextCharFormat::UnderlineStyle to RtfUnderlineStyle |
+| `QtListStyleFor(rtfStyle)` | RtfListStyle to QTextListFormat::Style |
+| `RtfListStyleFor(qtStyle)` | QTextListFormat::Style to RtfListStyle |
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `RtfTypes.h` | All type declarations, enums, user properties, helper functions |
+| `RtfTypes.h` | All type declarations, enums, user properties, conversion helpers |
