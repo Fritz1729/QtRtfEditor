@@ -11,7 +11,7 @@ This guide covers integrating QtRtfEditor into your project and common usage pat
 include(FetchContent)
 FetchContent_Declare(QtRtfEditor
     GIT_REPOSITORY https://github.com/Fritz1729/QtRtfEditor.git
-     GIT_TAG        v0.1.3
+     GIT_TAG        v0.1.4.2
 )
 FetchContent_MakeAvailable(QtRtfEditor)
 

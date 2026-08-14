@@ -6,7 +6,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(QtRtfEditor
-    VERSION 0.1.4.1
+    VERSION 0.1.4.2
     LANGUAGES CXX
     DESCRIPTION "QTextEdit subclass with partial RTF support"
     HOMEPAGE_URL https://github.com/Fritz1729/QtRtfEditor

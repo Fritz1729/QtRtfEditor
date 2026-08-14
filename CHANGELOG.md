@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.4.2
+
+Complete font types with nested font groups, negative margins/indents/spacing, `\clshdn` cell shading and border-color export, hex escapes for control characters, standard `\levelnfc` list format, parser refactor (public `RtfParser` class, `ScopeStack` RAII, `TableParser`, Qt decoupling), bugfixes.
+
 ## v0.1.4.1
 
 Windows shared library build fixes (RTE_EXPORT, MSVC CRT /MD vs /MT, output directories), test hang fixes (Qt on main thread, parser decoupled from widgets), `-Wall` clean, CI hardening.
