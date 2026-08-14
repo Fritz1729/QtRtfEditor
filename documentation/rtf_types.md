@@ -32,25 +32,28 @@ RtfDocument {
 
 ### RtfParagraph
 
-A paragraph with formatting and content runs. Inherits from `ParagraphFormatting`:
+A paragraph with formatting and content runs. Contains a `ParagraphFormat` member:
 
 ```cpp
-RtfParagraph : ParagraphFormatting {
+RtfParagraph {
+    format,                   // ParagraphFormat (paragraph-level formatting)
     runs[],                   // RtfRun array (text content)
     listId,                   // list ID (\listidN)
     listLevel,                // list level (\listlevelN)
     listStyle,                // ListStyle enum
     listIndent,               // indent for list items
+    defaultFontIndex,         // \deffN (group-persistent, not paragraph formatting)
+    defaultTabStopTwips,      // \deftabN (group-persistent, not paragraph formatting)
     pntextRtf,                // original \pntext RTF fragment for roundtrip preservation
 };
 ```
 
-### ParagraphFormatting
+### ParagraphFormat
 
 Shared paragraph formatting:
 
 ```cpp
-ParagraphFormatting {
+ParagraphFormat {
     alignment,                // 1=left, 128=center, 2=right, 4=justified
     leftIndent,               // \liN (twips)
     firstLineIndent,          // \fiN (twips)
@@ -60,8 +63,6 @@ ParagraphFormatting {
     lineHeight,               // \slN (twips, fixed height)
     slMult,                   // \slmultN (line-spacing multiplier)
     tabStops[],               // TabStop array
-    defaultFontIndex,         // \deffN (group-persistent)
-    defaultTabStopTwips,      // \deftabN (group-persistent)
 };
 ```
 

@@ -899,7 +899,7 @@ void TestSemanticComparison::NegativeArgNoSpace() {
     QCOMPARE(doc.elements.size(), 1u);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
-    QCOMPARE(para.leftIndent, -500);
+    QCOMPARE(para.format.leftIndent, -500);
 }
 
 void TestSemanticComparison::NegativeArgUnicode() {
@@ -1227,7 +1227,7 @@ void TestSemanticComparison::NegativeFirstLineIndent() {
     QCOMPARE(doc.elements.size(), 1u);
     QVERIFY(std::holds_alternative<RtfParagraph>(doc.elements[0]));
     const auto& para = std::get<RtfParagraph>(doc.elements[0]);
-    QCOMPARE(para.firstLineIndent, -200);
+    QCOMPARE(para.format.firstLineIndent, -200);
 }
 
 static int RunTest(int argc, char **argv) {

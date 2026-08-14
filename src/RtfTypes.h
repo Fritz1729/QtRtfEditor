@@ -82,7 +82,7 @@ struct TabStop {
     bool operator==(const TabStop& other) const = default;
 };
 
-struct ParagraphFormatting {
+struct ParagraphFormat {
     int alignment = 1;
     int leftIndent = 0;
     int firstLineIndent = 0;
@@ -92,8 +92,6 @@ struct ParagraphFormatting {
     int lineHeight = 0;
     int slMult = 1;
     std::vector<TabStop> tabStops;
-    int defaultFontIndex = 0;       // \deffN group-persistent per RTF 1.5/1.9.1 spec
-    int defaultTabStopTwips = 180;  // \deftabN group-persistent per RTF 1.5/1.9.1 spec (180 = 1/8 inch)
 };
 
 enum TableSide : size_t {
@@ -166,22 +164,20 @@ struct RtfTableRowEntry {
     bool operator==(const RtfTableRowEntry& other) const = default;
 };
 
-struct RtfParagraph : ParagraphFormatting {
+struct RtfParagraph {
+    ParagraphFormat format;
     std::vector<RtfRun> runs;
     int listId = 0;
     int listLevel = 0;
     ListStyle listStyle = ListStyle::None;
     int listIndent = 0;
+    int defaultFontIndex = 0;       // \deffN group-persistent
+    int defaultTabStopTwips = 180;  // \deftabN group-persistent
     // Original \pntext RTF fragment for structural roundtrip preservation.
     // Empty when the paragraph has no \pntext group.
     std::string pntextRtf;
 
-    RtfParagraph() = default;
-    explicit RtfParagraph(ParagraphFormatting fmt) : ParagraphFormatting(fmt) {}
-
-    void setFormatting(ParagraphFormatting fmt) {
-        static_cast<ParagraphFormatting&>(*this) = fmt;
-    }
+    bool operator==(const RtfParagraph& other) const = default;
 };
 
 enum class RtfImageFormat : uint8_t {

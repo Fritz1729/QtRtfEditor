@@ -447,7 +447,28 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
     // Emit \pntext group if the block has pntext content stored
     QString pntext = blockFmt.property(UserPropBlockPntextRtf).toString();
     if (!pntext.isEmpty()) {
-        out << "{\\pntext" << qPrintable(pntext) << "}";
+        QString pntextFam = blockFmt.property(UserPropBlockPntextFontFamily).toString();
+        string pntextRtf = pntext.toLatin1().toStdString();
+        if (!pntextFam.isEmpty() && !fontMap.empty()) {
+            string famStr = pntextFam.toStdString();
+            auto it = fontMap.find(famStr);
+            if (it != fontMap.end()) {
+                string newRef = "\\f" + to_string(it->second);
+                size_t pos = 0;
+                while ((pos = pntextRtf.find("\\f", pos)) != string::npos) {
+                    size_t endNum = pos + 2;
+                    while (endNum < pntextRtf.size() && isdigit(static_cast<unsigned char>(pntextRtf[endNum])))
+                        endNum++;
+                    if (endNum > pos + 2) {
+                        pntextRtf.replace(pos, endNum - pos, newRef);
+                        pos = pos + newRef.size();
+                    } else {
+                        pos = endNum;
+                    }
+                }
+            }
+        }
+        out << "{\\pntext" << pntextRtf << "}";
     }
 
     {
@@ -727,6 +748,12 @@ string ExportRtf(const QTextDocument& document) {
                 if (ulCol.isValid())
                     CollectColor(ulCol, colorList);
                 it++;
+            }
+
+            // Collect fonts from pntext content (not in document fragments)
+            QString pntextFam = block.blockFormat().property(UserPropBlockPntextFontFamily).toString();
+            if (!pntextFam.isEmpty() && fontMap.find(pntextFam.toStdString()) == fontMap.end()) {
+                fontMap[pntextFam.toStdString()] = ++idx;
             }
         }
     qDebug() << "[export] Font collection done, count=" << fontMap.size();

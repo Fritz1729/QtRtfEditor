@@ -142,27 +142,27 @@ void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
                              int& prevListId, int& prevListLevel,
                              bool& inList, QTextList*& currentList) {
     QTextBlockFormat blockFmt;
-    blockFmt.setAlignment(RtfAlignmentToQt(para.alignment));
-    if (para.leftIndent > 0 || para.firstLineIndent > 0) {
-        blockFmt.setLeftMargin(MarginTwipsToPoints(para.leftIndent));
-        blockFmt.setIndent(para.firstLineIndent > 0 ? static_cast<int>(MarginTwipsToPoints(para.firstLineIndent)) : 0);
+    blockFmt.setAlignment(RtfAlignmentToQt(para.format.alignment));
+    if (para.format.leftIndent > 0 || para.format.firstLineIndent > 0) {
+        blockFmt.setLeftMargin(MarginTwipsToPoints(para.format.leftIndent));
+        blockFmt.setIndent(para.format.firstLineIndent > 0 ? static_cast<int>(MarginTwipsToPoints(para.format.firstLineIndent)) : 0);
     }
-    if (para.rightIndent > 0) {
-        blockFmt.setRightMargin(MarginTwipsToPoints(para.rightIndent));
+    if (para.format.rightIndent > 0) {
+        blockFmt.setRightMargin(MarginTwipsToPoints(para.format.rightIndent));
     }
-    if (para.spaceBefore > 0) {
-        blockFmt.setTopMargin(MarginTwipsToPoints(para.spaceBefore));
+    if (para.format.spaceBefore > 0) {
+        blockFmt.setTopMargin(MarginTwipsToPoints(para.format.spaceBefore));
     }
-    if (para.spaceAfter > 0) {
-        blockFmt.setBottomMargin(MarginTwipsToPoints(para.spaceAfter));
+    if (para.format.spaceAfter > 0) {
+        blockFmt.setBottomMargin(MarginTwipsToPoints(para.format.spaceAfter));
     }
-    if (para.lineHeight > 0) {
-        blockFmt.setLineHeight(MarginTwipsToPoints(para.lineHeight),
+    if (para.format.lineHeight > 0) {
+        blockFmt.setLineHeight(MarginTwipsToPoints(para.format.lineHeight),
                                 QTextBlockFormat::FixedHeight);
     }
-    if (!para.tabStops.empty()) {
+    if (!para.format.tabStops.empty()) {
         QList<QTextOption::Tab> tabs;
-        for (const TabStop& ts : para.tabStops) {
+        for (const TabStop& ts : para.format.tabStops) {
             QTextOption::TabType type;
             switch (ts.alignment) {
             case 1: type = QTextOption::LeftTab; break;
@@ -201,9 +201,17 @@ void BuildParagraph(QTextCursor& cursor, const RtfParagraph& para,
     curFmt.setProperty(UserPropParaDefaultTabStopTwips, para.defaultTabStopTwips);
     if (!para.pntextRtf.empty()) {
         curFmt.setProperty(UserPropBlockPntextRtf, QString::fromLatin1(para.pntextRtf.c_str()));
+        for (const RtfRun& run : para.runs) {
+            if (run.format.inPntext && run.format.fontIndex >= 0 &&
+                run.format.fontIndex < static_cast<int>(doc.fonts.size())) {
+                const RtfFontEntry& fe = doc.fonts[static_cast<size_t>(run.format.fontIndex)];
+                curFmt.setProperty(UserPropBlockPntextFontFamily, QString::fromStdString(fe.family));
+                break;
+            }
+        }
     }
-    if (para.slMult != 1) {
-        curFmt.setProperty(UserPropSlMult, para.slMult);
+    if (para.format.slMult != 1) {
+        curFmt.setProperty(UserPropSlMult, para.format.slMult);
     }
     cursor.setBlockFormat(curFmt);
     prevListId = para.listId;

@@ -22,6 +22,7 @@ constexpr const char* UserPropMetaViewKind = "rtf_meta_viewKind";
 constexpr const char* UserPropMetaUcByteCount = "rtf_meta_ucByteCount";
 constexpr const char* UserPropMetaDefaultTabStopTwips = "rtf_meta_defaultTabStopTwips";
 constexpr int UserPropBlockPntextRtf = 1010;
+constexpr int UserPropBlockPntextFontFamily = 1014;
 constexpr int UserPropUlStyle = 1011;
 constexpr int UserPropUlColorIndex = 1012;
 constexpr int UserPropSlMult = 1013;

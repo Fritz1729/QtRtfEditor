@@ -74,7 +74,36 @@ constexpr TableSide CtrlWordToSide(RtfControl::TableCtrlWord ctrl) {
     }
 }
 
+template<typename T>
+struct ScopeStack {
+    vector<T> stack;
+    T current;
+
+    ScopeStack() = default;
+    explicit ScopeStack(T initial) : current(std::move(initial)) {}
+
+    void enterScope() { stack.push_back(current); }
+    void leaveScope() {
+        if (!stack.empty()) {
+            current = std::move(stack.back());
+            stack.pop_back();
+        }
+    }
+    const T& get() const { return current; }
+    T& get() { return current; }
+};
+
 class RtfParserImpl {
+private:
+    struct ParserScope {
+        RtfParserImpl& parser;
+        ParserScope(RtfParserImpl& p) : parser(p) {
+            p._groupDepth++;
+            p.PushState();
+        }
+        ~ParserScope() { parser.RestoreState(); }
+    };
+
 public:
 
     RtfDocument Parse(const string& rtf, int codePage) {
@@ -88,16 +117,11 @@ public:
         _skipLeadingWsTrim = false;
         _paragraphFlushed = false;
         _iter = 0;
-
-        _format = RtfRunFormat{};
-        _para = ParagraphFormatting{};
-        _formatStack.clear();
         _inColortbl = false;
         _inFonttbl = false;
         _inPict = false;
         _inListtable = false;
         _listIdToStyle.clear();
-        _paraStateStack.clear();
         _inTable = false;
         _inRow = false;
         _inTableCell = false;
@@ -154,26 +178,26 @@ private:
             const RtfControl::CharProp prop = ctrl.value.charProp;
             switch (prop) {
             case RtfControl::CharProp::Bold:
-                _format.bold = on;
+                _formatScope.get().bold = on;
                 break;
             case RtfControl::CharProp::Italic:
-                _format.italic = on;
+                _formatScope.get().italic = on;
                 break;
             case RtfControl::CharProp::Subscript:
-                _format.subscript = on;
+                _formatScope.get().subscript = on;
                 break;
             case RtfControl::CharProp::Superscript:
-                _format.superscript = on;
-                if (on) _format.subscript = false;
+                _formatScope.get().superscript = on;
+                if (on) _formatScope.get().subscript = false;
                 break;
             case RtfControl::CharProp::Strike:
-                _format.strikeOut = on;
+                _formatScope.get().strikeOut = on;
                 break;
             case RtfControl::CharProp::Kerning:
-                _format.kerning = on;
+                _formatScope.get().kerning = on;
                 break;
             case RtfControl::CharProp::Protect:
-                _format.protected_ = on;
+                _formatScope.get().protected_ = on;
                 break;
             case RtfControl::CharProp::Underline:
             default:
@@ -187,25 +211,25 @@ private:
             if (arg < 0) break;
             switch (prop) {
             case RtfControl::CharSetProp::FontIndex:
-                _format.fontIndex = arg;
+                _formatScope.get().fontIndex = arg;
                 break;
             case RtfControl::CharSetProp::FontSize:
-                _format.fontSize = arg;
+                _formatScope.get().fontSize = arg;
                 break;
             case RtfControl::CharSetProp::ColorIndex:
-                _format.colorIndex = arg;
+                _formatScope.get().colorIndex = arg;
                 break;
             case RtfControl::CharSetProp::BgColorIndex:
-                _format.bgColorIndex = arg;
+                _formatScope.get().bgColorIndex = arg;
                 break;
             case RtfControl::CharSetProp::UpOffset:
-                _format.upOffset = arg;
+                _formatScope.get().upOffset = arg;
                 break;
             case RtfControl::CharSetProp::DnOffset:
-                _format.dnOffset = arg;
+                _formatScope.get().dnOffset = arg;
                 break;
             case RtfControl::CharSetProp::Expnd:
-                _format.expnd = arg;
+                _formatScope.get().expnd = arg;
                 break;
             case RtfControl::CharSetProp::ListId:
                 _listId = arg;
@@ -215,13 +239,13 @@ private:
                 }
                 break;
             case RtfControl::CharSetProp::UlColorIndex:
-                _format.ulColorIndex = arg;
+                _formatScope.get().ulColorIndex = arg;
                 break;
             case RtfControl::CharSetProp::HighlightIndex:
-                _format.highlightIndex = arg;
+                _formatScope.get().highlightIndex = arg;
                 break;
             case RtfControl::CharSetProp::LangId:
-                _format.langId = arg;
+                _formatScope.get().langId = arg;
                 break;
             }
             break;
@@ -230,30 +254,30 @@ private:
             const RtfControl::ParaProp prop = ctrl.value.paraProp;
             switch (prop) {
             case RtfControl::ParaProp::LeftIndent:
-                _para.leftIndent = arg;
+                _paraScope.get().leftIndent = arg;
                 break;
             case RtfControl::ParaProp::FirstLineIndent:
-                _para.firstLineIndent = arg;
+                _paraScope.get().firstLineIndent = arg;
                 break;
             case RtfControl::ParaProp::RightIndent:
-                _para.rightIndent = arg;
+                _paraScope.get().rightIndent = arg;
                 break;
             case RtfControl::ParaProp::SpaceBefore:
-                _para.spaceBefore = arg;
+                _paraScope.get().spaceBefore = arg;
                 break;
             case RtfControl::ParaProp::SpaceAfter:
-                _para.spaceAfter = arg;
+                _paraScope.get().spaceAfter = arg;
                 break;
             case RtfControl::ParaProp::LineHeight:
-                _para.lineHeight = arg;
+                _paraScope.get().lineHeight = arg;
                 break;
             case RtfControl::ParaProp::SlMult:
-                if (arg >= 0) _para.slMult = arg;
+                if (arg >= 0) _paraScope.get().slMult = arg;
                 break;
             case RtfControl::ParaProp::TabStop:
                 if (arg >= 0) {
-                    _para.tabStops.push_back({arg, _pendingTabAlignment});
-                    _pendingTabAlignment = 1;
+                    _paraScope.get().tabStops.push_back({arg, _tabAlignScope.get()});
+                    _tabAlignScope.get() = 1;
                 }
                 break;
             case RtfControl::ParaProp::ListLevel:
@@ -264,26 +288,26 @@ private:
         }
         case RtfControl::Action::SetAlignment: {
             const RtfControl::Align align = ctrl.value.align;
-            if (align == RtfControl::Align::Center) _para.alignment = 128;
-            else if (align == RtfControl::Align::Right) _para.alignment = 2;
-            else if (align == RtfControl::Align::Justified) _para.alignment = 4;
-            else _para.alignment = 1;
+            if (align == RtfControl::Align::Center) _paraScope.get().alignment = 128;
+            else if (align == RtfControl::Align::Right) _paraScope.get().alignment = 2;
+            else if (align == RtfControl::Align::Justified) _paraScope.get().alignment = 4;
+            else _paraScope.get().alignment = 1;
             break;
         }
         case RtfControl::Action::SetTabAlign: {
             const RtfControl::TabAlign tabAlign = ctrl.value.tabAlign;
             switch (tabAlign) {
             case RtfControl::TabAlign::Left:
-                _pendingTabAlignment = 1;
+                _tabAlignScope.get() = 1;
                 break;
             case RtfControl::TabAlign::Center:
-                _pendingTabAlignment = 128;
+                _tabAlignScope.get() = 128;
                 break;
             case RtfControl::TabAlign::Right:
-                _pendingTabAlignment = 2;
+                _tabAlignScope.get() = 2;
                 break;
             case RtfControl::TabAlign::Decimal:
-                _pendingTabAlignment = 3;
+                _tabAlignScope.get() = 3;
                 break;
             }
             break;
@@ -294,40 +318,40 @@ private:
             switch (style) {
             case RtfControl::RtfUlStyle::UlSolid:
                 if (arg == 0) {
-                    _format.underlineStyle = UnderlineStyle::None;
-                    _format.underline = false;
+                    _formatScope.get().underlineStyle = UnderlineStyle::None;
+                    _formatScope.get().underline = false;
                 } else {
-                    _format.underlineStyle = UnderlineStyle::Solid;
-                    _format.underline = true;
+                    _formatScope.get().underlineStyle = UnderlineStyle::Solid;
+                    _formatScope.get().underline = true;
                 }
                 break;
             case RtfControl::RtfUlStyle::UlDotted:
-                _format.underlineStyle = UnderlineStyle::Dotted;
-                _format.underline = true;
+                _formatScope.get().underlineStyle = UnderlineStyle::Dotted;
+                _formatScope.get().underline = true;
                 break;
             case RtfControl::RtfUlStyle::UlDashed:
-                _format.underlineStyle = UnderlineStyle::Dashed;
-                _format.underline = true;
+                _formatScope.get().underlineStyle = UnderlineStyle::Dashed;
+                _formatScope.get().underline = true;
                 break;
             case RtfControl::RtfUlStyle::UlDashDot:
-                _format.underlineStyle = UnderlineStyle::DashDot;
-                _format.underline = true;
+                _formatScope.get().underlineStyle = UnderlineStyle::DashDot;
+                _formatScope.get().underline = true;
                 break;
             case RtfControl::RtfUlStyle::UlDashDotDot:
-                _format.underlineStyle = UnderlineStyle::DashDotDot;
-                _format.underline = true;
+                _formatScope.get().underlineStyle = UnderlineStyle::DashDotDot;
+                _formatScope.get().underline = true;
                 break;
             case RtfControl::RtfUlStyle::UlDouble:
-                _format.underlineStyle = UnderlineStyle::Double;
-                _format.underline = true;
+                _formatScope.get().underlineStyle = UnderlineStyle::Double;
+                _formatScope.get().underline = true;
                 break;
             case RtfControl::RtfUlStyle::UlThick:
-                _format.underlineStyle = UnderlineStyle::Thick;
-                _format.underline = true;
+                _formatScope.get().underlineStyle = UnderlineStyle::Thick;
+                _formatScope.get().underline = true;
                 break;
             case RtfControl::RtfUlStyle::UlNone:
-                _format.underlineStyle = UnderlineStyle::None;
-                _format.underline = false;
+                _formatScope.get().underlineStyle = UnderlineStyle::None;
+                _formatScope.get().underline = false;
                 break;
             }
             break;
@@ -337,13 +361,13 @@ private:
             const RtfControl::RtfCaps caps = ctrl.value.caps;
             switch (caps) {
             case RtfControl::RtfCaps::CapsAll:
-                _format.capitalization = Capitalization::AllCaps;
+                _formatScope.get().capitalization = Capitalization::AllCaps;
                 break;
             case RtfControl::RtfCaps::CapsSmall:
-                _format.capitalization = Capitalization::SmallCaps;
+                _formatScope.get().capitalization = Capitalization::SmallCaps;
                 break;
             case RtfControl::RtfCaps::CapsNone:
-                _format.capitalization = Capitalization::None;
+                _formatScope.get().capitalization = Capitalization::None;
                 break;
             }
             break;
@@ -362,8 +386,8 @@ private:
             if (strcmp(ctrl.keyword, "pard") == 0) {
                 // \pard resets paragraph formatting to defaults without creating
                 // a new paragraph. Formatting applies to the current paragraph.
-                _para = ParagraphFormatting{};
-                _pendingTabAlignment = 1;
+                _paraScope.get() = ParagraphFormat{};
+                _tabAlignScope.get() = 1;
                 _listId = 0;
                 _listLevel = 0;
                 _listStyle = ListStyle::None;
@@ -371,13 +395,13 @@ private:
             }
             if (strcmp(ctrl.keyword, "plain") == 0) {
                 FinalizeRun();
-                _format = RtfRunFormat{};
+                _formatScope.get() = RtfRunFormat{};
                 _skipLeadingWsTrim = false;
                 return;
             }
             if (strcmp(ctrl.keyword, "uc") == 0) {
-                _currentUc = (arg >= 0) ? arg : 1;
-                _doc.ucByteCount = _currentUc;
+                _ucScope.get() = (arg >= 0) ? arg : 1;
+                _doc.ucByteCount = _ucScope.get();
                 return;
             }
             if (strcmp(ctrl.keyword, "deflang") == 0) {
@@ -400,9 +424,9 @@ private:
             return;
         case RtfControl::Action::GroupPersistent:
             if (strcmp(ctrl.keyword, "deff") == 0) {
-                if (arg >= 0) _currentDeff = arg;
+                if (arg >= 0) _deffScope.get() = arg;
             } else if (strcmp(ctrl.keyword, "deftab") == 0) {
-                if (arg >= 0) _currentDeftab = arg;
+                if (arg >= 0) _deftabScope.get() = arg;
             }
             break;
         case RtfControl::Action::FieldControl:
@@ -426,8 +450,8 @@ private:
         // \par resets tab stops and list state (paragraph-local) but preserves
         // alignment, indents, and spacing (which persist across paragraphs).
         _currentParagraph = {};
-        _para.tabStops.clear();
-        _pendingTabAlignment = 1;
+        _paraScope.get().tabStops.clear();
+        _tabAlignScope.get() = 1;
         _listId = 0;
         _listLevel = 0;
         _listStyle = ListStyle::None;
@@ -645,13 +669,13 @@ private:
             return;
         }
         _paragraphFlushed = true;
-        _currentParagraph.setFormatting(_para);
+        _currentParagraph.format = _paraScope.get();
         _currentParagraph.listId = _listId;
         _currentParagraph.listLevel = _listLevel;
         _currentParagraph.listStyle = _listStyle;
-        _currentParagraph.listIndent = _para.leftIndent;
-        _currentParagraph.defaultFontIndex = _currentDeff;
-        _currentParagraph.defaultTabStopTwips = _currentDeftab;
+        _currentParagraph.listIndent = _paraScope.get().leftIndent;
+        _currentParagraph.defaultFontIndex = _deffScope.get();
+        _currentParagraph.defaultTabStopTwips = _deftabScope.get();
         _doc.elements.push_back(std::move(_currentParagraph));
         _currentParagraph = {};
     }
@@ -706,26 +730,20 @@ private:
     bool _paragraphFlushed = false;
     size_t _iter = 0;
     int _codePage = 1252;
-    RtfRunFormat _format;
-    ParagraphFormatting _para;
-    vector<RtfRunFormat> _formatStack;
+    ScopeStack<RtfRunFormat> _formatScope;
+    ScopeStack<ParagraphFormat> _paraScope;
     bool _inColortbl = false;
     bool _inFonttbl = false;
     bool _inPict = false;
     bool _inListtable = false;
     bool _inPntext = false;
     map<int, ListStyle> _listIdToStyle;
-    vector<ParagraphFormatting> _paraStateStack;
-    vector<int> _pendingTabAlignmentStack;
-    int _pendingTabAlignment = 1;
+    ScopeStack<int> _tabAlignScope{1};
 
     // Group-persistent control words: push on group enter, pop on group exit
-    vector<int> _deffStack;
-    int _currentDeff = 0;
-    vector<int> _deftabStack;
-    int _currentDeftab = 180;  // RTF spec default = 180 twips (1/8 inch)
-    vector<int> _ucStack;
-    int _currentUc = 1;  // RTF spec default = 1 fallback byte after \uXXXX
+    ScopeStack<int> _deffScope{0};
+    ScopeStack<int> _deftabScope{180};  // RTF spec default = 180 twips (1/8 inch)
+    ScopeStack<int> _ucScope{1};  // RTF spec default = 1 fallback byte after \uXXXX
     int _listId = 0;
     int _listLevel = 0;
     ListStyle _listStyle = ListStyle::None;
@@ -790,35 +808,25 @@ private:
 
     void ParseGroup() {
         _pos++; // skip '{'
-        _groupDepth++;
-        PushState();
+        ParserScope scope{*this};
 
-        // Check for known table groups
         SkipWhitespace();
         if (_pos < _len && Matches("\\colortbl")) {
-            // Consume \\colortbl control word and optional argument
             _pos += 9;
             while (_pos < _len && IsDigit(_rtf[_pos])) _pos++;
             SkipWhitespace();
-
             _inColortbl = true;
             ParseColortbl();
             _inColortbl = false;
-            RestoreState();
-            // parseColortbl consumes the closing '}'
             return;
         }
         if (_pos < _len && Matches("\\fonttbl")) {
-            // Consume \\fonttbl control word and optional argument
             _pos += 7;
             while (_pos < _len && IsDigit(_rtf[_pos])) _pos++;
             SkipWhitespace();
-
             _inFonttbl = true;
             ParseFonttbl();
             _inFonttbl = false;
-            RestoreState();
-            // parseFonttbl consumes the closing '}'
             return;
         }
 
@@ -828,20 +836,15 @@ private:
             _inListtable = true;
             ParseListtable();
             _inListtable = false;
-            RestoreState();
             return;
         }
 
         if (_pos < _len && Matches("\\pict")) {
-            // Consume \\pict control word
             _pos += 4;
             SkipWhitespace();
-
             _inPict = true;
             ParsePict();
             _inPict = false;
-            RestoreState();
-            // parsePict consumes the closing '}'
             return;
         }
 
@@ -849,7 +852,6 @@ private:
             _pos += 5;
             SkipWhitespace();
             ParseField();
-            // ParseField consumes the closing '}'
             return;
         }
 
@@ -860,12 +862,10 @@ private:
             SkipWhitespace();
             size_t fragStart = _pos;
             _inPntext = true;
-            _format.inPntext = true;
+            _formatScope.get().inPntext = true;
             Parse();
-            // Finalize pending pntext content as a run with inPntext=true
-            // before RestoreState() clears the flag
             FinalizeRun();
-            _format.inPntext = false;
+            _formatScope.get().inPntext = false;
             _inPntext = false;
             string frag = _rtf.substr(fragStart, _pos - fragStart);
             _currentParagraph.pntextRtf = frag;
@@ -877,24 +877,22 @@ private:
         // Check for star-prefixed (destination) group: {\*\word ...}
         // RTF spec: unknown destinations starting with \* are silently ignored
         if (_pos + 1 < _len && _rtf[_pos] == '\\' && _rtf[_pos + 1] == '*') {
-            // Skip whitespace after \* and read the destination word
             size_t starPos = _pos;
             _pos += 2; // skip \*
             SkipWhitespace();
             string destWord;
             if (_pos < _len && _rtf[_pos] == '\\') {
-                _pos++; // skip the \ before the control word
+                _pos++;
                 SkipWhitespace();
                 if (_pos < _len && IsWordChar(_rtf[_pos])) {
                     auto [w, a] = ReadControlWord();
                     destWord = w;
                 }
             }
-            _pos = starPos; // restore position
+            _pos = starPos;
 
             // If unknown destination, skip the entire group silently
             if (!destWord.empty() && !FindControl(destWord.c_str())) {
-                RestoreState();
                 SkipGroup();
                 return;
             }
@@ -907,50 +905,30 @@ private:
         if (_pos < _len && _rtf[_pos] == '}') {
             _pos++;
         }
-
-        RestoreState();
     }
 
     void PushState() {
-        _formatStack.push_back(_format);
-        _paraStateStack.push_back(_para);
-        _pendingTabAlignmentStack.push_back(_pendingTabAlignment);
-        _deffStack.push_back(_currentDeff);
-        _deftabStack.push_back(_currentDeftab);
-        _ucStack.push_back(_currentUc);
+        _formatScope.enterScope();
+        _paraScope.enterScope();
+        _tabAlignScope.enterScope();
+        _deffScope.enterScope();
+        _deftabScope.enterScope();
+        _ucScope.enterScope();
     }
 
     void RestoreState() {
         FinalizeRun();
-        if (!_formatStack.empty()) {
-            _format = _formatStack.back();
-            _formatStack.pop_back();
-        }
-        if (!_paraStateStack.empty()) {
-            _para = _paraStateStack.back();
-            _paraStateStack.pop_back();
-        }
-        if (!_pendingTabAlignmentStack.empty()) {
-            _pendingTabAlignment = _pendingTabAlignmentStack.back();
-            _pendingTabAlignmentStack.pop_back();
-        }
+        _formatScope.leaveScope();
+        _paraScope.leaveScope();
+        _tabAlignScope.leaveScope();
         // Save document-level group-persistent values when exiting outermost group
-        if (!_deffStack.empty()) {
-            if (_groupDepth == 1)
-                _doc.defaultFontIndex = _currentDeff;
-            _currentDeff = _deffStack.back();
-            _deffStack.pop_back();
+        if (_groupDepth == 1) {
+            _doc.defaultFontIndex = _deffScope.get();
+            _doc.defaultTabStopTwips = _deftabScope.get();
         }
-        if (!_deftabStack.empty()) {
-            if (_groupDepth == 1)
-                _doc.defaultTabStopTwips = _currentDeftab;
-            _currentDeftab = _deftabStack.back();
-            _deftabStack.pop_back();
-        }
-        if (!_ucStack.empty()) {
-            _currentUc = _ucStack.back();
-            _ucStack.pop_back();
-        }
+        _deffScope.leaveScope();
+        _deftabScope.leaveScope();
+        _ucScope.leaveScope();
         if (_groupDepth > 0) _groupDepth--;
     }
 
@@ -1016,7 +994,7 @@ private:
             }
             int fcharset = 0;
             string fontFamily;
-            int fi = _format.fontIndex;
+            int fi = _formatScope.get().fontIndex;
             if (fi >= 0 && fi < ssize(_doc.fonts)) {
                 fcharset = _doc.fonts[static_cast<size_t>(fi)].fcharset;
                 fontFamily = _doc.fonts[static_cast<size_t>(fi)].family;
@@ -1090,7 +1068,7 @@ private:
 
         // Skip \ucN fallback bytes (alternate ANSI encoding after \uXXXX)
         // RTF spec: \ucN sets how many bytes follow \uNNNN for backward compat
-        for (int i = 0; i < _currentUc && _pos < _len; ++i) {
+        for (int i = 0; i < _ucScope.get() && _pos < _len; ++i) {
             _pos++;
         }
     }
@@ -1247,7 +1225,6 @@ private:
         // {\field{\*\fldinst HYPERLINK "URL"}{\*\fldrslt display text}}
         _fieldAnchorHref.clear();
         _inFieldRslt = false;
-        PushState();
 
         while (_pos < _len && _rtf[_pos] != '}') {
             CheckIter();
@@ -1297,17 +1274,15 @@ private:
         // Consume closing '}'
         if (_pos < _len && _rtf[_pos] == '}') _pos++;
 
-        // Save accumulated text and anchor state before RestoreState clears _format
+        // Save accumulated text and anchor state
         string savedText = _literalText;
-        bool savedIsAnchor = _format.isAnchor;
-        string savedHref = _format.anchorHref;
+        bool savedIsAnchor = _formatScope.get().isAnchor;
+        string savedHref = _formatScope.get().anchorHref;
         _literalText.clear();
 
-        RestoreState();
-
-        // Finalize the accumulated text with anchor format after state restoration
+        // Finalize accumulated text with anchor format
         if (!savedText.empty()) {
-            RtfRunFormat runFmt = _format;
+            RtfRunFormat runFmt = _formatScope.get();
             if (savedIsAnchor) {
                 runFmt.isAnchor = true;
                 runFmt.anchorHref = savedHref;
@@ -1399,8 +1374,8 @@ private:
         // Parse content as normal text, but apply anchor format to all runs
         _inFieldRslt = true;
         if (!_fieldAnchorHref.empty()) {
-            _format.isAnchor = true;
-            _format.anchorHref = _fieldAnchorHref;
+            _formatScope.get().isAnchor = true;
+            _formatScope.get().anchorHref = _fieldAnchorHref;
         }
 
         // Parse content normally
@@ -1581,9 +1556,9 @@ private:
         if (_literalText.empty()) return;
 
         if (_inTableCell) {
-            _currentCellRuns.emplace_back(std::move(_literalText), _format);
+            _currentCellRuns.emplace_back(std::move(_literalText), _formatScope.get());
         } else {
-            _currentParagraph.runs.emplace_back(std::move(_literalText), _format);
+            _currentParagraph.runs.emplace_back(std::move(_literalText), _formatScope.get());
         }
      }
 
