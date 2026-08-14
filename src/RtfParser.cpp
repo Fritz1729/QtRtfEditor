@@ -1,6 +1,7 @@
 #include "RtfParser.h"
 #include "RtfCharset.h"
 #include "RtfControl.h"
+#include "RtfInputReader.h"
 
 #include "RtfTypes.h"
 
@@ -18,18 +19,6 @@ using namespace std;
 namespace Rte {
 
 namespace {
-
-[[nodiscard]] constexpr bool IsWordChar(char c) {
-    return std::isalpha(static_cast<unsigned char>(c));
-}
-
-[[nodiscard]] constexpr bool IsDigit(char c) {
-    return std::isdigit(static_cast<unsigned char>(c));
-}
-
-[[nodiscard]] constexpr bool IsWhitespace(char c) {
-    return std::isspace(static_cast<unsigned char>(c));
-}
 
 [[nodiscard]] constexpr bool IsPrintable(char c) {
     return std::isprint(static_cast<unsigned char>(c));
@@ -143,9 +132,7 @@ public:
         _doc = RtfDocument{};
         _codePage = codePage;
         _doc.codePage = codePage;
-        _rtf = rtf;
-        _pos = 0;
-        _len = rtf.size();
+        _input = InputReader(rtf);
         _literalText.clear();
         _skipLeadingWsTrim = false;
         _paragraphFlushed = false;
@@ -184,11 +171,11 @@ private:
     }
 
     void SkipGroup() {
-        _pos++;
+        _input.Advance();
         int depth = 1;
-        while (_pos < _len && depth > 0) {
+        while (!_input.IsEof() && depth > 0) {
             CheckIter();
-            char c = _rtf[_pos++];
+            char c = _input.Advance();
             if (c == '{') depth++;
             else if (c == '}') depth--;
         }
@@ -755,9 +742,7 @@ private:
 
     RtfDocument _doc;
     RtfParagraph _currentParagraph;
-    string _rtf;
-    size_t _pos = 0;
-    size_t _len = 0;
+    InputReader _input;
     string _literalText;
     bool _skipLeadingWsTrim = false;
     bool _paragraphFlushed = false;
@@ -817,9 +802,9 @@ private:
     bool _pendingBorderIsRow = false;
 
     void Parse() {
-        while (_pos < _len) {
+        while (!_input.IsEof()) {
             CheckIter();
-            char c = _rtf[_pos];
+            char c = _input.Peek();
             if (c == '{') {
                 ParseGroup();
             } else if (c == '}') {
@@ -830,114 +815,106 @@ private:
             } else if (IsPrintable(c)) {
                 AccumulateLiteral(c);
             } else {
-                _pos++;
+                _input.Advance();
             }
         }
         // Flush pending table row at end of input (outermost parse only)
-        if (_inTable && _pos >= _len) {
+        if (_inTable && _input.IsEof()) {
             FlushPendingTableRow();
         }
     }
 
     void ParseGroup() {
-        _pos++; // skip '{'
-        ParserScope scope{*this};
+        _input.SkipAs('{');
+        {
+            ParserScope scope{*this};
 
-        SkipWhitespace();
-        if (_pos < _len && Matches("\\colortbl")) {
-            _pos += 9;
-            while (_pos < _len && IsDigit(_rtf[_pos])) _pos++;
-            SkipWhitespace();
-            _inColortbl = true;
-            ParseColortbl();
-            _inColortbl = false;
-            return;
-        }
-        if (_pos < _len && Matches("\\fonttbl")) {
-            _pos += 7;
-            while (_pos < _len && IsDigit(_rtf[_pos])) _pos++;
-            SkipWhitespace();
-            _inFonttbl = true;
-            ParseFonttbl();
-            _inFonttbl = false;
-            return;
-        }
-
-        if (_pos < _len && Matches("\\listtable")) {
-            _pos += 9;
-            SkipWhitespace();
-            _inListtable = true;
-            ParseListtable();
-            _inListtable = false;
-            return;
-        }
-
-        if (_pos < _len && Matches("\\pict")) {
-            _pos += 4;
-            SkipWhitespace();
-            _inPict = true;
-            ParsePict();
-            _inPict = false;
-            return;
-        }
-
-        if (_pos < _len && Matches("\\field")) {
-            _pos += 5;
-            SkipWhitespace();
-            ParseField();
-            return;
-        }
-
-        if (_pos < _len && Matches("\\pntext")) {
-            // Capture raw RTF fragment for roundtrip preservation, then parse content normally
-            _pos += 7; // consume \pntext
-            while (_pos < _len && IsDigit(_rtf[_pos])) _pos++;
-            SkipWhitespace();
-            size_t fragStart = _pos;
-            _inPntext = true;
-            _formatScope.get().inPntext = true;
-            Parse();
-            FinalizeRun();
-            _formatScope.get().inPntext = false;
-            _inPntext = false;
-            string frag = _rtf.substr(fragStart, _pos - fragStart);
-            _currentParagraph.pntextRtf = frag;
-            // Consume closing '}'
-            if (_pos < _len && _rtf[_pos] == '}') _pos++;
-            return;
-        }
-
-        // Check for star-prefixed (destination) group: {\*\word ...}
-        // RTF spec: unknown destinations starting with \* are silently ignored
-        if (_pos + 1 < _len && _rtf[_pos] == '\\' && _rtf[_pos + 1] == '*') {
-            size_t starPos = _pos;
-            _pos += 2; // skip \*
-            SkipWhitespace();
-            string destWord;
-            if (_pos < _len && _rtf[_pos] == '\\') {
-                _pos++;
-                SkipWhitespace();
-                if (_pos < _len && IsWordChar(_rtf[_pos])) {
-                    auto [w, a] = ReadControlWord();
-                    destWord = w;
-                }
-            }
-            _pos = starPos;
-
-            // If unknown destination, skip the entire group silently
-            if (!destWord.empty() && !FindControl(destWord.c_str())) {
-                SkipGroup();
+            _input.SkipWhitespace();
+            if (_input.ConsumeMatch("\\colortbl")) {
+                _input.SkipDigits();
+                _input.SkipWhitespace();
+                _inColortbl = true;
+                ParseColortbl();
+                _inColortbl = false;
                 return;
             }
+            if (_input.ConsumeMatch("\\fonttbl")) {
+                _input.SkipDigits();
+                _input.SkipWhitespace();
+                _inFonttbl = true;
+                ParseFonttbl();
+                _inFonttbl = false;
+                return;
+            }
+
+            if (_input.ConsumeMatch("\\listtable")) {
+                _input.SkipWhitespace();
+                _inListtable = true;
+                ParseListtable();
+                _inListtable = false;
+                return;
+            }
+
+            if (_input.ConsumeMatch("\\pict")) {
+                _input.SkipWhitespace();
+                _inPict = true;
+                ParsePict();
+                _inPict = false;
+                return;
+            }
+
+            if (_input.ConsumeMatch("\\field")) {
+                _input.SkipWhitespace();
+                ParseField();
+                return;
+            }
+
+            if (_input.ConsumeMatch("\\pntext")) {
+                // Capture raw RTF fragment for roundtrip preservation, then parse content normally
+                _input.SkipDigits();
+                _input.SkipWhitespace();
+                size_t fragStart = _input.Pos();
+                _inPntext = true;
+                _formatScope.get().inPntext = true;
+                Parse();
+                FinalizeRun();
+                _formatScope.get().inPntext = false;
+                _inPntext = false;
+                string frag = _input.Substring(fragStart, _input.Pos());
+                _currentParagraph.pntextRtf = frag;
+                _input.SkipAs('}');
+                return;
+            }
+
+            // Check for star-prefixed (destination) group: {\*\word ...}
+            // RTF spec: unknown destinations starting with \* are silently ignored
+            if (_input.PeekIs("\\*")) {
+                size_t starPos = _input.Pos();
+                _input.AdvanceBy(2); // skip \*
+                _input.SkipWhitespace();
+                string destWord;
+                if (!_input.IsEof() && _input.PeekIs('\\')) {
+                    _input.Advance();
+                    _input.SkipWhitespace();
+                    if (!_input.IsEof() && Rte::IsWordChar(_input.Peek())) {
+                        auto [w, a] = _input.ReadControlWord();
+                        destWord = w;
+                    }
+                }
+                _input.Seek(starPos);
+
+                // If unknown destination, skip the entire group silently
+                if (!destWord.empty() && !FindControl(destWord.c_str())) {
+                    SkipGroup();
+                    return;
+                }
+            }
+
+            // Unknown group — parse contents normally
+            Parse();
         }
 
-        // Unknown group — parse contents normally
-        Parse();
-
-        // Expect '}'
-        if (_pos < _len && _rtf[_pos] == '}') {
-            _pos++;
-        }
+        _input.SkipAs('}');
     }
 
     void PushState() {
@@ -966,22 +943,19 @@ private:
     }
 
     void ParseControl() {
-        _pos++; // skip '\'
+        _input.SkipAs('\\');
 
-        if (_pos >= _len) return;
+        if (_input.IsEof()) return;
 
-        char c = _rtf[_pos];
+        char c = _input.Peek();
 
-        if (IsDigit(c)) {
-            // Control symbol: single digit
-            _pos++;
+        if (Rte::IsDigit(c)) {
+            _input.SkipAs(c);
         } else if (c == '{') {
-            // Escaped literal {
-            _pos++;
+            _input.SkipAs('{');
             _literalText += '{';
         } else if (c == '}') {
-            // Escaped literal }
-            _pos++;
+            _input.SkipAs('}');
             _literalText += '}';
         } else if (c == '\\') {
             // Escaped literal backslash.
@@ -989,36 +963,36 @@ private:
             // (e.g. backslash-brace), handled as single units so { doesn't
             // start a group.
             _literalText += '\\';
-            if (_pos + 1 < _len && _rtf[_pos + 1] == '{') {
+            if (_input.PeekIs('{', 1)) {
                 _literalText += '{';
-                _pos += 2; // skip both \ and {
-            } else if (_pos + 1 < _len && _rtf[_pos + 1] == '}') {
+                _input.AdvanceBy(2);
+            } else if (_input.PeekIs('}', 1)) {
                 _literalText += '}';
-                _pos += 2; // skip both \ and }
+                _input.AdvanceBy(2);
             } else {
-                _pos++; // skip second backslash only
+                _input.SkipAs('\\');
             }
         } else if (c == 't') {
             // Tab character — only if not followed by more word chars (\trowd etc.)
-            if (_pos + 1 >= _len || !IsWordChar(_rtf[_pos + 1])) {
-                _pos++;
+            if (_input.IsEof() || !_input.PeekIf(Rte::IsWordChar, 1)) {
+                _input.SkipAs('t');
                 _literalText += static_cast<char>(9);
                 // Consume space delimiter for \t
-                if (_pos < _len && _rtf[_pos] == ' ') _pos++;
+                if (!_input.IsEof() && _input.PeekIs(' ')) _input.SkipAs(' ');
             } else {
                 ParseControlWord();
                 // parseControlWord already consumes the delimiter
             }
         } else if (c == '~') {
             // Non-breaking space
-            _pos++;
+            _input.Advance();
             AppendUtf8(0x00A0);
         } else if (c == '\'') {
             // Hex escape: \\'hh — charset-aware decoding
-            _pos++;
+            _input.Advance();
             int val = 0;
-            for (int h = 0; h < 2 && _pos < _len; ++h) {
-                char hc = _rtf[_pos++];
+            for (int h = 0; h < 2 && !_input.IsEof(); ++h) {
+                char hc = _input.Advance();
                 int digit;
                 if (hc >= '0' && hc <= '9') digit = hc - '0';
                 else if (hc >= 'a' && hc <= 'f') digit = hc - 'a' + 10;
@@ -1033,7 +1007,7 @@ private:
                 fontFamily = _doc.fonts[static_cast<size_t>(fi)].family;
             }
             AppendUtf8(static_cast<uint32_t>(MapHexByteToCodepoint(val, fcharset, _doc.codePage, fontFamily)));
-        } else if ((c == 'u' || c == 'U') && _pos + 1 < _len && (IsDigit(_rtf[_pos + 1]) || _rtf[_pos + 1] == '-')) {
+        } else if ((c == 'u' || c == 'U') && !_input.IsEof() && (_input.PeekIf(Rte::IsDigit, 1) || _input.PeekIs('-', 1))) {
             // Unicode escape: \uNNN? (only if 'u' is immediately followed by digit)
             ParseUnicodeEscape();
         } else {
@@ -1042,42 +1016,40 @@ private:
     }
 
     void ParseControlWord() {
-        auto [word, arg] = ReadControlWord();
+        auto [word, arg] = _input.ReadControlWord();
         bool hasArg = arg >= 0;
 
         // Handle negative arguments: \word-NNN (no space between - and digits)
         // RTF spec: minus sign must be followed immediately by one or more digits
-        if (!hasArg && _pos + 1 < _len && _rtf[_pos] == '-' && IsDigit(_rtf[_pos + 1])) {
-            _pos++; // skip '-'
+        if (!hasArg && _input.PeekIs('-') && _input.PeekIf(Rte::IsDigit, 1)) {
+            _input.Advance(); // skip '-'
             arg = 0;
-            while (_pos < _len && IsDigit(_rtf[_pos])) {
-                arg = arg * 10 + (_rtf[_pos] - '0');
-                _pos++;
+            while (!_input.IsEof() && Rte::IsDigit(_input.Peek())) {
+                arg = arg * 10 + (_input.Advance() - '0');
             }
             arg = -arg;
             hasArg = true;
         }
 
-        ConsumeControlDelimiter(arg, hasArg);
+        _input.ConsumeControlDelimiter(arg, hasArg);
         if (word.empty()) {
             // Consume lone \* — RTF star modifier, no-op when not followed by a control word
-            if (_pos < _len && _rtf[_pos] == '*') _pos++;
+            _input.AdvanceIf('*');
             return;
         }
         ProcessControlWord(word, arg);
     }
 
     void ParseUnicodeEscape() {
-        _pos++; // skip 'u'
+        _input.Advance(); // skip 'u'
         bool negative = false;
-        if (_pos < _len && _rtf[_pos] == '-') {
+        if (!_input.IsEof() && _input.PeekIs('-')) {
             negative = true;
-            _pos++;
+            _input.SkipAs('-');
         }
         int val = 0;
-        while (_pos < _len && IsDigit(_rtf[_pos])) {
-            val = val * 10 + (_rtf[_pos] - '0');
-            _pos++;
+        while (!_input.IsEof() && Rte::IsDigit(_input.Peek())) {
+            val = val * 10 + (_input.Advance() - '0');
         }
         if (negative) val = -val;
 
@@ -1086,47 +1058,42 @@ private:
         if (cp < 0) cp += 65536;  // normalize negative UTF-16 values
         if (cp >= 0xD800 && cp <= 0xDBFF) {
             // High surrogate — expect low surrogate
-            if (_pos + 1 < _len &&
-                _rtf[_pos] == '\\' && _rtf[_pos + 1] == 'u') {
-                _pos += 2;
+            if (_input.PeekIs("\\u")) {
+                _input.AdvanceBy(2);
                 int low = 0;
-                while (_pos < _len && IsDigit(_rtf[_pos])) {
-                    low = low * 10 + (_rtf[_pos] - '0');
-                    _pos++;
+                while (!_input.IsEof() && Rte::IsDigit(_input.Peek())) {
+                    low = low * 10 + (_input.Advance() - '0');
                 }
                 cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
             }
         }
-         AppendUtf8(static_cast<uint32_t>(cp));
+        AppendUtf8(static_cast<uint32_t>(cp));
 
         // Skip \ucN fallback bytes (alternate ANSI encoding after \uXXXX)
         // RTF spec: \ucN sets how many bytes follow \uNNNN for backward compat
-        for (int i = 0; i < _ucScope.get() && _pos < _len; ++i) {
-            _pos++;
+        for (int i = 0; i < _ucScope.get() && !_input.IsEof(); ++i) {
+            _input.Advance();
         }
     }
 
     void ParseColortbl() {
         // {\colortbl ;\red255\green0\blue0;\red0\green128\blue0;}
         // Each ';' separates a color entry. First entry is "auto" (may be empty).
-        while (_pos < _len && _rtf[_pos] != '}') {
+        while (!_input.IsEof() && !_input.PeekIs('}')) {
             CheckIter();
-            SkipWhitespace();
+            _input.SkipWhitespace();
 
             int r = 0, g = 0, b = 0;
 
-            while (_pos < _len && _rtf[_pos] != ';' && _rtf[_pos] != '}') {
-                if (Matches("\\red")) {
-                    _pos += 4;
-                    r = ParseInt();
-                } else if (Matches("\\green")) {
-                    _pos += 6;
-                    g = ParseInt();
-                } else if (Matches("\\blue")) {
-                    _pos += 5;
-                    b = ParseInt();
-                } else if (IsPrintable(_rtf[_pos])) {
-                    _pos++;
+            while (!_input.IsEof() && !_input.PeekIs(';') && !_input.PeekIs('}')) {
+                if (_input.ConsumeMatch("\\red")) {
+                    r = _input.ParseInt();
+                } else if (_input.ConsumeMatch("\\green")) {
+                    g = _input.ParseInt();
+                } else if (_input.ConsumeMatch("\\blue")) {
+                    b = _input.ParseInt();
+                } else if (IsPrintable(_input.Peek())) {
+                    _input.Advance();
                 } else {
                     break;
                 }
@@ -1135,44 +1102,41 @@ private:
             // Always add color entry (first entry may be empty "auto" color)
             _doc.colors.push_back({r, g, b});
 
-            if (_pos < _len) _pos++; // skip ';' or '}'
+            if (!_input.IsEof()) _input.Advance(); // skip ';' or '}'
         }
-        // Consume the closing '}' of the colortbl group
-        if (_pos < _len && _rtf[_pos] == '}') _pos++;
+        _input.SkipAs('}');
     }
 
     void ParseFonttbl() {
         // {\fonttbl{\f0\froman\fcharset0 Times New Roman;}
         //        {\f1\fswiss\fcharset0 Arial;}}
         // Each font entry is a group containing \fN and the family name
-        while (_pos < _len && _rtf[_pos] != '}') {
+        while (!_input.IsEof() && !_input.PeekIs('}')) {
             CheckIter();
-            if (_rtf[_pos] == '{') {
+            if (_input.PeekIs('{')) {
                 // Font entry group
-                _pos++;
+                _input.Advance();
 
                 int fcharset = 0;
                 string family;
 
-                while (_pos < _len && _rtf[_pos] != '}') {
-                    if (_rtf[_pos] == '\\') {
-                        if (Matches("\\fcharset")) {
-                            _pos += 9;
-                            fcharset = ParseInt();
-                        } else if (Matches("\\f")) {
-                            _pos += 2;
-                            ParseInt();
+                while (!_input.IsEof() && !_input.PeekIs('}')) {
+                    if (_input.PeekIs('\\')) {
+                        if (_input.ConsumeMatch("\\fcharset")) {
+                            fcharset = _input.ParseInt();
+                        } else if (_input.ConsumeMatch("\\f")) {
+                            _input.ParseInt();
                         } else {
                             ParseControl();
                         }
-                    } else if (_rtf[_pos] != ';' && IsPrintable(_rtf[_pos])) {
-                        family += _rtf[_pos++];
+                    } else if (!_input.PeekIs(';') && IsPrintable(_input.Peek())) {
+                        family += _input.Advance();
                     } else {
-                        _pos++;
+                        _input.Advance();
                     }
                 }
 
-                if (_pos < _len) _pos++; // skip '}'
+                if (!_input.IsEof()) _input.SkipAs('}');
 
                 // Remove leading/trailing whitespace from family
                 while (!family.empty() && family.back() == ' ') family.pop_back();
@@ -1184,11 +1148,10 @@ private:
                     _doc.fonts.push_back({family, fcharset});
                 }
             } else {
-                _pos++;
+                _input.Advance();
             }
         }
-        // Consume the closing '}' of the fonttbl group
-        if (_pos < _len && _rtf[_pos] == '}') _pos++;
+        _input.SkipAs('}');
     }
 
     void ParsePict() {
@@ -1207,30 +1170,26 @@ private:
         _pictPiccropt = 0;
         _pictPiccropb = 0;
 
-        while (_pos < _len && _rtf[_pos] != '}') {
+        while (!_input.IsEof() && !_input.PeekIs('}')) {
             CheckIter();
-            if (_rtf[_pos] == '\\') {
+            if (_input.PeekIs('\\')) {
                 ParsePictControl();
                 // Skip whitespace after control words
-                while (_pos < _len && _rtf[_pos] != '}' && IsWhitespace(_rtf[_pos])) {
-                    _pos++;
+                while (!_input.IsEof() && !_input.PeekIs('}') && Rte::IsWhitespace(_input.Peek())) {
+                    _input.Advance();
                 }
             } else {
                 // Hex data — but skip any non-hex characters (whitespace, etc.)
-                char c = _rtf[_pos];
+                char c = _input.Peek();
                 // Only collect uppercase/lowercase hex digits
-                if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f')) {
+                if (Rte::IsHexDigit(c)) {
                     _pictData += c;
                 }
-                _pos++;
+                _input.Advance();
             }
         }
 
-        if (_pos < _len && _rtf[_pos] == '}') {
-            _pos++;
-        }
-
-        // Finalize image
+        _input.SkipAs('}');
         if (!_pictFormat.empty() && !_pictData.empty()) {
             RtfImage img;
             img.data = HexToBytes(_pictData);
@@ -1258,29 +1217,28 @@ private:
         _fieldAnchorHref.clear();
         _inFieldRslt = false;
 
-        while (_pos < _len && _rtf[_pos] != '}') {
+        while (!_input.IsEof() && !_input.PeekIs('}')) {
             CheckIter();
 
-            if (_rtf[_pos] == '{') {
-                // Parse sub-group
-                _pos++;
+            if (_input.PeekIs('{')) {
+                _input.SkipAs('{');
 
                 // Check for star-prefixed sub-group: {\*\word ...}
-                SkipWhitespace();
-                if (_pos + 1 < _len && _rtf[_pos] == '\\' && _rtf[_pos + 1] == '*') {
-                    size_t starPos = _pos;
-                    _pos += 2;
-                    SkipWhitespace();
+                _input.SkipWhitespace();
+                if (_input.PeekIs("\\*")) {
+                    size_t starPos = _input.Pos();
+                    _input.AdvanceBy(2);
+                    _input.SkipWhitespace();
                     string destWord;
-                    if (_pos < _len && _rtf[_pos] == '\\') {
-                        _pos++;
-                        SkipWhitespace();
-                        if (_pos < _len && IsWordChar(_rtf[_pos])) {
-                            auto [w, a] = ReadControlWord();
+                    if (!_input.IsEof() && _input.PeekIs('\\')) {
+                        _input.SkipAs('\\');
+                        _input.SkipWhitespace();
+                        if (!_input.IsEof() && Rte::IsWordChar(_input.Peek())) {
+                            auto [w, a] = _input.ReadControlWord();
                             destWord = w;
                         }
                     }
-                    _pos = starPos;
+                    _input.Seek(starPos);
 
                     if (destWord == "fldinst") {
                         ParseFldInst();
@@ -1292,21 +1250,18 @@ private:
                 } else {
                     SkipGroup();
                 }
-            } else if (_rtf[_pos] == '\\') {
+            } else if (_input.PeekIs('\\')) {
                 // Control word at field level — skip
                 ParseControl();
-                while (_pos < _len && _rtf[_pos] != '}' && IsWhitespace(_rtf[_pos])) {
-                    _pos++;
+                while (!_input.IsEof() && !_input.PeekIs('}') && Rte::IsWhitespace(_input.Peek())) {
+                    _input.Advance();
                 }
             } else {
-                _pos++;
+                _input.Advance();
             }
         }
 
-        // Consume closing '}'
-        if (_pos < _len && _rtf[_pos] == '}') _pos++;
-
-        // Save accumulated text and anchor state
+        _input.SkipAs('}');
         string savedText = _literalText;
         bool savedIsAnchor = _formatScope.get().isAnchor;
         string savedHref = _formatScope.get().anchorHref;
@@ -1334,34 +1289,31 @@ private:
         // {\*\fldinst HYPERLINK "URL"}
         // Collect instruction text to extract HYPERLINK target
         string inst;
-        while (_pos < _len && _rtf[_pos] != '}') {
+        while (!_input.IsEof() && !_input.PeekIs('}')) {
             CheckIter();
-            if (_rtf[_pos] == '\\') {
-                _pos++;
-                if (_pos < _len) {
-                    char c = _rtf[_pos];
-                    if (c == '\\') { _pos++; inst += '\\'; }
-                    else if (c == '{') { _pos++; inst += '{'; }
-                    else if (c == '}') { _pos++; inst += '}'; }
+            if (_input.PeekIs('\\')) {
+                _input.Advance();
+                if (!_input.IsEof()) {
+                    char c = _input.Peek();
+                    if (c == '\\') { _input.Advance(); inst += '\\'; }
+                    else if (c == '{') { _input.Advance(); inst += '{'; }
+                    else if (c == '}') { _input.Advance(); inst += '}'; }
                     else if (c == '_') {
                         // RTF escape: \_ produces literal space
-                        _pos++;
+                        _input.Advance();
                         inst += ' ';
                     }
                     else {
                         // Control word in instruction — read it
-                        auto [w, _] = ReadControlWord();
+                        auto [w, _] = _input.ReadControlWord();
                         inst += w;
                     }
                 }
             } else {
-                inst += _rtf[_pos++];
+                inst += _input.Advance();
             }
         }
-        // Consume closing '}'
-        if (_pos < _len && _rtf[_pos] == '}') _pos++;
-
-        // Parse HYPERLINK "URL" from instruction
+        _input.SkipAs('}');
         // Also handle HYPERLINK \\bkmk3 Name (internal bookmark reference)
         string lowerInst;
         lowerInst.reserve(inst.size());
@@ -1413,10 +1365,7 @@ private:
         // Parse content normally
         Parse();
 
-        // Consume closing '}'
-        if (_pos < _len && _rtf[_pos] == '}') _pos++;
-
-        // Format restored by ParseField before RestoreState call
+        _input.SkipAs('}');
         _inFieldRslt = false;
     }
 
@@ -1444,32 +1393,32 @@ private:
     }
 
     void ParseListtable() {
-        while (_pos < _len && _rtf[_pos] != '}') {
+        while (!_input.IsEof() && !_input.PeekIs('}')) {
             CheckIter();
-            if (_rtf[_pos] == '{') {
-                _pos++;
-                while (_pos < _len && _rtf[_pos] != '}') {
-                    if (_rtf[_pos] == '\\') {
+            if (_input.PeekIs('{')) {
+                _input.SkipAs('{');
+                while (!_input.IsEof() && !_input.PeekIs('}')) {
+                    if (_input.PeekIs('\\')) {
                         ParseListtableControl();
                     } else {
-                        _pos++;
+                        _input.Advance();
                     }
                 }
-                if (_pos < _len && _rtf[_pos] == '}') _pos++;
-            } else if (_rtf[_pos] == '\\') {
+                _input.SkipAs('}');
+            } else if (_input.PeekIs('\\')) {
                 ParseListtableControl();
             } else {
-                _pos++;
+                _input.Advance();
             }
         }
-        if (_pos < _len && _rtf[_pos] == '}') _pos++;
+        _input.SkipAs('}');
     }
 
     void ParseListtableControl() {
-        _pos++;
-        if (_pos >= _len) return;
+        _input.Advance();
+        if (_input.IsEof()) return;
 
-        auto [word, arg] = ReadControlWord();
+        auto [word, arg] = _input.ReadControlWord();
         bool hasArg = arg >= 0;
 
         if (word == "list" || word == "listoverride") {
@@ -1497,8 +1446,8 @@ private:
                 _listIdToStyle[_currentListId] = _currentListStyle;
             }
         } else if (word == "listname") {
-            while (_pos < _len && _rtf[_pos] != '"') _pos++;
-            while (_pos < _len && _rtf[_pos] != '"') _pos++;
+            while (!_input.IsEof() && !_input.PeekIs('"')) _input.Advance();
+            while (!_input.IsEof() && !_input.PeekIs('"')) _input.Advance();
         } else if (word == "listlevel" && hasArg) {
             if (_currentListId > 0 && _currentListStyle != ListStyle::None) {
                 _listIdToStyle[_currentListId] = _currentListStyle;
@@ -1526,13 +1475,13 @@ private:
     ListStyle _currentListStyle = ListStyle::None;
 
     void ParsePictControl() {
-        _pos++; // skip '\'
+        _input.SkipAs('\\');
 
-        if (_pos >= _len) return;
+        if (_input.IsEof()) return;
 
-        char c = _rtf[_pos];
-        if (IsWordChar(c)) {
-            auto [word, arg] = ReadControlWord();
+        char c = _input.Peek();
+        if (Rte::IsWordChar(c)) {
+            auto [word, arg] = _input.ReadControlWord();
             bool hasArg = arg >= 0;
             if (word.empty()) return;
 
@@ -1555,8 +1504,8 @@ private:
         }
 
         // Skip other control symbols (digits, etc.)
-        if (IsDigit(c)) {
-            _pos++;
+        if (Rte::IsDigit(c)) {
+            _input.Advance();
         }
     }
 
@@ -1581,7 +1530,7 @@ private:
 
     void AccumulateLiteral(char c) {
         _literalText += c;
-        _pos++;
+        _input.Advance();
     }
 
     void FinalizeRun() {
@@ -1609,53 +1558,6 @@ private:
             _literalText += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
             _literalText += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
             _literalText += static_cast<char>(0x80 | (cp & 0x3F));
-        }
-    }
-
-    [[nodiscard]] bool Matches(std::string_view s) {
-        if (_pos + s.size() > _len) return false;
-        if (_rtf.compare(_pos, s.size(), s) != 0) return false;
-        if (_pos + s.size() < _len && IsWordChar(_rtf[_pos + s.size()])) return false;
-        return true;
-    }
-
-    int ParseInt() {
-        int val = 0;
-        while (_pos < _len && IsDigit(_rtf[_pos])) {
-            val = val * 10 + (_rtf[_pos] - '0');
-            _pos++;
-        }
-        return val;
-    }
-
-    pair<string, int> ReadControlWord() {
-        string word;
-        int arg = 0;
-        bool hasArg = false;
-        while (_pos < _len && (IsWordChar(_rtf[_pos]) || IsDigit(_rtf[_pos]))) {
-            if (_rtf[_pos] >= '0' && _rtf[_pos] <= '9') {
-                arg = arg * 10 + (_rtf[_pos] - '0');
-                hasArg = true;
-            } else {
-                word += static_cast<char>(static_cast<unsigned char>(_rtf[_pos]) | 0x20);
-            }
-            _pos++;
-        }
-        return {word, hasArg ? arg : -1};
-    }
-
-    void ConsumeControlDelimiter(int arg, bool hasArg) {
-        (void)arg;
-        if (hasArg && _pos < _len && !IsWordChar(_rtf[_pos]) && _rtf[_pos] != '\\' && _rtf[_pos] != '}' && _rtf[_pos] != '{') {
-            _pos++;
-        } else if (!hasArg && _pos < _len && _rtf[_pos] == ' ') {
-            _pos++;
-        }
-    }
-
-    void SkipWhitespace() {
-        while (_pos < _len && IsWhitespace(_rtf[_pos])) {
-            _pos++;
         }
     }
 };

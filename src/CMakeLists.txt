@@ -13,6 +13,8 @@ add_library(QtRtfEditor ${_rte_lib_type}
     RtfTypes.h
     RtfQtConversions.h
     RtfParser.h
+    RtfInputReader.h
+    RtfInputReader.cpp
     RtfCharset.h
     RtfCharset.cpp
     RtfControl.cpp

@@ -867,7 +867,7 @@ void TestSemanticComparison::UcSkipCharsGroupScoped() {
     // \uc is group-persistent: inner group \uc1 overrides outer \uc2
     // \u252 AB — \uc2 skips "AB" (2 bytes)
     // \u33C — \uc1 skips "C" (1 byte)
-    std::string rtfA = R"({\rtf1\ansi\deff0\uc2\u252 AB {\uc1\u33C\par})";
+    std::string rtfA = R"({\rtf1\ansi\deff0\uc2\u252 AB {\uc1\u33C}\par})";
     auto docA = ParseRtf(rtfA);
     // "AB" should be skipped (2 bytes), "C" should be skipped (1 byte)
     // Only the two Unicode chars should appear
