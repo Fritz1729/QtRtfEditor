@@ -39,6 +39,13 @@ void ParsePictControl(RtfParserScopeContext& ctx) {
     }
 }
 
+RtfImageFormat ImageFormatFromString(const std::string& s) {
+    if (s == "jpg") return RtfImageFormat::Jpeg;
+    if (s == "png") return RtfImageFormat::Png;
+    if (s == "bmp") return RtfImageFormat::Bmp;
+    return RtfImageFormat::Unknown;
+}
+
 std::vector<uint8_t> HexToBytes(const std::string& hex) {
     std::vector<uint8_t> result;
     result.reserve(hex.size() / 2);

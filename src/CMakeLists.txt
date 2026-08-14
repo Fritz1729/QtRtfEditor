@@ -11,7 +11,6 @@ add_library(QtRtfEditor ${_rte_lib_type}
     RtfExport.h
     RtfExport.cpp
     RtfTypes.h
-    RtfTypes.cpp
     RtfQtConversions.h
     RtfParser.h
     RtfParserContext.h

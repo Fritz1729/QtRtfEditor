@@ -36,6 +36,24 @@ namespace Rte {
 
 namespace {
 
+RtfLevelNfc ListStyleToLevelNfc(RtfListStyle style) {
+    switch (style) {
+        case RtfListStyle::Number: return RtfLevelNfc::Arabic;
+        case RtfListStyle::Roman:  return RtfLevelNfc::LowerRoman;
+        case RtfListStyle::Letter: return RtfLevelNfc::LowerAlpha;
+        case RtfListStyle::Disc:     [[fallthrough]];
+        case RtfListStyle::Circle:   [[fallthrough]];
+        case RtfListStyle::Square:   [[fallthrough]];
+        case RtfListStyle::Box:      [[fallthrough]];
+        case RtfListStyle::Check:    [[fallthrough]];
+        case RtfListStyle::None:     [[fallthrough]];
+        default:                     return RtfLevelNfc::Bullet;
+    }
+}
+
+int PointsToTwips(double pts) { return lround(pts * 20.0); }
+int PointsToHalfPtTwips(double pts) { return lround(pts * 2.0); }
+
 using BorderWidthGetter = double (QTextTableCellFormat::*)() const;
 using BorderStyleGetter = QTextFrameFormat::BorderStyle (QTextTableCellFormat::*)() const;
 using BorderBrushGetter = QBrush (QTextTableCellFormat::*)() const;

@@ -25,6 +25,25 @@ namespace Rte {
 
 namespace {
 
+const char* ImageFormatExtension(RtfImageFormat fmt) {
+    switch (fmt) {
+        case RtfImageFormat::Jpeg: return "jpg";
+        case RtfImageFormat::Png:  return "png";
+        case RtfImageFormat::Bmp:  return "bmp";
+        case RtfImageFormat::Unknown:
+        default:
+            throw std::runtime_error("unknown image format");
+    }
+}
+
+BorderValues GetBorderValues(const TableCellBorders& b, TableSide side) {
+    const auto& m = kBorderMembers[side];
+    return { b.*(m.width), b.*(m.style), b.*(m.color) };
+}
+
+double TwipsToHalfPt(double twips) { return twips / 20.0; }
+double MarginTwipsToPoints(double twips) { return twips / 2.0; }
+
 QColor ResolveColor(int idx, const RtfDocument& doc) {
     const RtfColorEntry* col = ResolveColorEntry(idx, doc.colors);
     return col ? QColor(col->red, col->green, col->blue) : QColor();
