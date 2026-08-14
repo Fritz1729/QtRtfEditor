@@ -8,8 +8,6 @@
 #include <variant>
 
 #include <QFont>
-#include <QTextCharFormat>
-#include <QTextListFormat>
 #include <QtGlobal>
 
 namespace Rte {
@@ -21,24 +19,11 @@ enum class RtfUnderlineStyle : int {
     COUNT
 };
 
-// Verify RtfUnderlineStyle values 0-7 match QTextCharFormat::UnderlineStyle
-static_assert(static_cast<int>(RtfUnderlineStyle::NoUnderline) == static_cast<int>(QTextCharFormat::NoUnderline));
-static_assert(static_cast<int>(RtfUnderlineStyle::Single) == static_cast<int>(QTextCharFormat::SingleUnderline));
-static_assert(static_cast<int>(RtfUnderlineStyle::Dash) == static_cast<int>(QTextCharFormat::DashUnderline));
-static_assert(static_cast<int>(RtfUnderlineStyle::DotLine) == static_cast<int>(QTextCharFormat::DotLine));
-static_assert(static_cast<int>(RtfUnderlineStyle::DashDotLine) == static_cast<int>(QTextCharFormat::DashDotLine));
-static_assert(static_cast<int>(RtfUnderlineStyle::DashDotDotLine) == static_cast<int>(QTextCharFormat::DashDotDotLine));
-static_assert(static_cast<int>(RtfUnderlineStyle::Wave) == static_cast<int>(QTextCharFormat::WaveUnderline));
-static_assert(static_cast<int>(RtfUnderlineStyle::SpellCheck) == static_cast<int>(QTextCharFormat::SpellCheckUnderline));
-
 enum class RtfListStyle : int {
     None = 0,
     Disc = 1, Circle = 2, Square = 3, Box = 4, Check = 5,
     Number = 6, Letter = 7, Roman = 8,
 };
-
-// Verify RtfListStyle values match QTextListFormat::Style where applicable
-static_assert(static_cast<int>(RtfListStyle::None) == static_cast<int>(QTextListFormat::ListStyleUndefined));
 
 // RTF \levelnfcN values (RTF 1.5 spec, section 5.8)
 enum class RtfLevelNfc : int {

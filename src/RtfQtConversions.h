@@ -39,6 +39,16 @@ inline QByteArray VectorToByteArray(const std::vector<uint8_t>& v) {
 }
 
 // RtfUnderlineStyle <-> QTextCharFormat::UnderlineStyle
+// Values 0-7 are guaranteed to match by static_assert below
+static_assert(static_cast<int>(RtfUnderlineStyle::NoUnderline) == static_cast<int>(QTextCharFormat::NoUnderline));
+static_assert(static_cast<int>(RtfUnderlineStyle::Single) == static_cast<int>(QTextCharFormat::SingleUnderline));
+static_assert(static_cast<int>(RtfUnderlineStyle::Dash) == static_cast<int>(QTextCharFormat::DashUnderline));
+static_assert(static_cast<int>(RtfUnderlineStyle::DotLine) == static_cast<int>(QTextCharFormat::DotLine));
+static_assert(static_cast<int>(RtfUnderlineStyle::DashDotLine) == static_cast<int>(QTextCharFormat::DashDotLine));
+static_assert(static_cast<int>(RtfUnderlineStyle::DashDotDotLine) == static_cast<int>(QTextCharFormat::DashDotDotLine));
+static_assert(static_cast<int>(RtfUnderlineStyle::Wave) == static_cast<int>(QTextCharFormat::WaveUnderline));
+static_assert(static_cast<int>(RtfUnderlineStyle::SpellCheck) == static_cast<int>(QTextCharFormat::SpellCheckUnderline));
+
 inline QTextCharFormat::UnderlineStyle QtUlStyleFor(RtfUnderlineStyle v) {
     if (v > RtfUnderlineStyle::SpellCheck) return QTextCharFormat::SingleUnderline;
     return static_cast<QTextCharFormat::UnderlineStyle>(v);
@@ -50,6 +60,8 @@ inline RtfUnderlineStyle RtfUlStyleFor(QTextCharFormat::UnderlineStyle v) {
 }
 
 // RtfListStyle <-> QTextListFormat::Style
+// RtfListStyle::None == QTextListFormat::ListStyleUndefined
+static_assert(static_cast<int>(RtfListStyle::None) == static_cast<int>(QTextListFormat::ListStyleUndefined));
 inline QTextListFormat::Style QtListStyleFor(RtfListStyle v) {
     switch (v) {
         case RtfListStyle::Disc:   return QTextListFormat::ListDisc;
