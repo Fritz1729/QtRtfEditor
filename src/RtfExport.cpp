@@ -1,4 +1,5 @@
 #include "RtfExport.h"
+#include "RtfQtConversions.h"
 #include "RtfTypes.h"
 
 #include <QTextDocument>

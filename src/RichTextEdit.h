@@ -8,6 +8,7 @@
 
 #include "RteExport.h"
 
+#include "RtfQtConversions.h"
 #include "RtfTypes.h"
 
 namespace Rte {

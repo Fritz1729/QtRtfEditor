@@ -3,7 +3,7 @@
 #include <array>
 #include <cstdint>
 
-#include "RichTextEdit.h"
+#include "RteExport.h"
 
 namespace Rte {
 

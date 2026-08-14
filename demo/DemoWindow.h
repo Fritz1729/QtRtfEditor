@@ -36,7 +36,15 @@ public slots:
 
 private:
     template<typename Fn>
-    void applyFormatOnSelection(Fn fn);
+    void applyFormatOnSelection(Fn fn) {
+        QTextCursor cursor = _editor.textCursor();
+        if (cursor.hasSelection()) {
+            QTextCharFormat fmt = cursor.charFormat();
+            fn(fmt);
+            cursor.mergeCharFormat(fmt);
+            _editor.setTextCursor(cursor);
+        }
+    }
 
     Rte::RichTextEdit _editor;
     ToolbarBuilder* _pToolbarBuilder = nullptr;

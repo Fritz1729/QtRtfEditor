@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "RichTextEdit.h"
+#include "RteExport.h"
 
 class QTextDocument;
 

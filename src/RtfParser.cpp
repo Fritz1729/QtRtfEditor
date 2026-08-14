@@ -1,6 +1,7 @@
 #include "RtfParser.h"
 #include "RtfCharset.h"
 #include "RtfControl.h"
+#include "RtfQtConversions.h"
 #include "RtfTypes.h"
 
 #include <algorithm>
@@ -1222,7 +1223,7 @@ private:
         if (!_pictFormat.empty() && !_pictData.isEmpty()) {
             QByteArray rawBytes = QByteArray::fromHex(_pictData.toUpper());
             RtfImage img;
-            img.data = rawBytes;
+            img.data = ByteArrayToVector(rawBytes);
             if (_pictFormat == "jpg") img.format = RtfImageFormat::Jpeg;
             else if (_pictFormat == "png") img.format = RtfImageFormat::Png;
             else if (_pictFormat == "bmp") img.format = RtfImageFormat::Bmp;

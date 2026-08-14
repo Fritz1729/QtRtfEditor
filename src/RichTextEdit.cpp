@@ -2,6 +2,7 @@
 
 #include "RtfExport.h"
 #include "RtfImport.h"
+#include "RtfQtConversions.h"
 
 #include <QTextBlock>
 #include <QTextCursor>

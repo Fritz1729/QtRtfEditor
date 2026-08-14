@@ -2,6 +2,7 @@
 
 add_executable(demo
     main.cpp
+    DemoWindow.cpp
     DemoWindow.h
     ToolbarBuilder.cpp
     ToolbarBuilder.h

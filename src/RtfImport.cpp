@@ -1,6 +1,7 @@
 #include "RtfImport.h"
 
 #include "RtfParser.h"
+#include "RtfQtConversions.h"
 #include "RtfTypes.h"
 
 #include <algorithm>
@@ -217,7 +218,7 @@ void BuildImage(QTextCursor& cursor, const RtfImage& img,
 
     // Determine image size in pixels
     qreal widthPx = 0, heightPx = 0;
-    QByteArray imageData = img.data;
+    QByteArray imageData = VectorToByteArray(img.data);
     QBuffer buffer(&imageData);
     buffer.open(QIODevice::ReadOnly);
     QImageReader reader(&buffer);
@@ -247,7 +248,7 @@ void BuildImage(QTextCursor& cursor, const RtfImage& img,
         default:                         ext = "png"; break;
     }
     QString name = QString("rtfimage://%1.%2").arg(imgCounter).arg(ext);
-    document->addResource(QTextDocument::ImageResource, QUrl(name), QVariant::fromValue(img.data));
+    document->addResource(QTextDocument::ImageResource, QUrl(name), QVariant::fromValue(VectorToByteArray(img.data)));
 
     // Store original RTF hex string and format for byte-identical roundtrip
     if (!img.rtfPictHex.empty()) {

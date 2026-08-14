@@ -1,6 +1,7 @@
 #include "RtfCompare.h"
 #include "RtfParser.h"
 
+#include <QDebug>
 #include <algorithm>
 #include <string>
 #include <vector>
