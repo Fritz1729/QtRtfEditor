@@ -175,18 +175,18 @@ static string AlignmentToRtf(Qt::Alignment alignment) {
     return "";
 }
 
-static int ListStyleTypeValue(RtfListStyle style) {
+static RtfLevelNfc ListStyleToLevelNfc(RtfListStyle style) {
     switch (style) {
-        case RtfListStyle::Disc:   return 1;
-        case RtfListStyle::Circle: return 0;
-        case RtfListStyle::Square: return 2;
-        case RtfListStyle::Number: return 3;
-        case RtfListStyle::Roman:  return 4;
-        case RtfListStyle::Letter: return 6;
-        case RtfListStyle::Box:
-        case RtfListStyle::Check:
-        case RtfListStyle::None:
-        default:                   return 1;
+        case RtfListStyle::Number: return RtfLevelNfc::Arabic;
+        case RtfListStyle::Roman:  return RtfLevelNfc::LowerRoman;
+        case RtfListStyle::Letter: return RtfLevelNfc::LowerAlpha;
+        case RtfListStyle::Disc:     [[fallthrough]];
+        case RtfListStyle::Circle:   [[fallthrough]];
+        case RtfListStyle::Square:   [[fallthrough]];
+        case RtfListStyle::Box:      [[fallthrough]];
+        case RtfListStyle::Check:    [[fallthrough]];
+        case RtfListStyle::None:     [[fallthrough]];
+        default:                     return RtfLevelNfc::Bullet;
     }
 }
 
@@ -795,8 +795,8 @@ string ExportRtf(const QTextDocument& document) {
         out << "{\\listtable";
         for (const auto& [list, id] : listMap) {
             out << "\\list\\listid" << id
-                << "\\liststylebulletsimple\\liststyletype"
-                << ListStyleTypeValue(listStyleMap[list]);
+                << "\\listsimple1\\listlevel{\\levelnfc"
+                << static_cast<int>(ListStyleToLevelNfc(listStyleMap[list])) << "}";
         }
         out << "}";
     }

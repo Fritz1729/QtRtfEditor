@@ -40,6 +40,21 @@ enum class RtfListStyle : int {
 // Verify RtfListStyle values match QTextListFormat::Style where applicable
 static_assert(static_cast<int>(RtfListStyle::None) == static_cast<int>(QTextListFormat::ListStyleUndefined));
 
+// RTF \levelnfcN values (RTF 1.5 spec, section 5.8)
+enum class RtfLevelNfc : int {
+    Arabic = 0,
+    UpperRoman = 1,
+    LowerRoman = 2,
+    UpperAlpha = 3,
+    LowerAlpha = 4,
+    Ordinal = 5,
+    CardinalText = 6,
+    OrdinalText = 7,
+    ArabicLeadingZero = 22,
+    Bullet = 23,
+    NoNumber = 255,
+};
+
 enum TableSide : size_t {
     Side_Left = 0,
     Side_Top = 1,

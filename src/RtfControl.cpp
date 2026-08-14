@@ -96,10 +96,8 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("listtext", Action::HeaderControl,    0),
     DATA("listoverride", Action::HeaderControl, 0),
     DATA("listtable", Action::HeaderControl,   0),
-    DATA("liststylebulletsimple", Action::HeaderControl, 0),
-    DATA("liststylenum", Action::HeaderControl, 0),
-    DATA("liststyletype", Action::HeaderControl, 0),
-    DATA("liststyle", Action::HeaderControl,   0),
+    DATA("listsimple", Action::HeaderControl,  0),
+    DATA("levelnfc", Action::HeaderControl,    0),
     DATA("listname", Action::HeaderControl,    0),
     DATA("pntext",   Action::HeaderControl,    0),
 

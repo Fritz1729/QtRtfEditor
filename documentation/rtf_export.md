@@ -72,7 +72,7 @@ The exporter emits the RTF header in order:
 |-----------|---------------|-----------|
 | Document header | `{\rtf1\ansi\deffN\deftabN` | Always |
 | Color table | `{\colortbl ;\redN\greenN\blueN;...}` | If colors exist |
-| List table | `{\listtable\list\listidN\liststyletypeN...}` | If lists exist |
+| List table | `{\listtable\list\listidN\listsimple1{\listlevel{\levelnfcN}}...}` | If lists exist |
 | Font table | `{\fonttbl{\fN\fnil\fcharset0 Family;}}` | If non-default fonts exist |
 | Metadata | `\deflangN\viewkindN\ucN` | If present in document properties |
 

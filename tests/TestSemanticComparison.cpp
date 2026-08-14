@@ -353,20 +353,20 @@ void TestSemanticComparison::DifferentJustification() {
 }
 
 void TestSemanticComparison::DifferentListStyle() {
-    std::string rtfA = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylenum\liststyletype3}}{\listid1\listlevel0 Item one\par}{\listid1\listlevel0 Item two\par}})";
-    std::string rtfB = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylebulletsimple}}{\listid1\listlevel0 Item one\par}{\listid1\listlevel0 Item two\par}})";
+    std::string rtfA = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\listsimple1{\listlevel{\levelnfc0}}}}{\listid1\listlevel0 Item one\par}{\listid1\listlevel0 Item two\par}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\listsimple1{\listlevel{\levelnfc23}}}}{\listid1\listlevel0 Item one\par}{\listid1\listlevel0 Item two\par}})";
     AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentListIndent() {
-    std::string rtfA = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylenum\liststyletype3}}{\listid1\listlevel0\li200 Item one\par}})";
-    std::string rtfB = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylenum\liststyletype3}}{\listid1\listlevel0\li400 Item one\par}})";
+    std::string rtfA = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\listsimple1{\listlevel{\levelnfc0}}}}{\listid1\listlevel0\li200 Item one\par}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\listsimple1{\listlevel{\levelnfc0}}}}{\listid1\listlevel0\li400 Item one\par}})";
     AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentListLevel() {
-    std::string rtfA = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylenum\liststyletype3}}{\listid1\listlevel0 Item\par}})";
-    std::string rtfB = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\liststylenum\liststyletype3}}{\listid1\listlevel1 Item\par}})";
+    std::string rtfA = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\listsimple1{\listlevel{\levelnfc0}}}}{\listid1\listlevel0 Item\par}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\listtable{\list\listid1\listsimple1{\listlevel{\levelnfc0}}}}{\listid1\listlevel1 Item\par}})";
     AssertRtfDifferent(rtfA, rtfB);
 }
 

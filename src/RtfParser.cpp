@@ -1373,45 +1373,49 @@ private:
         } else if (word == "listid" && hasArg) {
             _currentListId = arg;
             _currentListStyle = RtfListStyle::None;
-        } else if (word == "liststylenum" || word == "liststyletype") {
-            if (hasArg && _currentListId > 0) {
-                _currentListStyle = RtfStyleTypeToListStyle(arg);
-                _listIdToStyle[_currentListId] = _currentListStyle;
-            }
-        } else if (word == "liststylebulletsimple") {
-            if (_currentListId > 0) {
-                _currentListStyle = RtfListStyle::Disc;
-                _listIdToStyle[_currentListId] = _currentListStyle;
-            }
-        } else if (word == "liststylenumberinparen") {
-            if (_currentListId > 0) {
-                _currentListStyle = RtfListStyle::Number;
-                _listIdToStyle[_currentListId] = _currentListStyle;
+        } else if (word == "listlevel") {
+            // \listlevel opens a group {\listlevel ... \levelnfcN ...}
+            // Parse the group contents looking for \levelnfc
+            _input.SkipWhitespace();
+            if (!_input.IsEof() && _input.PeekIs('{')) {
+                _input.SkipAs('{');
+                while (!_input.IsEof() && !_input.PeekIs('}')) {
+                    if (_input.PeekIs('\\')) {
+                        _input.Advance();
+                        auto [innerWord, innerArg] = _input.ReadControlWord();
+                        if (innerWord == "levelnfc" && innerArg >= 0) {
+                            if (_currentListId > 0) {
+                                _currentListStyle = RtfLevelNfcToListStyle(innerArg);
+                                _listIdToStyle[_currentListId] = _currentListStyle;
+                            }
+                        }
+                    } else {
+                        _input.Advance();
+                    }
+                }
+                _input.SkipAs('}');
             }
         } else if (word == "listname") {
             while (!_input.IsEof() && !_input.PeekIs('"')) _input.Advance();
             while (!_input.IsEof() && !_input.PeekIs('"')) _input.Advance();
-        } else if (word == "listlevel" && hasArg) {
-            if (_currentListId > 0 && _currentListStyle != RtfListStyle::None) {
-                _listIdToStyle[_currentListId] = _currentListStyle;
-            }
         }
     }
 
-    static RtfListStyle RtfStyleTypeToListStyle(int type) {
-        switch (type) {
-            case 0: return RtfListStyle::Circle;
-            case 1: return RtfListStyle::Disc;
-            case 2: return RtfListStyle::Square;
-            case 3: return RtfListStyle::Number;
-            case 4: return RtfListStyle::Roman;
-            case 5: return RtfListStyle::Roman;
-            case 6: return RtfListStyle::Letter;
-            case 7: return RtfListStyle::Letter;
-            case 8: return RtfListStyle::Check;
-            case 9: return RtfListStyle::Check;
-            default: return RtfListStyle::Number;
+    static RtfListStyle RtfLevelNfcToListStyle(int nfc) {
+        switch (static_cast<RtfLevelNfc>(nfc)) {
+            case RtfLevelNfc::Arabic:           return RtfListStyle::Number;
+            case RtfLevelNfc::UpperRoman:       return RtfListStyle::Roman;
+            case RtfLevelNfc::LowerRoman:       return RtfListStyle::Roman;
+            case RtfLevelNfc::UpperAlpha:       return RtfListStyle::Letter;
+            case RtfLevelNfc::LowerAlpha:       return RtfListStyle::Letter;
+            case RtfLevelNfc::Ordinal:          return RtfListStyle::Number;
+            case RtfLevelNfc::CardinalText:     return RtfListStyle::Number;
+            case RtfLevelNfc::OrdinalText:      return RtfListStyle::Number;
+            case RtfLevelNfc::ArabicLeadingZero: return RtfListStyle::Number;
+            case RtfLevelNfc::Bullet:           return RtfListStyle::Disc;
+            case RtfLevelNfc::NoNumber:         return RtfListStyle::None;
         }
+        return RtfListStyle::Number;
     }
 
     int _currentListId = 0;
