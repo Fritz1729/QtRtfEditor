@@ -51,5 +51,5 @@ set_tests_properties(test_protected_ranges test_rtf_structural test_roundtrip
 add_custom_command(TARGET test_roundtrip POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/TestData
-        ${CMAKE_CURRENT_BINARY_DIR}/testdata
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/testdata
 )
