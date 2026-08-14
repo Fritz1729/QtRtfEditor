@@ -15,6 +15,7 @@ add_library(QtRtfEditor ${_rte_lib_type}
     RtfParser.h
     RtfParserContext.h
     RtfParserContext.cpp
+    ScopeStack.h
     RtfParser.cpp
     RtfParserTable.h
     RtfParserTable.cpp

@@ -60,8 +60,6 @@ private:
     void AddCurrentCellToRow();
     void EmitTableRow();
 
-    static bool TableRowHasNonWhitespaceContent(const RtfTableRowEntry& row);
-
     RtfDocument& _doc;
 
     bool _inTable = false;

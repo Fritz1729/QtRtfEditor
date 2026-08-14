@@ -2,48 +2,58 @@
 
 #include "RtfInputReader.h"
 #include "RtfTypes.h"
+#include "ScopeStack.h"
 
 #include <QtGlobal>
-#include <cctype>
 #include <map>
+#include <string>
 #include <utility>
 #include <vector>
 
 namespace Rte {
 
-template<typename T>
-struct ScopeStack {
-    std::vector<T> stack;
-    T current;
+/**
+ * @brief All scope-pushed formatting state, tracked as one unit.
+ *
+ * Groups the per-group scopes so entering/leaving a group touches a single
+ * object instead of six independent stacks.
+ */
+struct FormatScopes {
+    ScopeStack<RtfRunFormat>    format;
+    ScopeStack<ParagraphFormat> para;
+    ScopeStack<Qt::Alignment>   tabAlign{Qt::AlignLeft};
+    ScopeStack<int>             deff{0};
+    ScopeStack<int>             deftab{180};   // RTF spec default: 180 twips (1/8 inch)
+    ScopeStack<int>             uc{1};         // RTF spec default: 1 fallback byte after \uXXXX
 
-    ScopeStack() = default;
-    explicit ScopeStack(T initial) : current(std::move(initial)) {}
-
-    void enterScope() { stack.push_back(current); }
-    void leaveScope() {
-        if (!stack.empty()) {
-            current = std::move(stack.back());
-            stack.pop_back();
-        }
+    void enterScope() {
+        format.enterScope();
+        para.enterScope();
+        tabAlign.enterScope();
+        deff.enterScope();
+        deftab.enterScope();
+        uc.enterScope();
     }
-    const T& get() const { return current; }
-    T& get() { return current; }
+    void leaveScope() {
+        format.leaveScope();
+        para.leaveScope();
+        tabAlign.leaveScope();
+        deff.leaveScope();
+        deftab.leaveScope();
+        uc.leaveScope();
+    }
 };
 
-[[nodiscard]] constexpr bool IsPrintable(char c) {
-    return std::isprint(static_cast<unsigned char>(c));
-}
-
-struct RtfParserContext {
-    InputReader& input;
-    RtfDocument& doc;
-    size_t& iter;
-};
-
-struct RtfListtableContext {
-    InputReader& input;
-    size_t& iter;
-    std::map<int, RtfListStyle>& listIdToStyle;
+/**
+ * @brief List state accumulated during parsing: current list id/level/style,
+ * whether the first paragraph has been flushed, and the listtable id->style map.
+ */
+struct ListState {
+    int listId = 0;
+    int listLevel = 0;
+    RtfListStyle listStyle = RtfListStyle::None;
+    bool paragraphFlushed = false;
+    std::map<int, RtfListStyle> listIdToStyle;
 };
 
 struct RtfPictState {
@@ -61,50 +71,21 @@ struct RtfPictState {
     int piccropb = 0;
 };
 
-struct RtfScopeStacks {
-    ScopeStack<RtfRunFormat>& formatScope;
-    ScopeStack<ParagraphFormat>& paraScope;
-    ScopeStack<Qt::Alignment>& tabAlignScope;
-    ScopeStack<int>& deffScope;
-    ScopeStack<int>& deftabScope;
-    ScopeStack<int>& ucScope;
-};
-
-struct RtfListState {
-    int& listId;
-    int& listLevel;
-    RtfListStyle& listStyle;
-    bool& paragraphFlushed;
-    std::map<int, RtfListStyle>& listIdToStyle;
-};
-
-struct RtfParserScopeContext {
-    InputReader& input;
-    RtfDocument& doc;
-    RtfParagraph& currentParagraph;
-    size_t& iter;
-
-    RtfScopeStacks scopes;
-    RtfListState listState;
-    RtfPictState pict;
-
-    RtfParserScopeContext(InputReader& inp, RtfDocument& d, RtfParagraph& cp,
-                           size_t& it, RtfScopeStacks s, RtfListState ls)
-        : input(inp), doc(d), currentParagraph(cp), iter(it),
-          scopes(s), listState(ls) {}
-};
-
-void CheckIter(size_t& iter);
-void SkipGroup(InputReader& input, size_t& iter);
+void SkipGroup(InputReader& input);
 bool HasNonWhitespaceText(const std::vector<RtfRun>& runs);
 bool ParagraphHasNonWhitespaceContent(const RtfParagraph& p);
+bool TableRowHasNonWhitespaceContent(const RtfTableRowEntry& row);
+void RecordUnknownTag(RtfDocument& doc, const std::string& word, int arg);
+void ResetListAndTabState(FormatScopes& scopes, ListState& list);
 std::pair<std::string, int> ParseControlWordWithArg(InputReader& input);
 
-void FlushCurrentParagraph(RtfParserScopeContext& ctx);
+void FlushCurrentParagraph(RtfDocument& doc, RtfParagraph& currentParagraph,
+                           FormatScopes& scopes, ListState& list);
 
-void ParseColortbl(RtfParserContext& ctx);
-void ParseFonttbl(RtfParserContext& ctx);
-void ParseListtable(RtfListtableContext& ctx);
-void ParsePict(RtfParserScopeContext& ctx);
+void ParseColortbl(InputReader& input, RtfDocument& doc);
+void ParseFonttbl(InputReader& input, RtfDocument& doc);
+void ParseListtable(InputReader& input, ListState& list);
+void ParsePict(InputReader& input, RtfDocument& doc, RtfParagraph& currentParagraph,
+               FormatScopes& scopes, ListState& list, RtfPictState& pict);
 
 } // namespace Rte

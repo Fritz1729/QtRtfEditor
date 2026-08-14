@@ -108,18 +108,21 @@ add_library(QtRtfEditor ${_rte_lib_type}
     RtfParser.h
     RtfParserContext.h
     RtfParserContext.cpp
+    ScopeStack.h
     RtfParser.cpp
+    RtfParserTable.h
+    RtfParserTable.cpp
     RtfParserColortbl.cpp
     RtfParserFonttbl.cpp
     RtfParserListtable.cpp
     RtfParserPict.cpp
     RtfInputReader.h
     RtfInputReader.cpp
+    RtfCharset.h
+    RtfCharset.cpp
     RtfControl.cpp
     RtfImport.h
     RtfImport.cpp
-    RtfCharset.h
-    RtfCharset.cpp
 )
 
 add_library(QtRtfEditor::QtRtfEditor ALIAS QtRtfEditor)

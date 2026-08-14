@@ -20,6 +20,10 @@ namespace Rte {
     return std::isspace(static_cast<unsigned char>(c));
 }
 
+[[nodiscard]] constexpr bool IsPrintable(char c) {
+    return std::isprint(static_cast<unsigned char>(c));
+}
+
 [[nodiscard]] constexpr bool IsHexDigit(char c) {
     return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
 }
@@ -34,10 +38,17 @@ namespace Rte {
 class InputReader {
     std::string_view _input;
     size_t _pos = 0;
+    size_t _iterations = 0;
+    static constexpr size_t kMaxIterations = 10'000'000;
 
 public:
     InputReader() = default;
     explicit InputReader(std::string_view input) : _input(input) {}
+
+    // DoS guard: bounds the work a single parse can do. Call once per loop step.
+    void CheckIteration() {
+        if (++_iterations > kMaxIterations) throw std::runtime_error("parser iteration limit");
+    }
 
     [[nodiscard]] bool IsEof() const { return _pos >= _input.size(); }
     [[nodiscard]] size_t Pos() const { return _pos; }

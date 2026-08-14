@@ -43,13 +43,8 @@ public:
         _input = InputReader(rtf);
         _literalText.clear();
         _skipLeadingWsTrim = false;
-        _paragraphFlushed = false;
-        _iter = 0;
-        _listIdToStyle.clear();
         _tableParser.Reset();
-        _listId = 0;
-        _listLevel = 0;
-        _listStyle = RtfListStyle::None;
+        _list = ListState{};
         _inFieldRslt = false;
         _fieldAnchorHref.clear();
 
@@ -66,7 +61,7 @@ public:
 private:
     void SkipGroup() {
         // The group's own "{" has already been consumed by the caller.
-        Rte::SkipGroup(_input, _iter);
+        Rte::SkipGroup(_input);
     }
 
     const RtfControl* FindControl(const char* word) const {
@@ -86,26 +81,26 @@ private:
             const RtfControl::CharProp prop = ctrl.value.charProp;
             switch (prop) {
             case RtfControl::CharProp::Bold:
-                _formatScope.get().bold = on;
+                _scopes.format.get().bold = on;
                 break;
             case RtfControl::CharProp::Italic:
-                _formatScope.get().italic = on;
+                _scopes.format.get().italic = on;
                 break;
             case RtfControl::CharProp::Subscript:
-                _formatScope.get().subscript = on;
+                _scopes.format.get().subscript = on;
                 break;
             case RtfControl::CharProp::Superscript:
-                _formatScope.get().superscript = on;
-                if (on) _formatScope.get().subscript = false;
+                _scopes.format.get().superscript = on;
+                if (on) _scopes.format.get().subscript = false;
                 break;
             case RtfControl::CharProp::Strike:
-                _formatScope.get().strikeOut = on;
+                _scopes.format.get().strikeOut = on;
                 break;
             case RtfControl::CharProp::Kerning:
-                _formatScope.get().kerning = on;
+                _scopes.format.get().kerning = on;
                 break;
             case RtfControl::CharProp::Protect:
-                _formatScope.get().protected_ = on;
+                _scopes.format.get().protected_ = on;
                 break;
             case RtfControl::CharProp::Underline:
             default:
@@ -119,41 +114,41 @@ private:
             if (arg < 0) break;
             switch (prop) {
             case RtfControl::CharSetProp::FontIndex:
-                _formatScope.get().fontIndex = arg;
+                _scopes.format.get().fontIndex = arg;
                 break;
             case RtfControl::CharSetProp::FontSize:
-                _formatScope.get().fontSize = arg;
+                _scopes.format.get().fontSize = arg;
                 break;
             case RtfControl::CharSetProp::ColorIndex:
-                _formatScope.get().colorIndex = arg;
+                _scopes.format.get().colorIndex = arg;
                 break;
             case RtfControl::CharSetProp::BgColorIndex:
-                _formatScope.get().bgColorIndex = arg;
+                _scopes.format.get().bgColorIndex = arg;
                 break;
             case RtfControl::CharSetProp::UpOffset:
-                _formatScope.get().upOffset = arg;
+                _scopes.format.get().upOffset = arg;
                 break;
             case RtfControl::CharSetProp::DnOffset:
-                _formatScope.get().dnOffset = arg;
+                _scopes.format.get().dnOffset = arg;
                 break;
             case RtfControl::CharSetProp::Expnd:
-                _formatScope.get().expnd = arg;
+                _scopes.format.get().expnd = arg;
                 break;
             case RtfControl::CharSetProp::ListId:
-                _listId = arg;
+                _list.listId = arg;
                 {
-                    auto it = _listIdToStyle.find(arg);
-                    _listStyle = (it != _listIdToStyle.end()) ? it->second : RtfListStyle::Number;
+                    auto it = _list.listIdToStyle.find(arg);
+                    _list.listStyle = (it != _list.listIdToStyle.end()) ? it->second : RtfListStyle::Number;
                 }
                 break;
             case RtfControl::CharSetProp::UlColorIndex:
-                _formatScope.get().ulColorIndex = arg;
+                _scopes.format.get().ulColorIndex = arg;
                 break;
             case RtfControl::CharSetProp::HighlightIndex:
-                _formatScope.get().highlightIndex = arg;
+                _scopes.format.get().highlightIndex = arg;
                 break;
             case RtfControl::CharSetProp::LangId:
-                _formatScope.get().langId = arg;
+                _scopes.format.get().langId = arg;
                 break;
             }
             break;
@@ -162,64 +157,64 @@ private:
             const RtfControl::ParaProp prop = ctrl.value.paraProp;
             switch (prop) {
             case RtfControl::ParaProp::LeftIndent:
-                _paraScope.get().leftIndent = arg;
+                _scopes.para.get().leftIndent = arg;
                 break;
             case RtfControl::ParaProp::FirstLineIndent:
-                _paraScope.get().firstLineIndent = arg;
+                _scopes.para.get().firstLineIndent = arg;
                 break;
             case RtfControl::ParaProp::RightIndent:
-                _paraScope.get().rightIndent = arg;
+                _scopes.para.get().rightIndent = arg;
                 break;
             case RtfControl::ParaProp::SpaceBefore:
-                _paraScope.get().spaceBefore = arg;
+                _scopes.para.get().spaceBefore = arg;
                 break;
             case RtfControl::ParaProp::SpaceAfter:
-                _paraScope.get().spaceAfter = arg;
+                _scopes.para.get().spaceAfter = arg;
                 break;
             case RtfControl::ParaProp::LineHeight:
-                _paraScope.get().lineHeight = arg;
+                _scopes.para.get().lineHeight = arg;
                 break;
             case RtfControl::ParaProp::SlMult:
-                if (arg >= 0) _paraScope.get().slMult = arg;
+                if (arg >= 0) _scopes.para.get().slMult = arg;
                 break;
             case RtfControl::ParaProp::TabStop:
                 if (arg >= 0) {
-                    _paraScope.get().tabStops.push_back({arg, _tabAlignScope.get()});
-                    _tabAlignScope.get() = Qt::AlignLeft;
+                    _scopes.para.get().tabStops.push_back({arg, _scopes.tabAlign.get()});
+                    _scopes.tabAlign.get() = Qt::AlignLeft;
                 }
                 break;
             case RtfControl::ParaProp::ListLevel:
-                if (arg >= 0) _listLevel = arg;
+                if (arg >= 0) _list.listLevel = arg;
                 break;
             }
             break;
         }
         case RtfControl::Action::SetAlignment: {
-            _paraScope.get().alignment = static_cast<Qt::Alignment>(ctrl.value.raw);
+            _scopes.para.get().alignment = static_cast<Qt::Alignment>(ctrl.value.raw);
             break;
         }
         case RtfControl::Action::SetTabAlign: {
-            _tabAlignScope.get() = static_cast<Qt::Alignment>(ctrl.value.raw);
+            _scopes.tabAlign.get() = static_cast<Qt::Alignment>(ctrl.value.raw);
             break;
         }
         case RtfControl::Action::SetUlStyle: {
             FinalizeRun();
             const auto style = static_cast<RtfUnderlineStyle>(ctrl.value.raw);
             if (style == RtfUnderlineStyle::NoUnderline) {
-                _formatScope.get().underlineStyle = RtfUnderlineStyle::NoUnderline;
-                _formatScope.get().underline = false;
+                _scopes.format.get().underlineStyle = RtfUnderlineStyle::NoUnderline;
+                _scopes.format.get().underline = false;
             } else if (style == RtfUnderlineStyle::Single && arg == 0) {
-                _formatScope.get().underlineStyle = RtfUnderlineStyle::NoUnderline;
-                _formatScope.get().underline = false;
+                _scopes.format.get().underlineStyle = RtfUnderlineStyle::NoUnderline;
+                _scopes.format.get().underline = false;
             } else {
-                _formatScope.get().underlineStyle = style;
-                _formatScope.get().underline = (style != RtfUnderlineStyle::NoUnderline);
+                _scopes.format.get().underlineStyle = style;
+                _scopes.format.get().underline = (style != RtfUnderlineStyle::NoUnderline);
             }
             break;
         }
         case RtfControl::Action::SetCapitalization: {
             FinalizeRun();
-            _formatScope.get().capitalization = static_cast<QFont::Capitalization>(ctrl.value.raw);
+            _scopes.format.get().capitalization = static_cast<QFont::Capitalization>(ctrl.value.raw);
             break;
         }
         case RtfControl::Action::EmitParagraph:
@@ -234,22 +229,19 @@ private:
             break;
         case RtfControl::Action::HeaderMetadata:
             if (strcmp(ctrl.keyword, "pard") == 0) {
-                _paraScope.get() = ParagraphFormat{};
-                _tabAlignScope.get() = Qt::AlignLeft;
-                _listId = 0;
-                _listLevel = 0;
-                _listStyle = RtfListStyle::None;
+                _scopes.para.get() = ParagraphFormat{};
+                ResetListAndTabState(_scopes, _list);
                 return;
             }
             if (strcmp(ctrl.keyword, "plain") == 0) {
                 FinalizeRun();
-                _formatScope.get() = RtfRunFormat{};
+                _scopes.format.get() = RtfRunFormat{};
                 _skipLeadingWsTrim = false;
                 return;
             }
             if (strcmp(ctrl.keyword, "uc") == 0) {
-                _ucScope.get() = (arg >= 0) ? arg : 1;
-                _doc.ucByteCount = _ucScope.get();
+                _scopes.uc.get() = (arg >= 0) ? arg : 1;
+                _doc.ucByteCount = _scopes.uc.get();
                 return;
             }
             if (strcmp(ctrl.keyword, "deflang") == 0) {
@@ -287,9 +279,9 @@ private:
             return;
         case RtfControl::Action::GroupPersistent:
             if (strcmp(ctrl.keyword, "deff") == 0) {
-                if (arg >= 0) _deffScope.get() = arg;
+                if (arg >= 0) _scopes.deff.get() = arg;
             } else if (strcmp(ctrl.keyword, "deftab") == 0) {
-                if (arg >= 0) _deftabScope.get() = arg;
+                if (arg >= 0) _scopes.deftab.get() = arg;
             }
             break;
         case RtfControl::Action::FieldControl:
@@ -313,24 +305,12 @@ private:
         // \par resets tab stops and list state (paragraph-local) but preserves
         // alignment, indents, and spacing (which persist across paragraphs).
         _currentParagraph = {};
-        _paraScope.get().tabStops.clear();
-        _tabAlignScope.get() = Qt::AlignLeft;
-        _listId = 0;
-        _listLevel = 0;
-        _listStyle = RtfListStyle::None;
+        _scopes.para.get().tabStops.clear();
+        ResetListAndTabState(_scopes, _list);
     }
 
     void FlushCurrentParagraph() {
-        RtfParserScopeContext ctx(_input, _doc, _currentParagraph, _iter,
-                             {_formatScope, _paraScope, _tabAlignScope, _deffScope, _deftabScope, _ucScope},
-                             {_listId, _listLevel, _listStyle, _paragraphFlushed, _listIdToStyle});
-        Rte::FlushCurrentParagraph(ctx);
-    }
-
-    static bool TableRowHasNonWhitespaceContent(const RtfTableRowEntry& r) {
-        for (const auto& [runs, _] : r.cells)
-            if (HasNonWhitespaceText(runs)) return true;
-        return false;
+        Rte::FlushCurrentParagraph(_doc, _currentParagraph, _scopes, _list);
     }
 
     void RemoveTrailingEmptyElements() {
@@ -352,22 +332,9 @@ private:
     InputReader _input;
     string _literalText;
     bool _skipLeadingWsTrim = false;
-    bool _paragraphFlushed = false;
-    size_t _iter = 0;
     int _codePage = 1252;
-    ScopeStack<RtfRunFormat> _formatScope;
-    ScopeStack<ParagraphFormat> _paraScope;
-    bool _inPntext = false;
-    map<int, RtfListStyle> _listIdToStyle;
-    ScopeStack<Qt::Alignment> _tabAlignScope{Qt::AlignLeft};
-
-    // Group-persistent control words: push on group enter, pop on group exit
-    ScopeStack<int> _deffScope{0};
-    ScopeStack<int> _deftabScope{180};  // RTF spec default = 180 twips (1/8 inch)
-    ScopeStack<int> _ucScope{1};  // RTF spec default = 1 fallback byte after \uXXXX
-    int _listId = 0;
-    int _listLevel = 0;
-    RtfListStyle _listStyle = RtfListStyle::None;
+    FormatScopes _scopes;
+    ListState _list;
 
     // Group nesting depth for document-level save
     int _groupDepth = 0;
@@ -378,7 +345,7 @@ private:
 
     void Parse() {
         while (!_input.IsEof()) {
-            CheckIter(_iter);
+            _input.CheckIteration();
             char c = _input.Peek();
             if (c == '{') {
                 ParseGroup();
@@ -408,31 +375,26 @@ private:
             if (_input.ConsumeMatch("\\colortbl")) {
                 _input.SkipDigits();
                 _input.SkipWhitespace();
-                RtfParserContext ctx{_input, _doc, _iter};
-                ParseColortbl(ctx);
+                ParseColortbl(_input, _doc);
                 return;
             }
             if (_input.ConsumeMatch("\\fonttbl")) {
                 _input.SkipDigits();
                 _input.SkipWhitespace();
-                RtfParserContext ctx{_input, _doc, _iter};
-                ParseFonttbl(ctx);
+                ParseFonttbl(_input, _doc);
                 return;
             }
 
             if (_input.ConsumeMatch("\\listtable")) {
                 _input.SkipWhitespace();
-                RtfListtableContext ctx{_input, _iter, _listIdToStyle};
-                ParseListtable(ctx);
+                ParseListtable(_input, _list);
                 return;
             }
 
             if (_input.ConsumeMatch("\\pict")) {
                 _input.SkipWhitespace();
-                RtfParserScopeContext ctx(_input, _doc, _currentParagraph, _iter,
-                                          {_formatScope, _paraScope, _tabAlignScope, _deffScope, _deftabScope, _ucScope},
-                                          {_listId, _listLevel, _listStyle, _paragraphFlushed, _listIdToStyle});
-                ParsePict(ctx);
+                RtfPictState pict;
+                ParsePict(_input, _doc, _currentParagraph, _scopes, _list, pict);
                 return;
             }
 
@@ -447,12 +409,10 @@ private:
                 _input.SkipDigits();
                 _input.SkipWhitespace();
                 size_t fragStart = _input.Pos();
-                _inPntext = true;
-                _formatScope.get().inPntext = true;
+                _scopes.format.get().inPntext = true;
                 Parse();
                 FinalizeRun();
-                _formatScope.get().inPntext = false;
-                _inPntext = false;
+                _scopes.format.get().inPntext = false;
                 string frag = _input.Substring(fragStart, _input.Pos());
                 _currentParagraph.pntextRtf = frag;
                 _input.SkipAs('}');
@@ -475,27 +435,17 @@ private:
     }
 
     void PushState() {
-        _formatScope.enterScope();
-        _paraScope.enterScope();
-        _tabAlignScope.enterScope();
-        _deffScope.enterScope();
-        _deftabScope.enterScope();
-        _ucScope.enterScope();
+        _scopes.enterScope();
     }
 
     void RestoreState() {
         FinalizeRun();
-        _formatScope.leaveScope();
-        _paraScope.leaveScope();
-        _tabAlignScope.leaveScope();
         // Save document-level group-persistent values when exiting outermost group
         if (_groupDepth == 1) {
-            _doc.defaultFontIndex = _deffScope.get();
-            _doc.defaultTabStopTwips = _deftabScope.get();
+            _doc.defaultFontIndex = _scopes.deff.get();
+            _doc.defaultTabStopTwips = _scopes.deftab.get();
         }
-        _deffScope.leaveScope();
-        _deftabScope.leaveScope();
-        _ucScope.leaveScope();
+        _scopes.leaveScope();
         if (_groupDepth > 0) _groupDepth--;
     }
 
@@ -553,7 +503,7 @@ private:
             }
             int fcharset = 0;
             string fontFamily;
-            int fi = _formatScope.get().fontIndex;
+            int fi = _scopes.format.get().fontIndex;
             if (fi >= 0 && fi < ssize(_doc.fonts)) {
                 fcharset = _doc.fonts[static_cast<size_t>(fi)].fcharset;
                 fontFamily = _doc.fonts[static_cast<size_t>(fi)].family;
@@ -609,7 +559,7 @@ private:
 
         // Skip \ucN fallback bytes (alternate ANSI encoding after \uXXXX)
         // RTF spec: \ucN sets how many bytes follow \uNNNN for backward compat
-        for (int i = 0; i < _ucScope.get() && !_input.IsEof(); ++i) {
+        for (int i = 0; i < _scopes.uc.get() && !_input.IsEof(); ++i) {
             _input.Advance();
         }
     }
@@ -620,7 +570,7 @@ private:
         _inFieldRslt = false;
 
         while (!_input.IsEof() && !_input.PeekIs('}')) {
-            CheckIter(_iter);
+            _input.CheckIteration();
 
             if (_input.PeekIs('{')) {
                 _input.SkipAs('{');
@@ -652,13 +602,13 @@ private:
 
         _input.SkipAs('}');
         string savedText = _literalText;
-        bool savedIsAnchor = _formatScope.get().isAnchor;
-        string savedHref = _formatScope.get().anchorHref;
+        bool savedIsAnchor = _scopes.format.get().isAnchor;
+        string savedHref = _scopes.format.get().anchorHref;
         _literalText.clear();
 
         // Finalize accumulated text with anchor format
         if (!savedText.empty()) {
-            RtfRunFormat runFmt = _formatScope.get();
+            RtfRunFormat runFmt = _scopes.format.get();
             if (savedIsAnchor) {
                 runFmt.isAnchor = true;
                 runFmt.anchorHref = savedHref;
@@ -679,7 +629,7 @@ private:
         // Collect instruction text to extract HYPERLINK target
         string inst;
         while (!_input.IsEof() && !_input.PeekIs('}')) {
-            CheckIter(_iter);
+            _input.CheckIteration();
             if (_input.PeekIs('\\')) {
                 _input.SkipAs('\\');
                 if (!_input.IsEof()) {
@@ -747,8 +697,8 @@ private:
         // Parse content as normal text, but apply anchor format to all runs
         _inFieldRslt = true;
         if (!_fieldAnchorHref.empty()) {
-            _formatScope.get().isAnchor = true;
-            _formatScope.get().anchorHref = _fieldAnchorHref;
+            _scopes.format.get().isAnchor = true;
+            _scopes.format.get().anchorHref = _fieldAnchorHref;
         }
 
         // Parse content normally
@@ -792,11 +742,7 @@ private:
             Dispatch(*ctrl, arg);
         } else {
             // Unknown tag — record for preservation
-            string tag = "\\" + word;
-            if (arg >= 0) {
-                tag += to_string(arg);
-            }
-            _doc.unknownTags.push_back(tag);
+            RecordUnknownTag(_doc, word, arg);
         }
     }
 
@@ -809,9 +755,9 @@ private:
         if (_literalText.empty()) return;
 
         if (_tableParser.InCell()) {
-            _tableParser.FinalizeRunInCell(std::move(_literalText), _formatScope.get());
+            _tableParser.FinalizeRunInCell(std::move(_literalText), _scopes.format.get());
         } else {
-            _currentParagraph.runs.emplace_back(std::move(_literalText), _formatScope.get());
+            _currentParagraph.runs.emplace_back(std::move(_literalText), _scopes.format.get());
         }
      }
 
@@ -835,25 +781,6 @@ private:
 };
 
 } // namespace
-
-void FlushCurrentParagraph(RtfParserScopeContext& ctx) {
-    // Skip the initial empty paragraph before any content has been flushed.
-    // Empty paragraphs after the first flush are preserved (blank lines).
-    if (!ctx.listState.paragraphFlushed && !ParagraphHasNonWhitespaceContent(ctx.currentParagraph)) {
-        ctx.currentParagraph = {};
-        return;
-    }
-    ctx.listState.paragraphFlushed = true;
-    ctx.currentParagraph.format = ctx.scopes.paraScope.get();
-    ctx.currentParagraph.listId = ctx.listState.listId;
-    ctx.currentParagraph.listLevel = ctx.listState.listLevel;
-    ctx.currentParagraph.listStyle = ctx.listState.listStyle;
-    ctx.currentParagraph.listIndent = ctx.scopes.paraScope.get().leftIndent;
-    ctx.currentParagraph.defaultFontIndex = ctx.scopes.deffScope.get();
-    ctx.currentParagraph.defaultTabStopTwips = ctx.scopes.deftabScope.get();
-    ctx.doc.elements.push_back(std::move(ctx.currentParagraph));
-    ctx.currentParagraph = {};
-}
 
 RtfDocument ParseRtf(const string& rtf, int codePage) {
     RtfParserImpl impl;

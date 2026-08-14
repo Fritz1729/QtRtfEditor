@@ -3,47 +3,45 @@
 
 namespace Rte {
 
-void ParseFonttbl(RtfParserContext& ctx) {
+void ParseFonttbl(InputReader& input, RtfDocument& doc) {
     // {\fonttbl{\f0\froman\fcharset0 Times New Roman;}
     //        {\f1\fswiss\fcharset0 Arial;}}
     // Each font entry is a group containing \fN and the family name
-    while (!ctx.input.IsEof() && !ctx.input.PeekIs('}')) {
-        CheckIter(ctx.iter);
-        if (ctx.input.PeekIs('{')) {
+    while (!input.IsEof() && !input.PeekIs('}')) {
+        input.CheckIteration();
+        if (input.PeekIs('{')) {
             // Font entry group
-            ctx.input.SkipAs('{');
+            input.SkipAs('{');
 
             int fcharset = 0;
             std::string family;
 
-            while (!ctx.input.IsEof() && !ctx.input.PeekIs('}')) {
-                if (ctx.input.PeekIs('\\')) {
-                    if (ctx.input.ConsumeMatch("\\fcharset")) {
-                        fcharset = ctx.input.ParseInt();
-                    } else if (ctx.input.ConsumeMatch("\\f")) {
-                        ctx.input.ParseInt();
+            while (!input.IsEof() && !input.PeekIs('}')) {
+                if (input.PeekIs('\\')) {
+                    if (input.ConsumeMatch("\\fcharset")) {
+                        fcharset = input.ParseInt();
+                    } else if (input.ConsumeMatch("\\f")) {
+                        input.ParseInt();
                     } else {
                         // Parse control word; record truly unknown ones
-                        ctx.input.SkipAs('\\');
-                        auto [word, arg] = ParseControlWordWithArg(ctx.input);
+                        input.SkipAs('\\');
+                        auto [word, arg] = ParseControlWordWithArg(input);
                         if (!word.empty() && !Rte::FindControl(word.c_str())) {
-                            std::string tag = "\\" + word;
-                            if (arg >= 0) tag += std::to_string(arg);
-                            ctx.doc.unknownTags.push_back(tag);
+                            RecordUnknownTag(doc, word, arg);
                         }
                     }
-                } else if (ctx.input.PeekIs('{')) {
+                } else if (input.PeekIs('{')) {
                     // Nested group — skip all (e.g. {\*\fname ...} or any sub-group)
-                    ctx.input.SkipAs('{');
-                    SkipGroup(ctx.input, ctx.iter);
-                } else if (!ctx.input.PeekIs(';') && IsPrintable(ctx.input.Peek())) {
-                    family += ctx.input.Advance();
+                    input.SkipAs('{');
+                    SkipGroup(input);
+                } else if (!input.PeekIs(';') && IsPrintable(input.Peek())) {
+                    family += input.Advance();
                 } else {
-                    ctx.input.Advance();
+                    input.Advance();
                 }
             }
 
-            if (!ctx.input.IsEof()) ctx.input.SkipAs('}');
+            if (!input.IsEof()) input.SkipAs('}');
 
             // Remove leading/trailing whitespace from family
             while (!family.empty() && family.back() == ' ') family.pop_back();
@@ -52,13 +50,13 @@ void ParseFonttbl(RtfParserContext& ctx) {
             if (firstNonSpace > 0) family.erase(family.begin(), family.begin() + static_cast<ptrdiff_t>(firstNonSpace));
 
             if (!family.empty()) {
-                ctx.doc.fonts.push_back({family, fcharset});
+                doc.fonts.push_back({family, fcharset});
             }
         } else {
-            ctx.input.Advance();
+            input.Advance();
         }
     }
-    ctx.input.SkipAs('}');
+    input.SkipAs('}');
 }
 
 } // namespace Rte

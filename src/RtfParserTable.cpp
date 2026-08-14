@@ -1,6 +1,5 @@
 #include "RtfParserTable.h"
-
-#include <cctype>
+#include "RtfParserContext.h"
 
 namespace Rte {
 
@@ -295,14 +294,6 @@ void TableParser::EmitTableRow() {
         _doc.elements.emplace_back(std::move(_currentRow));
     }
     _currentRow = {};
-}
-
-bool TableParser::TableRowHasNonWhitespaceContent(const RtfTableRowEntry& row) {
-    for (const auto& [runs, _] : row.cells)
-        for (const auto& run : runs)
-            for (char c : run.text)
-                if (!std::isspace(static_cast<unsigned char>(c))) return true;
-    return false;
 }
 
 std::vector<RtfRun>& TableParser::MutableCellRuns() {

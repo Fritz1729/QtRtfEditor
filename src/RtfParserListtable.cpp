@@ -21,7 +21,7 @@ RtfListStyle RtfLevelNfcToListStyle(int nfc) {
     return RtfListStyle::Number;
 }
 
-void ParseListtableControl(InputReader& input, size_t& iter,
+void ParseListtableControl(InputReader& input,
                            int& listId, RtfListStyle& listStyle,
                            std::map<int, RtfListStyle>& listIdToStyle) {
     input.SkipAs('\\');
@@ -45,7 +45,7 @@ void ParseListtableControl(InputReader& input, size_t& iter,
         if (!input.IsEof() && input.PeekIs('{')) {
             input.SkipAs('{');
             while (!input.IsEof() && !input.PeekIs('}')) {
-                CheckIter(iter);
+                input.CheckIteration();
                 if (input.PeekIs('\\')) {
                     input.SkipAs('\\');
                     auto [innerWord, innerArg] = input.ReadControlWord();
@@ -69,34 +69,30 @@ void ParseListtableControl(InputReader& input, size_t& iter,
 
 } // namespace
 
-void ParseListtable(RtfListtableContext& ctx) {
+void ParseListtable(InputReader& input, ListState& list) {
     int currentListId = 0;
     RtfListStyle currentListStyle = RtfListStyle::None;
 
-    while (!ctx.input.IsEof() && !ctx.input.PeekIs('}')) {
-        CheckIter(ctx.iter);
-        if (ctx.input.PeekIs('{')) {
-            ctx.input.SkipAs('{');
-            while (!ctx.input.IsEof() && !ctx.input.PeekIs('}')) {
-                CheckIter(ctx.iter);
-                if (ctx.input.PeekIs('\\')) {
-                    ParseListtableControl(ctx.input, ctx.iter,
-                                          currentListId, currentListStyle,
-                                          ctx.listIdToStyle);
+    while (!input.IsEof() && !input.PeekIs('}')) {
+        input.CheckIteration();
+        if (input.PeekIs('{')) {
+            input.SkipAs('{');
+            while (!input.IsEof() && !input.PeekIs('}')) {
+                input.CheckIteration();
+                if (input.PeekIs('\\')) {
+                    ParseListtableControl(input, currentListId, currentListStyle, list.listIdToStyle);
                 } else {
-                    ctx.input.Advance();
+                    input.Advance();
                 }
             }
-            ctx.input.SkipAs('}');
-        } else if (ctx.input.PeekIs('\\')) {
-            ParseListtableControl(ctx.input, ctx.iter,
-                                  currentListId, currentListStyle,
-                                  ctx.listIdToStyle);
+            input.SkipAs('}');
+        } else if (input.PeekIs('\\')) {
+            ParseListtableControl(input, currentListId, currentListStyle, list.listIdToStyle);
         } else {
-            ctx.input.Advance();
+            input.Advance();
         }
     }
-    ctx.input.SkipAs('}');
+    input.SkipAs('}');
 }
 
 } // namespace Rte
