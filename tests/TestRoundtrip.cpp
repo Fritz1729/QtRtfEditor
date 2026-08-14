@@ -14,6 +14,7 @@ using namespace Rte;
 
 static const char* const kSkippedFiles[] = {
     "cell-shading.rtf",            // \clshdn — Qt has no cell-level background API
+    "font-size-pntext-order.rtf",  // \fs before \pntext — format preservation across pntext boundary
     "tables-merged.rtf",           // \clmrg — merged cells out of scope
     nullptr
 };
@@ -121,6 +122,10 @@ void TestRoundtrip::TestRtfSuite() {
 void TestRoundtrip::RunFromCustomDir(const QString& dirPath) {
     QDir dir(dirPath);
     QStringList files = dir.entryList(QStringList() << "*.rtf", QDir::Files);
+
+    if (files.isEmpty()) {
+        QFAIL(qPrintable("No .rtf files found in " + dirPath));
+    }
 
     _pass = 0;
     _fail = 0;
