@@ -110,13 +110,7 @@ static void ReportCase(const QString& filename, const char* result) {
 }
 
 void TestRoundtrip::TestRtfSuite() {
-    QString testDataDir;
-    if (!_customDir.isEmpty()) {
-        testDataDir = _customDir;
-    } else {
-        testDataDir = QCoreApplication::applicationDirPath() + "/testdata";
-    }
-    RunFromCustomDir(testDataDir);
+    RunFromCustomDir(_customDir);
 }
 
 void TestRoundtrip::RunFromCustomDir(const QString& dirPath) {
@@ -204,48 +198,30 @@ static void InitDefaultFontFamily() {
 
 static int CustomMain(int argc, char **argv) {
     InitDefaultFontFamily();
-    QStringList filtered;
-    QString testDataDir;
-    for (int i = 0; i < argc; ++i) {
-        QByteArray arg = argv[i];
-        if (arg == "--testdata-dir" && i + 1 < argc) {
-            testDataDir = QString::fromLocal8Bit(argv[++i]);
-        } else if (arg.startsWith("--testdata-dir=")) {
-            testDataDir = QString::fromLocal8Bit(arg.mid(strlen("--testdata-dir=")));
-        } else if (arg == "-t" && i + 1 < argc) {
-            testDataDir = QString::fromLocal8Bit(argv[++i]);
-        } else {
-            filtered << QString::fromLocal8Bit(argv[i]);
-        }
+
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <testdata-directory>\n", argv[0]);
+        return 1;
     }
 
-    if (!testDataDir.isEmpty()) {
+    QString testDataDir = QString::fromUtf8(argv[1]);
+    {
         QDir dir(testDataDir);
         if (!dir.exists() || !dir.isReadable()) {
+            fprintf(stderr, "Test data directory not found or not readable: %s\n", qPrintable(testDataDir));
             return 1;
         }
     }
 
-    int filteredArgc = filtered.size();
-    QVector<QByteArray> filteredBytes;
-    filteredBytes.reserve(filtered.size());
-    for (const QString& s : filtered) {
-        filteredBytes.append(s.toLocal8Bit());
-    }
-    QVector<char*> filteredArgv;
-    filteredArgv.reserve(filtered.size());
-    for (QByteArray& b : filteredBytes) {
-        filteredArgv.append(b.data());
-    }
-    filteredArgv.append(nullptr);
-
-    int adjustedArgc = filteredArgc;
-    QApplication app(adjustedArgc, filteredArgv.data());
+    QByteArray argv0 = argv[0];
+    int appArgc = 1;
+    char* appArgv = argv0.data();
+    QApplication app(appArgc, &appArgv);
     app.setApplicationName("test_roundtrip");
 
     TestRoundtrip test;
     test.SetCustomDir(testDataDir);
-    return QTest::qExec(&test, adjustedArgc, filteredArgv.data());
+    return QTest::qExec(&test, appArgc, &appArgv);
 }
 
 int main(int argc, char **argv) {

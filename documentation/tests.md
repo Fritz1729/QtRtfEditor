@@ -63,7 +63,7 @@ Data-driven test that iterates over `tests/TestData/*.rtf` files. For each file:
 | `RtfCompare.cpp` | Structural comparison implementation |
 | `RtfCompare.h` | `CompareRtf()`, `CompareImage()` declarations |
 
-Test data in `tests/TestData/` is copied to the test binary's directory under `testdata/` via a POST_BUILD custom command.
+`test_roundtrip` takes the test data directory as its first (positional) argument, passed via `add_test`.
 
 ## RtfCompare
 

@@ -43,7 +43,7 @@ add_executable(test_roundtrip
 
 target_include_directories(test_roundtrip PRIVATE ${TEST_INCLUDES})
 target_link_libraries(test_roundtrip PRIVATE ${TEST_LIBS})
-add_test(NAME test_roundtrip COMMAND test_roundtrip --testdata-dir ${CMAKE_CURRENT_SOURCE_DIR}/TestData)
+add_test(NAME test_roundtrip COMMAND test_roundtrip ${CMAKE_CURRENT_SOURCE_DIR}/TestData)
 
 set_tests_properties(test_protected_ranges test_rtf_structural test_roundtrip
     PROPERTIES TIMEOUT 15)
