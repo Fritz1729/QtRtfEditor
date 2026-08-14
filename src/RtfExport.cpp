@@ -417,11 +417,10 @@ struct BlockExportContext {
     const vector<QColor>& bgColorList;
     const map<const QTextList*, int>& listMap;
     int defaultFontIdx;
+    int defaultTabStopTwips;
     RtfRunFormat carriedOverFormat{};
     QTextBlockFormat lastParaFmt{};
     bool lastParaFmtSet = false;
-    int lastDeff = 0;
-    int lastDeftab = kDefaultTabStopTwips;
     int deffDeftabGroupDepth = 0;
     bool firstBlock = true;
 
@@ -487,18 +486,18 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
         // Absent property (blocks not created by import, e.g. image blocks) means no override
         QVariant deffVar = blockFmt.property(UserPropParaDefaultFontIndex);
         QVariant deftabVar = blockFmt.property(UserPropParaDefaultTabStopTwips);
-        bool deffChanged = deffVar.isValid() && (deffVar.toInt() != lastDeff);
-        bool deftabChanged = deftabVar.isValid() && (deftabVar.toInt() != lastDeftab);
+        // In-scope value at block boundaries is always the document default
+        // (the override group never spans blocks), so compare against it
+        bool deffChanged = deffVar.isValid() && (deffVar.toInt() != defaultFontIdx);
+        bool deftabChanged = deftabVar.isValid() && (deftabVar.toInt() != defaultTabStopTwips);
         if (deffChanged || deftabChanged) {
             out << "{";
             deffDeftabGroupDepth++;
             if (deffChanged) {
                 out << "\\deff" << deffVar.toInt();
-                lastDeff = deffVar.toInt();
             }
             if (deftabChanged) {
                 out << "\\deftab" << deftabVar.toInt();
-                lastDeftab = deftabVar.toInt();
             }
         }
     }
@@ -532,11 +531,11 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
             }
             itImg++;
         }
-        if (inListGroup) out << '}';
         out << "\\plain\\par";
         for (int i = 0; i < deffDeftabGroupDepth; i++)
             out << '}';
         deffDeftabGroupDepth = 0;
+        if (inListGroup) out << '}';
         out << "\n";
         carriedOverFormat.fontIndex = defaultFontIdx;
     } else {
@@ -704,11 +703,11 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
                 carriedOverFormat.fontIndex = lastEmitted.fontIndex;
             }
         }
-        if (inListGroup) out << '}';
         out << "\\par";
         for (int i = 0; i < deffDeftabGroupDepth; i++)
             out << '}';
         deffDeftabGroupDepth = 0;
+        if (inListGroup) out << '}';
         out << "\n";
     }
 }
@@ -882,7 +881,7 @@ string ExportRtf(const QTextDocument& document) {
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
     BlockExportContext exportCtx{
         out, document, defaultFont, fontMap, colorList, bgColorList, listMap,
-        defaultFontIdx, {}, QTextBlockFormat{}, false, defaultFontIdx, defaultTabStopTwips, 0, true
+        defaultFontIdx, defaultTabStopTwips, {}, QTextBlockFormat{}, false, 0, true
     };
 #pragma GCC diagnostic pop
 
