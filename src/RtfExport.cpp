@@ -36,14 +36,6 @@ namespace Rte {
 
 namespace {
 
-constexpr array<const char*, 4> kRowBorderSideTags = {{
-    "\\trbrdrl", "\\trbrdrt", "\\trbrdrr", "\\trbrdrb"
-}};
-
-constexpr array<const char*, 4> kCellBorderSideTags = {{
-    "\\clbrdrl", "\\clbrdrt", "\\clbrdrr", "\\clbrdrb"
-}};
-
 using BorderWidthGetter = double (QTextTableCellFormat::*)() const;
 using BorderStyleGetter = QTextFrameFormat::BorderStyle (QTextTableCellFormat::*)() const;
 using BorderBrushGetter = QBrush (QTextTableCellFormat::*)() const;
@@ -68,10 +60,6 @@ using PaddingGetter = double (QTextTableCellFormat::*)() const;
 constexpr array<PaddingGetter, 4> kPaddingGetters = {{
     &QTextTableCellFormat::leftPadding, &QTextTableCellFormat::topPadding,
     &QTextTableCellFormat::rightPadding, &QTextTableCellFormat::bottomPadding,
-}};
-
-constexpr array<const char*, 4> kCellPaddingTags = {{
-    "clpadl", "clpadt", "clpadr", "clpadb"
 }};
 
 static const char* UnderlineStyleTag(RtfUnderlineStyle style) {
@@ -176,19 +164,10 @@ static string AlignmentToRtf(Qt::Alignment alignment) {
     return "";
 }
 
-static RtfLevelNfc ListStyleToLevelNfc(RtfListStyle style) {
-    switch (style) {
-        case RtfListStyle::Number: return RtfLevelNfc::Arabic;
-        case RtfListStyle::Roman:  return RtfLevelNfc::LowerRoman;
-        case RtfListStyle::Letter: return RtfLevelNfc::LowerAlpha;
-        case RtfListStyle::Disc:     [[fallthrough]];
-        case RtfListStyle::Circle:   [[fallthrough]];
-        case RtfListStyle::Square:   [[fallthrough]];
-        case RtfListStyle::Box:      [[fallthrough]];
-        case RtfListStyle::Check:    [[fallthrough]];
-        case RtfListStyle::None:     [[fallthrough]];
-        default:                     return RtfLevelNfc::Bullet;
-    }
+static void EmitColorEntry(std::ostream& out, const QColor& color) {
+    out << "\\red" << color.red()
+        << "\\green" << color.green()
+        << "\\blue" << color.blue() << ";";
 }
 
 static void EmitPictHeader(ostringstream& out, const QString& blipTag, qreal width, qreal height) {
@@ -777,16 +756,8 @@ string ExportRtf(const QTextDocument& document) {
 
     if (!colorList.empty() || !bgColorList.empty()) {
         out << "{\\colortbl ;";
-        for (const QColor& color : colorList) {
-            out << "\\red" << color.red()
-                << "\\green" << color.green()
-                << "\\blue" << color.blue() << ";";
-        }
-        for (const QColor& color : bgColorList) {
-            out << "\\red" << color.red()
-                << "\\green" << color.green()
-                << "\\blue" << color.blue() << ";";
-        }
+        for (const QColor& color : colorList) EmitColorEntry(out, color);
+        for (const QColor& color : bgColorList) EmitColorEntry(out, color);
         out << "}";
     }
 

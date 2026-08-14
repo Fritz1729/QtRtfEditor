@@ -2,11 +2,6 @@
 #include "DemoWindow.h"
 #include <QSettings>
 #include <QFileInfo>
-#include <QFileDialog>
-#include <QFile>
-#include <QMessageBox>
-#include <RichTextEdit.h>
-#include <QStatusBar>
 
 RecentFileHandler::RecentFileHandler(DemoWindow* pWindow, QObject* parent)
     : QObject(parent)
@@ -64,22 +59,7 @@ void RecentFileHandler::UpdateRecentFilesMenu(QMenu* pMenu) {
 }
 
 void RecentFileHandler::OpenRecentFile(const QString& path) {
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QMessageBox::critical(_pWindow, "Error",
-            QString("Cannot open file:\n%1").arg(path));
-        return;
-    }
-
-    QByteArray data = file.readAll();
-    file.close();
-
-    try {
-        _pWindow->Editor()->Load(data.toStdString(), Rte::FormatMode::Rtf);
-        _pWindow->StatusBar()->showMessage(QString("Loaded: %1").arg(path));
-    } catch (const std::exception& e) {
-        QMessageBox::critical(_pWindow, "Error", e.what());
-    }
+    _pWindow->LoadFromFile(path);
 }
 
 void RecentFileHandler::ClearRecentFiles() {

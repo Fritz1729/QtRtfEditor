@@ -14,6 +14,7 @@ class DemoWindow : public QMainWindow {
 public:
     explicit DemoWindow(QWidget* parent = nullptr);
     Rte::RichTextEdit* Editor() { return &_editor; }
+    void LoadFromFile(const QString& path);
     QMenu* RecentFilesMenu() const;
     QStatusBar* StatusBar() { return statusBar(); }
 

@@ -92,27 +92,27 @@ void DemoWindow::ToggleWordWrap(bool checked) {
 }
 
 void DemoWindow::ToggleBold(bool checked) {
-    QTextCharFormat fmt;
-    fmt.setFontWeight(checked ? QFont::Bold : QFont::Normal);
-    MergeFormatOnSelection(fmt);
+    applyFormatOnSelection([checked](QTextCharFormat& fmt) {
+        fmt.setFontWeight(checked ? QFont::Bold : QFont::Normal);
+    });
 }
 
 void DemoWindow::ToggleItalic(bool checked) {
-    QTextCharFormat fmt;
-    fmt.setFontItalic(checked);
-    MergeFormatOnSelection(fmt);
+    applyFormatOnSelection([checked](QTextCharFormat& fmt) {
+        fmt.setFontItalic(checked);
+    });
 }
 
 void DemoWindow::ToggleUnderline(bool checked) {
-    QTextCharFormat fmt;
-    fmt.setFontUnderline(checked);
-    MergeFormatOnSelection(fmt);
+    applyFormatOnSelection([checked](QTextCharFormat& fmt) {
+        fmt.setFontUnderline(checked);
+    });
 }
 
 void DemoWindow::ToggleStrikethrough(bool checked) {
-    QTextCharFormat fmt;
-    fmt.setFontStrikeOut(checked);
-    MergeFormatOnSelection(fmt);
+    applyFormatOnSelection([checked](QTextCharFormat& fmt) {
+        fmt.setFontStrikeOut(checked);
+    });
 }
 
 void DemoWindow::ToggleSuperscript(bool checked) {
@@ -139,7 +139,11 @@ void DemoWindow::LoadFile() {
     QString path = QFileDialog::getOpenFileName(
         this, "Load RTF", "", "RTF Files (*.rtf);;All Files (*)");
     if (path.isEmpty()) return;
+    LoadFromFile(path);
+    _pRecentFileHandler->AddRecentFile(path);
+}
 
+void DemoWindow::LoadFromFile(const QString& path) {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QMessageBox::critical(this, "Error",
@@ -156,8 +160,6 @@ void DemoWindow::LoadFile() {
     } catch (const std::exception& e) {
         QMessageBox::critical(this, "Error", e.what());
     }
-
-    _pRecentFileHandler->AddRecentFile(path);
 }
 
 void DemoWindow::SaveFile() {

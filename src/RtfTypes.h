@@ -55,6 +55,9 @@ enum class RtfLevelNfc : int {
     NoNumber = 255,
 };
 
+[[nodiscard]] RtfListStyle RtfLevelNfcToListStyle(int nfc);
+[[nodiscard]] RtfLevelNfc ListStyleToLevelNfc(RtfListStyle style);
+
 enum TableSide : size_t {
     Side_Left = 0,
     Side_Top = 1,
@@ -66,6 +69,22 @@ enum TableSide : size_t {
 constexpr std::array<TableSide, 4> kTableSides = {{
     Side_Left, Side_Top, Side_Right, Side_Bottom
 }};
+
+// RTF border/padding tags for table sides (left, top, right, bottom)
+constexpr std::array<const char*, 4> kRowBorderSideTags = {{
+    "\\trbrdrl", "\\trbrdrt", "\\trbrdrr", "\\trbrdrb"
+}};
+constexpr std::array<const char*, 4> kCellBorderSideTags = {{
+    "\\clbrdrl", "\\clbrdrt", "\\clbrdrr", "\\clbrdrb"
+}};
+constexpr std::array<const char*, 4> kCellPaddingTags = {{
+    "clpadl", "clpadt", "clpadr", "clpadb"
+}};
+
+template<typename Fn>
+void IterateTableSides(Fn&& fn) {
+    for (TableSide side : kTableSides) fn(side);
+}
 
 enum class BorderStyle : uint8_t {
     None = 0,
@@ -120,6 +139,9 @@ enum class RtfImageFormat : uint8_t {
     Unknown,
 };
 
+[[nodiscard]] const char* ImageFormatExtension(RtfImageFormat fmt);
+[[nodiscard]] RtfImageFormat ImageFormatFromString(const std::string& s);
+
 struct RtfImage {
     std::vector<uint8_t> data;
     RtfImageFormat format = RtfImageFormat::Unknown;
@@ -149,42 +171,16 @@ struct RtfFontEntry {
     bool operator==(const RtfFontEntry &) const = default;
 };
 
-inline const RtfColorEntry* ResolveColorEntry(int idx, const std::vector<RtfColorEntry>& colors) {
-    if (idx >= 0 && idx < static_cast<int>(colors.size()))
-        return &colors[static_cast<std::size_t>(idx)];
-    return nullptr;
-}
-
-inline TableCellBorders NormalizeCellBorders(const TableCellBorders& cellBorders,
-                                                 const TableCellBorders& rowBorders) {
-    TableCellBorders normalized = cellBorders;
-    auto FillFromRow = [](int& cellVal, int& cellColor, BorderStyle& cellStyle,
-                                      int rowVal, int rowColor, BorderStyle rowStyle) {
-        if (cellVal <= 0 && cellStyle == BorderStyle::None) {
-            cellVal = rowVal;
-            cellColor = rowColor;
-            cellStyle = rowStyle;
-        }
-    };
-    FillFromRow(normalized.leftWidth, normalized.leftColor, normalized.leftStyle,
-                rowBorders.leftWidth, rowBorders.leftColor, rowBorders.leftStyle);
-    FillFromRow(normalized.topWidth, normalized.topColor, normalized.topStyle,
-                rowBorders.topWidth, rowBorders.topColor, rowBorders.topStyle);
-    FillFromRow(normalized.rightWidth, normalized.rightColor, normalized.rightStyle,
-                rowBorders.rightWidth, rowBorders.rightColor, rowBorders.rightStyle);
-    FillFromRow(normalized.bottomWidth, normalized.bottomColor, normalized.bottomStyle,
-                rowBorders.bottomWidth, rowBorders.bottomColor, rowBorders.bottomStyle);
-    return normalized;
-}
-
-inline int EffectiveCellPadding(int cellPad, int rowPad) {
-    return (cellPad > 0 || rowPad > 0) ? std::max(cellPad, rowPad) : 0;
-}
-
-inline double TwipsToHalfPt(double twips) { return twips / 20.0; }
-inline double MarginTwipsToPoints(double twips) { return twips / 2.0; }
-inline int PointsToTwips(double pts) { return lround(pts * 20.0); }
-inline int PointsToHalfPtTwips(double pts) { return lround(pts * 2.0); }
+const RtfColorEntry* ResolveColorEntry(int idx, const std::vector<RtfColorEntry>& colors);
+TableCellBorders NormalizeCellBorders(const TableCellBorders& cellBorders,
+                                      const TableCellBorders& rowBorders);
+int EffectiveCellPadding(int cellPad, int rowPad);
+struct BorderValues { int width; BorderStyle style; int color; };
+BorderValues GetBorderValues(const TableCellBorders& b, TableSide side);
+double TwipsToHalfPt(double twips);
+double MarginTwipsToPoints(double twips);
+int PointsToTwips(double pts);
+int PointsToHalfPtTwips(double pts);
 
 // Unit conversion constants
 constexpr double kTwipsToHalfPt = 20.0;

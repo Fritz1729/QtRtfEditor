@@ -96,6 +96,7 @@ struct RtfParserScopeContext {
 
 void CheckIter(size_t& iter);
 void SkipGroup(InputReader& input, size_t& iter);
+bool HasNonWhitespaceText(const std::vector<RtfRun>& runs);
 bool ParagraphHasNonWhitespaceContent(const RtfParagraph& p);
 std::pair<std::string, int> ParseControlWordWithArg(InputReader& input);
 

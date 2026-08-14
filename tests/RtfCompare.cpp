@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cctype>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 std::string gDefaultFontFamily;
@@ -93,19 +94,26 @@ static std::string BuildRunLocation(const std::string& kind, size_t locIdx,
             ", runB " + std::to_string(runB) + ")";
 }
 
-static bool ReportBoolDiff(const std::string& loc, const char* name, bool a, bool b,
-                            std::string& reason) {
+static bool ReportIntDiff(const std::string& loc, const char* name, int a, int b,
+                           std::string& reason) {
     if (a != b) {
-        reason = loc + " " + name + ": " + (a ? "true" : "false") + " vs " + (b ? "true" : "false");
+        reason = loc + " " + name + ": " + std::to_string(a) + " vs " + std::to_string(b);
         return true;
     }
     return false;
 }
 
-static bool ReportIntDiff(const std::string& loc, const char* name, int a, int b,
-                           std::string& reason) {
-    if (a != b) {
-        reason = loc + " " + name + ": " + std::to_string(a) + " vs " + std::to_string(b);
+template<typename T, typename V>
+static bool ReportMemberDiff(const std::string& loc, const char* name,
+                              const T& a, const T& b,
+                              V T::*member, std::string& reason) {
+    if ((a.*member) != (b.*member)) {
+        reason = loc + " " + name + ": ";
+        if constexpr (std::is_same_v<V, bool>) {
+            reason += std::string(a.*member ? "true" : "false") + " vs " + (b.*member ? "true" : "false");
+        } else {
+            reason += std::to_string(a.*member) + " vs " + std::to_string(b.*member);
+        }
         return true;
     }
     return false;
@@ -140,9 +148,9 @@ static bool ReportResolvedColorDiff(const std::string& loc, const char* name,
 static bool CompareFormatSemantic(const RtfRunFormat& fmtA, const RtfRunFormat& fmtB,
     const RtfDocument& docA, const RtfDocument& docB,
     const std::string& loc, int& effFsA, int& effFsB, std::string& reason) {
-    if (ReportBoolDiff(loc, "bold", fmtA.bold, fmtB.bold, reason)) return false;
-    if (ReportBoolDiff(loc, "italic", fmtA.italic, fmtB.italic, reason)) return false;
-    if (ReportBoolDiff(loc, "underline", fmtA.underline, fmtB.underline, reason)) return false;
+    if (ReportMemberDiff(loc, "bold", fmtA, fmtB, &RtfRunFormat::bold, reason)) return false;
+    if (ReportMemberDiff(loc, "italic", fmtA, fmtB, &RtfRunFormat::italic, reason)) return false;
+    if (ReportMemberDiff(loc, "underline", fmtA, fmtB, &RtfRunFormat::underline, reason)) return false;
 
     // Font — resolve by family; missing \fonttbl ≡ Qt default font
     // gDefaultFontFamily is set on the main thread before the worker is spawned.
@@ -171,29 +179,29 @@ static bool CompareFormatSemantic(const RtfRunFormat& fmtA, const RtfRunFormat& 
     if (fmtA.colorIndex != fmtB.colorIndex) {
         if (ReportResolvedColorDiff(loc, "colorIndex", fmtA.colorIndex, fmtB.colorIndex, docA, docB, reason)) return false;
     }
-    if (ReportBoolDiff(loc, "superscript", fmtA.superscript, fmtB.superscript, reason)) return false;
-    if (ReportBoolDiff(loc, "subscript", fmtA.subscript, fmtB.subscript, reason)) return false;
-    if (ReportBoolDiff(loc, "strikeOut", fmtA.strikeOut, fmtB.strikeOut, reason)) return false;
+    if (ReportMemberDiff(loc, "superscript", fmtA, fmtB, &RtfRunFormat::superscript, reason)) return false;
+    if (ReportMemberDiff(loc, "subscript", fmtA, fmtB, &RtfRunFormat::subscript, reason)) return false;
+    if (ReportMemberDiff(loc, "strikeOut", fmtA, fmtB, &RtfRunFormat::strikeOut, reason)) return false;
     if (fmtA.bgColorIndex != fmtB.bgColorIndex) {
         if (ReportResolvedColorDiff(loc, "bgColorIndex", fmtA.bgColorIndex, fmtB.bgColorIndex, docA, docB, reason)) return false;
     }
     if (ReportIntDiff(loc, "underlineStyle", static_cast<int>(fmtA.underlineStyle),
-                                  static_cast<int>(fmtB.underlineStyle), reason)) return false;
+                                   static_cast<int>(fmtB.underlineStyle), reason)) return false;
     if (ReportIntDiff(loc, "capitalization", static_cast<int>(fmtA.capitalization),
                                    static_cast<int>(fmtB.capitalization), reason)) return false;
-    if (ReportIntDiff(loc, "upOffset", fmtA.upOffset, fmtB.upOffset, reason)) return false;
-    if (ReportIntDiff(loc, "dnOffset", fmtA.dnOffset, fmtB.dnOffset, reason)) return false;
-    if (ReportBoolDiff(loc, "kerning", fmtA.kerning, fmtB.kerning, reason)) return false;
-    if (ReportIntDiff(loc, "expnd", fmtA.expnd, fmtB.expnd, reason)) return false;
+    if (ReportMemberDiff(loc, "upOffset", fmtA, fmtB, &RtfRunFormat::upOffset, reason)) return false;
+    if (ReportMemberDiff(loc, "dnOffset", fmtA, fmtB, &RtfRunFormat::dnOffset, reason)) return false;
+    if (ReportMemberDiff(loc, "kerning", fmtA, fmtB, &RtfRunFormat::kerning, reason)) return false;
+    if (ReportMemberDiff(loc, "expnd", fmtA, fmtB, &RtfRunFormat::expnd, reason)) return false;
     if (fmtA.ulColorIndex != 0 || fmtB.ulColorIndex != 0) {
         if (ReportResolvedColorDiff(loc, "ulColorIndex", fmtA.ulColorIndex, fmtB.ulColorIndex, docA, docB, reason)) return false;
     }
     if (fmtA.highlightIndex != 0 || fmtB.highlightIndex != 0) {
         if (ReportResolvedColorDiff(loc, "highlightIndex", fmtA.highlightIndex, fmtB.highlightIndex, docA, docB, reason)) return false;
     }
-    if (ReportIntDiff(loc, "langId", fmtA.langId, fmtB.langId, reason)) return false;
-    if (ReportBoolDiff(loc, "protected", fmtA.protected_, fmtB.protected_, reason)) return false;
-    if (ReportBoolDiff(loc, "isAnchor", fmtA.isAnchor, fmtB.isAnchor, reason)) return false;
+    if (ReportMemberDiff(loc, "langId", fmtA, fmtB, &RtfRunFormat::langId, reason)) return false;
+    if (ReportMemberDiff(loc, "protected", fmtA, fmtB, &RtfRunFormat::protected_, reason)) return false;
+    if (ReportMemberDiff(loc, "isAnchor", fmtA, fmtB, &RtfRunFormat::isAnchor, reason)) return false;
     if (fmtA.anchorHref != fmtB.anchorHref) {
         reason = loc + " anchorHref: '" + fmtA.anchorHref + "' vs '" + fmtB.anchorHref + "'";
         return false;

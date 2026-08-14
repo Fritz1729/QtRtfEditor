@@ -23,13 +23,15 @@ void SkipGroup(InputReader& input, size_t& iter) {
     }
 }
 
-bool ParagraphHasNonWhitespaceContent(const RtfParagraph& p) {
-    for (const auto& run : p.runs) {
-        for (char c : run.text) {
+bool HasNonWhitespaceText(const std::vector<RtfRun>& runs) {
+    for (const auto& run : runs)
+        for (char c : run.text)
             if (!std::isspace(static_cast<unsigned char>(c))) return true;
-        }
-    }
     return false;
+}
+
+bool ParagraphHasNonWhitespaceContent(const RtfParagraph& p) {
+    return HasNonWhitespaceText(p.runs);
 }
 
 std::pair<std::string, int> ParseControlWordWithArg(InputReader& input) {

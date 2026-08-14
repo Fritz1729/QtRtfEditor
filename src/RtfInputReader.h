@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cctype>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -21,6 +22,13 @@ namespace Rte {
 
 [[nodiscard]] constexpr bool IsHexDigit(char c) {
     return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
+}
+
+[[nodiscard]] constexpr uint8_t HexCharValue(char c) {
+    if (!IsHexDigit(c)) throw std::runtime_error(std::string("invalid hex character: ") + c);
+    if (c >= '0' && c <= '9') return static_cast<uint8_t>(c - '0');
+    if (c >= 'A' && c <= 'F') return static_cast<uint8_t>(c - 'A' + 10);
+    return static_cast<uint8_t>(c - 'a' + 10);
 }
 
 class InputReader {
@@ -75,6 +83,10 @@ public:
     [[nodiscard]] std::string Substring(size_t start, size_t end) const {
         return std::string(_input.substr(start, end - start));
     }
+
+    // Returns the destination word of a {\*\word ...} group, or empty string.
+    // Input position is preserved (lookahead only).
+    [[nodiscard]] std::string ReadStarDestWord();
 
 private:
     [[nodiscard]] bool Matches(std::string_view s) const;

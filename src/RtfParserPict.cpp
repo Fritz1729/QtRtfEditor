@@ -43,18 +43,7 @@ std::vector<uint8_t> HexToBytes(const std::string& hex) {
     std::vector<uint8_t> result;
     result.reserve(hex.size() / 2);
     for (size_t i = 0; i + 1 < hex.size(); i += 2) {
-        uint8_t hi, lo;
-        if (hex[i] >= '0' && hex[i] <= '9') hi = static_cast<uint8_t>(hex[i] - '0');
-        else if (hex[i] >= 'A' && hex[i] <= 'F') hi = static_cast<uint8_t>(hex[i] - 'A' + 10);
-        else if (hex[i] >= 'a' && hex[i] <= 'f') hi = static_cast<uint8_t>(hex[i] - 'a' + 10);
-        else hi = 0;
-
-        if (hex[i + 1] >= '0' && hex[i + 1] <= '9') lo = static_cast<uint8_t>(hex[i + 1] - '0');
-        else if (hex[i + 1] >= 'A' && hex[i + 1] <= 'F') lo = static_cast<uint8_t>(hex[i + 1] - 'A' + 10);
-        else if (hex[i + 1] >= 'a' && hex[i + 1] <= 'f') lo = static_cast<uint8_t>(hex[i + 1] - 'a' + 10);
-        else lo = 0;
-
-        result.push_back(hi << 4 | lo);
+        result.push_back(Rte::HexCharValue(hex[i]) << 4 | Rte::HexCharValue(hex[i + 1]));
     }
     return result;
 }
@@ -89,9 +78,7 @@ void ParsePict(RtfParserScopeContext& ctx) {
     if (!ctx.pict.format.empty() && !ctx.pict.data.empty()) {
         RtfImage img;
         img.data = HexToBytes(ctx.pict.data);
-        if (ctx.pict.format == "jpg") img.format = RtfImageFormat::Jpeg;
-        else if (ctx.pict.format == "png") img.format = RtfImageFormat::Png;
-        else if (ctx.pict.format == "bmp") img.format = RtfImageFormat::Bmp;
+        img.format = ImageFormatFromString(ctx.pict.format);
         img.picw = ctx.pict.picw;
         img.pich = ctx.pict.pich;
         img.picwgoal = ctx.pict.picwgoal;

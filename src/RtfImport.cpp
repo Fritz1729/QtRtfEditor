@@ -246,14 +246,7 @@ void BuildImage(QTextCursor& cursor, const RtfImage& img,
 
     // Register image as resource
     ++imgCounter;
-    const char* ext = "";
-    switch (img.format) {
-        case Rte::RtfImageFormat::Jpeg:  ext = "jpg"; break;
-        case Rte::RtfImageFormat::Png:   ext = "png"; break;
-        case Rte::RtfImageFormat::Bmp:   ext = "bmp"; break;
-        case Rte::RtfImageFormat::Unknown:
-        default:                         ext = "png"; break;
-    }
+    const char* ext = ImageFormatExtension(img.format);
     QString name = QString("rtfimage://%1.%2").arg(imgCounter).arg(ext);
     document->addResource(QTextDocument::ImageResource, QUrl(name), QVariant::fromValue(VectorToByteArray(img.data)));
 
@@ -382,31 +375,19 @@ void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEntry*>& t
                 }
 
                 // Apply cell borders
-                const TableCellBorders& borders = cellData.borders;
-                // For each side, use cell border; if not set, inherit from row borders
-                for (TableSide side : kTableSides) {
-                    const TableCellBorderMember& members = kBorderMembers[side];
-                    const int w = borders.*(members.width);
-                    const BorderStyle s = borders.*(members.style);
-                    const int ci = borders.*(members.color);
-                    if (w <= 0 && s == BorderStyle::None) {
-                        const TableCellBorders& rb = rowEntry->rowBorders;
-                        ApplyBorderToCellFormat(cellFmt, side,
-                            rb.*(members.width), rb.*(members.style), rb.*(members.color), doc);
-                    } else {
-                        ApplyBorderToCellFormat(cellFmt, side, w, s, ci, doc);
-                    }
-                }
+                TableCellBorders nb = NormalizeCellBorders(cellData.borders, rowEntry->rowBorders);
+                IterateTableSides([&](TableSide side) {
+                    auto [w, s, col] = GetBorderValues(nb, side);
+                    ApplyBorderToCellFormat(cellFmt, side, w, s, col, doc);
+                });
 
                 InsertRuns(cellCursor, runs, doc, defaultFont);
             } else {
                 // Empty cell — apply row borders
-                const TableCellBorders& rb = rowEntry->rowBorders;
-                for (TableSide side : kTableSides) {
-                    const TableCellBorderMember& members = kBorderMembers[side];
-                    ApplyBorderToCellFormat(cellFmt, side,
-                        rb.*(members.width), rb.*(members.style), rb.*(members.color), doc);
-                }
+                IterateTableSides([&](TableSide side) {
+                    auto [w, s, col] = GetBorderValues(rowEntry->rowBorders, side);
+                    ApplyBorderToCellFormat(cellFmt, side, w, s, col, doc);
+                });
             }
             cell.setFormat(cellFmt);
         }

@@ -579,13 +579,8 @@ private:
     }
 
     static bool TableRowHasNonWhitespaceContent(const RtfTableRowEntry& r) {
-        for (const auto& [runs, _] : r.cells) {
-            for (const auto& run : runs) {
-                for (char c : run.text) {
-                    if (!isspace(static_cast<unsigned char>(c))) return true;
-                }
-            }
-        }
+        for (const auto& [runs, _] : r.cells)
+            if (HasNonWhitespaceText(runs)) return true;
         return false;
     }
 
@@ -730,26 +725,10 @@ private:
 
             // Check for star-prefixed (destination) group: {\*\word ...}
             // RTF spec: unknown destinations starting with \* are silently ignored
-            if (_input.PeekIs("\\*")) {
-                size_t starPos = _input.Pos();
-                _input.AdvanceBy(2); // skip \*
-                _input.SkipWhitespace();
-                string destWord;
-                if (!_input.IsEof() && _input.PeekIs('\\')) {
-                    _input.Advance();
-                    _input.SkipWhitespace();
-                    if (!_input.IsEof() && Rte::IsWordChar(_input.Peek())) {
-                        auto [w, a] = _input.ReadControlWord();
-                        destWord = w;
-                    }
-                }
-                _input.Seek(starPos);
-
-                // If unknown destination, skip the entire group silently
-                if (!destWord.empty() && !FindControl(destWord.c_str())) {
-                    SkipGroup();
-                    return;
-                }
+            string destWord = _input.ReadStarDestWord();
+            if (!destWord.empty() && !FindControl(destWord.c_str())) {
+                SkipGroup();
+                return;
             }
 
             // Unknown group — parse contents normally
@@ -834,12 +813,7 @@ private:
             _input.SkipAs('\'');
             int val = 0;
             for (int h = 0; h < 2 && !_input.IsEof(); ++h) {
-                char hc = _input.Advance();
-                int digit;
-                if (hc >= '0' && hc <= '9') digit = hc - '0';
-                else if (hc >= 'a' && hc <= 'f') digit = hc - 'a' + 10;
-                else digit = hc - 'A' + 10;
-                val = val * 16 + digit;
+                val = val * 16 + Rte::HexCharValue(_input.Advance());
             }
             int fcharset = 0;
             string fontFamily;
@@ -918,20 +892,7 @@ private:
                 // Check for star-prefixed sub-group: {\*\word ...}
                 _input.SkipWhitespace();
                 if (_input.PeekIs("\\*")) {
-                    size_t starPos = _input.Pos();
-                    _input.AdvanceBy(2);
-                    _input.SkipWhitespace();
-                    string destWord;
-                    if (!_input.IsEof() && _input.PeekIs('\\')) {
-                        _input.SkipAs('\\');
-                        _input.SkipWhitespace();
-                        if (!_input.IsEof() && Rte::IsWordChar(_input.Peek())) {
-                            auto [w, a] = _input.ReadControlWord();
-                            destWord = w;
-                        }
-                    }
-                    _input.Seek(starPos);
-
+                    string destWord = _input.ReadStarDestWord();
                     if (destWord == "fldinst") {
                         ParseFldInst();
                     } else if (destWord == "fldrslt") {

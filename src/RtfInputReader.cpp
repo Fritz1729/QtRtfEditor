@@ -72,4 +72,22 @@ void InputReader::SkipDigits() {
     }
 }
 
+std::string InputReader::ReadStarDestWord() {
+    if (!PeekIs("\\*")) return {};
+    size_t saved = Pos();
+    AdvanceBy(2);
+    SkipWhitespace();
+    std::string word;
+    if (!IsEof() && PeekIs('\\')) {
+        Advance();
+        SkipWhitespace();
+        if (!IsEof() && Rte::IsWordChar(Peek())) {
+            auto [w, a] = ReadControlWord();
+            word = w;
+        }
+    }
+    Seek(saved);
+    return word;
+}
+
 } // namespace Rte

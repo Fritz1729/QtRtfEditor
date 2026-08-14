@@ -4,23 +4,6 @@ namespace Rte {
 
 namespace {
 
-RtfListStyle RtfLevelNfcToListStyle(int nfc) {
-    switch (static_cast<RtfLevelNfc>(nfc)) {
-        case RtfLevelNfc::Arabic:           return RtfListStyle::Number;
-        case RtfLevelNfc::UpperRoman:       return RtfListStyle::Roman;
-        case RtfLevelNfc::LowerRoman:       return RtfListStyle::Roman;
-        case RtfLevelNfc::UpperAlpha:       return RtfListStyle::Letter;
-        case RtfLevelNfc::LowerAlpha:       return RtfListStyle::Letter;
-        case RtfLevelNfc::Ordinal:          return RtfListStyle::Number;
-        case RtfLevelNfc::CardinalText:     return RtfListStyle::Number;
-        case RtfLevelNfc::OrdinalText:      return RtfListStyle::Number;
-        case RtfLevelNfc::ArabicLeadingZero: return RtfListStyle::Number;
-        case RtfLevelNfc::Bullet:           return RtfListStyle::Disc;
-        case RtfLevelNfc::NoNumber:         return RtfListStyle::None;
-    }
-    return RtfListStyle::Number;
-}
-
 void ParseListtableControl(InputReader& input, size_t& iter,
                            int& listId, RtfListStyle& listStyle,
                            std::map<int, RtfListStyle>& listIdToStyle) {
