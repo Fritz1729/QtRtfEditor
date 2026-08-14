@@ -171,7 +171,7 @@ private:
     }
 
     void SkipGroup() {
-        _input.Advance();
+        // The group's own "{" has already been consumed by the caller.
         int depth = 1;
         while (!_input.IsEof() && depth > 0) {
             CheckIter();
@@ -928,11 +928,11 @@ private:
             }
         } else if (c == '~') {
             // Non-breaking space
-            _input.Advance();
+            _input.SkipAs('~');
             AppendUtf8(0x00A0);
         } else if (c == '\'') {
             // Hex escape: \\'hh — charset-aware decoding
-            _input.Advance();
+            _input.SkipAs('\'');
             int val = 0;
             for (int h = 0; h < 2 && !_input.IsEof(); ++h) {
                 char hc = _input.Advance();
@@ -965,7 +965,7 @@ private:
         // Handle negative arguments: \word-NNN (no space between - and digits)
         // RTF spec: minus sign must be followed immediately by one or more digits
         if (!hasArg && _input.PeekIs('-') && _input.PeekIf(Rte::IsDigit, 1)) {
-            _input.Advance(); // skip '-'
+            _input.SkipAs('-');
             arg = 0;
             while (!_input.IsEof() && Rte::IsDigit(_input.Peek())) {
                 arg = arg * 10 + (_input.Advance() - '0');
@@ -984,7 +984,8 @@ private:
     }
 
     void ParseUnicodeEscape() {
-        _input.Advance(); // skip 'u'
+        // Guard at entry already verified current char is 'u' or 'U'
+        _input.Advance();
         bool negative = false;
         if (!_input.IsEof() && _input.PeekIs('-')) {
             negative = true;
@@ -1058,7 +1059,7 @@ private:
             CheckIter();
             if (_input.PeekIs('{')) {
                 // Font entry group
-                _input.Advance();
+                _input.SkipAs('{');
 
                 int fcharset = 0;
                 string family;
@@ -1072,6 +1073,10 @@ private:
                         } else {
                             ParseControl();
                         }
+                    } else if (_input.PeekIs('{')) {
+                        // Nested group — skip all (e.g. {\*\fname ...} or any sub-group)
+                        _input.SkipAs('{');
+                        SkipGroup();
                     } else if (!_input.PeekIs(';') && IsPrintable(_input.Peek())) {
                         family += _input.Advance();
                     } else {
@@ -1235,15 +1240,15 @@ private:
         while (!_input.IsEof() && !_input.PeekIs('}')) {
             CheckIter();
             if (_input.PeekIs('\\')) {
-                _input.Advance();
+                _input.SkipAs('\\');
                 if (!_input.IsEof()) {
                     char c = _input.Peek();
-                    if (c == '\\') { _input.Advance(); inst += '\\'; }
-                    else if (c == '{') { _input.Advance(); inst += '{'; }
-                    else if (c == '}') { _input.Advance(); inst += '}'; }
+                    if (c == '\\') { _input.SkipAs('\\'); inst += '\\'; }
+                    else if (c == '{') { _input.SkipAs('{'); inst += '{'; }
+                    else if (c == '}') { _input.SkipAs('}'); inst += '}'; }
                     else if (c == '_') {
                         // RTF escape: \_ produces literal space
-                        _input.Advance();
+                        _input.SkipAs('_');
                         inst += ' ';
                     }
                     else {
@@ -1358,7 +1363,7 @@ private:
     }
 
     void ParseListtableControl() {
-        _input.Advance();
+        _input.SkipAs('\\');
         if (_input.IsEof()) return;
 
         auto [word, arg] = _input.ReadControlWord();
@@ -1381,7 +1386,7 @@ private:
                 _input.SkipAs('{');
                 while (!_input.IsEof() && !_input.PeekIs('}')) {
                     if (_input.PeekIs('\\')) {
-                        _input.Advance();
+                        _input.SkipAs('\\');
                         auto [innerWord, innerArg] = _input.ReadControlWord();
                         if (innerWord == "levelnfc" && innerArg >= 0) {
                             if (_currentListId > 0) {

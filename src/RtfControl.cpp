@@ -147,6 +147,10 @@ constexpr RtfControl rtfControlTableEntries[] = {
     DATA("fswiss",   Action::TableControl,     0),
     DATA("fmodern",  Action::TableControl,     0),
     DATA("fnil",     Action::TableControl,     0),
+    DATA("fscript",  Action::TableControl,     0),
+    DATA("fdecor",   Action::TableControl,     0),
+    DATA("ftech",    Action::TableControl,     0),
+    DATA("fbidi",    Action::TableControl,     0),
     DATA("fcharset", Action::TableControl,     0),
     // \fprqN (font pitch and quality) — recognized but not preserved.
     // Qt has no API to set font pitch; QFont::setFixedPitch() is a
