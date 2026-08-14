@@ -389,16 +389,38 @@ static RtfCompareResult DoCompareDocuments(const RtfDocument& a, const RtfDocume
                         return RtfCompareResult::StructuralDiff;
                     }
 
-                    // Normalize borders: merge row borders into cell borders for comparison
+                    // Normalize borders: merge row borders into cell borders for comparison.
+                    // Width/style compared directly; colors compared after resolving
+                    // through each document's color table.
                     {
                         TableCellBorders normA = NormalizeCellBorders(fmtA.borders, rowA.rowBorders);
                         TableCellBorders normB = NormalizeCellBorders(fmtB.borders, rowB.rowBorders);
-                        if (normA != normB) {
-                            reason = "Table " + std::to_string(tableIdxA) +
-                                     " row " + std::to_string(ri) +
-                                     " cell " + std::to_string(ci) + " borders differ";
-                            return RtfCompareResult::StructuralDiff;
+                        static const char* kSideNames[4] = {"left", "top", "right", "bottom"};
+                        bool borderDiff = false;
+                        for (TableSide side : kTableSides) {
+                            const TableCellBorderMember& m = kBorderMembers[side];
+                            std::string sideLoc = cellKind + " " + kSideNames[static_cast<int>(side)] + " border";
+                            if (normA.*(m.width) != normB.*(m.width)) {
+                                reason = sideLoc + " width: " + std::to_string(normA.*(m.width)) +
+                                    " vs " + std::to_string(normB.*(m.width));
+                                borderDiff = true;
+                                break;
+                            }
+                            if (normA.*(m.style) != normB.*(m.style)) {
+                                reason = sideLoc + " style: " + std::to_string(static_cast<int>(normA.*(m.style))) +
+                                    " vs " + std::to_string(static_cast<int>(normB.*(m.style)));
+                                borderDiff = true;
+                                break;
+                            }
+                            // Always resolve — equal indices may point at different
+                            // colors in different color tables
+                            if (ReportResolvedColorDiff(sideLoc, "color",
+                                normA.*(m.color), normB.*(m.color), a, b, reason)) {
+                                borderDiff = true;
+                                break;
+                            }
                         }
+                        if (borderDiff) return RtfCompareResult::StructuralDiff;
                     }
 
                     // Compare effective padding
@@ -417,12 +439,8 @@ static RtfCompareResult DoCompareDocuments(const RtfDocument& a, const RtfDocume
                         }
                     }
 
-                    if (fmtA.shadingColor != fmtB.shadingColor) {
-                        reason = "Table " + std::to_string(tableIdxA) +
-                                 " row " + std::to_string(ri) +
-                                 " cell " + std::to_string(ci) +
-                                 " shadingColor: " + std::to_string(fmtA.shadingColor) +
-                                 " vs " + std::to_string(fmtB.shadingColor);
+                    if (ReportResolvedColorDiff(cellKind, "shadingColor",
+                            fmtA.shadingColor, fmtB.shadingColor, a, b, reason)) {
                         return RtfCompareResult::StructuralDiff;
                     }
                 }

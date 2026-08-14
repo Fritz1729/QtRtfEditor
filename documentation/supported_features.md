@@ -60,7 +60,6 @@ These features are parsed and preserved but cannot be rendered.
 
 | Feature | RTF Tag | Reason |
 |---------|---------|--------|
-| Cell shading | `\clshdn` | No Qt cell background API |
 | Merged cells | `\clmrg` | No Qt merged cell support |
 
 ## Rendered with Approximation
@@ -72,8 +71,6 @@ These features are rendered visually (using the closest Qt equivalent) and prese
 | Thick underline | `\ulth` | Wave underline |
 | Double underline | `\uldb` | Solid underline |
 | Positional superscript/subscript | `\upN`, `\dnN` | Boolean toggle |
-| Underline color | `\ulcN` | No Qt API — color stored as user property for roundtrip |
-| Line-spacing multiplier | `\slmultN` | No Qt API — multiplier stored as block property for roundtrip |
 
 ## Stored but Not Rendered
 
@@ -81,6 +78,9 @@ These features are parsed and preserved through roundtrip, but cannot be rendere
 
 | Feature | RTF Tag | Reason |
 |---------|---------|--------|
+| Cell shading | `\clshdnN` | No Qt cell background API — color stored as cell property for roundtrip |
+| Underline color | `\ulcN` | No Qt API — color stored as user property for roundtrip |
+| Line-spacing multiplier | `\slmultN` | No Qt API — multiplier stored as block property for roundtrip |
 | Highlight | `\highlightN` | No reliable RGB mapping per RTF spec |
 | Language ID | `\langN`, `\chlangN`, `\langfeN` | Qt 6.11 has no `setFontLanguageId()` |
 

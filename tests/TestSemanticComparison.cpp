@@ -174,6 +174,7 @@ private slots:
     // Tables
     void DifferentCellShading();
     void DifferentCellShadingVsNoShading();
+    void SameCellShadingColorDifferentIndex();
     void DifferentTableRowCount();
     void DifferentTableColCount();
     void DifferentTableCellText();
@@ -199,6 +200,8 @@ private slots:
     void RowBorderVsCellBorderSame();
     void RowBorderVsCellBorderDifferent();
     void DifferentBorderStyle();
+    void DifferentBorderColors();
+    void SameBorderColorDifferentIndex();
 
     // \pntext structural preservation
     void DifferentPntext();
@@ -1004,15 +1007,23 @@ void TestSemanticComparison::TableWithFormatting() {
 }
 
 void TestSemanticComparison::DifferentCellShading() {
-    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clshdn1 \intbl A\cell \row}})";
-    std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clshdn2 \intbl A\cell \row}})";
+    // Different effective shading colors
+    std::string rtfA = R"({\rtf1\ansi\deff0{\colortbl ;\red255\green0\blue0;\red0\green0\blue255;}{\trowd \cellx2000 \clshdn1 \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\colortbl ;\red255\green0\blue0;\red0\green0\blue255;}{\trowd \cellx2000 \clshdn2 \intbl A\cell \row}})";
     AssertRtfDifferent(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentCellShadingVsNoShading() {
-    std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clshdn1 \intbl A\cell \row}})";
+    std::string rtfA = R"({\rtf1\ansi\deff0{\colortbl ;\red255\green0\blue0;}{\trowd \cellx2000 \clshdn1 \intbl A\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \intbl A\cell \row}})";
     AssertRtfDifferent(rtfA, rtfB);
+}
+
+void TestSemanticComparison::SameCellShadingColorDifferentIndex() {
+    // Same effective shading color at different color-table indices
+    std::string rtfA = R"({\rtf1\ansi\deff0{\colortbl ;\red255\green0\blue0;}{\trowd \cellx2000 \clshdn1 \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\colortbl ;\red0\green0\blue255;\red255\green0\blue0;}{\trowd \cellx2000 \clshdn2 \intbl A\cell \row}})";
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::TableOrderingParagraphTableParagraph() {
@@ -1078,6 +1089,20 @@ void TestSemanticComparison::DifferentBorderStyle() {
     std::string rtfA = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clbrdrl\brdrs\brdrw10 \intbl A\cell \row}})";
     std::string rtfB = R"({\rtf1\ansi\deff0{\trowd \cellx2000 \clbrdrl\brdrd\brdrw10 \intbl A\cell \row}})";
     AssertRtfDifferent(rtfA, rtfB);
+}
+
+void TestSemanticComparison::DifferentBorderColors() {
+    // Same border-color index, different effective colors
+    std::string rtfA = R"({\rtf1\ansi\deff0{\colortbl ;\red255\green0\blue0;}{\trowd \cellx2000 \clbrdrl\brdrs\brdrw10\brdrcf1 \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\colortbl ;\red0\green0\blue255;}{\trowd \cellx2000 \clbrdrl\brdrs\brdrw10\brdrcf1 \intbl A\cell \row}})";
+    AssertRtfDifferent(rtfA, rtfB);
+}
+
+void TestSemanticComparison::SameBorderColorDifferentIndex() {
+    // Same effective border color at different color-table indices
+    std::string rtfA = R"({\rtf1\ansi\deff0{\colortbl ;\red255\green0\blue0;}{\trowd \cellx2000 \clbrdrl\brdrs\brdrw10\brdrcf1 \intbl A\cell \row}})";
+    std::string rtfB = R"({\rtf1\ansi\deff0{\colortbl ;\red0\green0\blue255;\red255\green0\blue0;}{\trowd \cellx2000 \clbrdrl\brdrs\brdrw10\brdrcf2 \intbl A\cell \row}})";
+    AssertRtfIdentical(rtfA, rtfB);
 }
 
 void TestSemanticComparison::DifferentDeflang() {

@@ -13,7 +13,6 @@
 using namespace Rte;
 
 static const char* const kSkippedFiles[] = {
-    "cell-shading.rtf",            // \clshdn — Qt has no cell-level background API
     "font-size-pntext-order.rtf",  // \fs before \pntext — format preservation across pntext boundary
     "tables-merged.rtf",           // \clmrg — merged cells out of scope
     nullptr

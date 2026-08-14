@@ -354,8 +354,7 @@ static int LookupColorIndex(const QColor& col, const vector<QColor>& list) {
     return FindColorIndex(list, col) + 1;
 }
 
-static QColor ParseUlColor(const QTextCharFormat& fmt) {
-    QString s = fmt.property(UserPropUlColorIndex).toString();
+static QColor ParseRgbString(const QString& s) {
     if (s.isEmpty()) return {};
     QStringList p = s.split(',');
     if (p.size() == 3)
@@ -633,7 +632,7 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
             cur.dnOffset = charFmt.property(UserPropDnOffset).toInt();
             cur.langId = charFmt.property(UserPropLangId).toInt();
             cur.highlightIndex = charFmt.property(UserPropHighlightIndex).toInt();
-            QColor ulCol = ParseUlColor(charFmt);
+            QColor ulCol = ParseRgbString(charFmt.property(UserPropUlColorIndex).toString());
             if (ulCol.isValid())
                 cur.ulColorIndex = LookupColorIndex(ulCol, colorList);
             qreal spacing = charFmt.fontLetterSpacing();
@@ -709,6 +708,27 @@ void BlockExportContext::ExportBlock(const QTextBlock& block, bool isTableCell, 
     }
 }
 
+// Collect colors used by table cells (shading + border brushes) so they are
+// assigned \colortbl indices before the color table is emitted
+static void CollectTableCellColors(QTextFrame* frame, vector<QColor>& colorList) {
+    for (QTextFrame::iterator it = frame->begin(); it != frame->end(); ++it) {
+        QTextTable* table = qobject_cast<QTextTable*>(it.currentFrame());
+        if (!table) continue;
+        for (int r = 0; r < table->rows(); ++r) {
+            for (int c = 0; c < table->columns(); ++c) {
+                QTextTableCell cell = table->cellAt(r, c);
+                if (!cell.isValid()) continue;
+                QColor shading = ParseRgbString(cell.format().property(UserPropCellShading).toString());
+                if (shading.isValid()) CollectColor(shading, colorList);
+                QTextTableCellFormat cf(cell.format().toTableCellFormat());
+                for (TableSide side : kTableSides) {
+                    CollectBorderColor((cf.*(kBorderBrushGetters.at(side)))(), colorList);
+                }
+            }
+        }
+    }
+}
+
 } // namespace
 
 string ExportRtf(const QTextDocument& document) {
@@ -756,7 +776,7 @@ string ExportRtf(const QTextDocument& document) {
                 QBrush bgBrush = frag.charFormat().background();
                 if (bgBrush.style() != Qt::NoBrush)
                     CollectColor(bgBrush.color(), bgColorList);
-                QColor ulCol = ParseUlColor(frag.charFormat());
+                QColor ulCol = ParseRgbString(frag.charFormat().property(UserPropUlColorIndex).toString());
                 if (ulCol.isValid())
                     CollectColor(ulCol, colorList);
                 it++;
@@ -768,6 +788,9 @@ string ExportRtf(const QTextDocument& document) {
                 fontMap[pntextFam.toStdString()] = ++idx;
             }
         }
+
+    CollectTableCellColors(document.rootFrame(), colorList);
+
     out << "{\\rtf1\\ansi\\deff" << defaultFontIdx;
     if (defaultTabStopTwips != kDefaultTabStopTwips)
         out << "\\deftab" << defaultTabStopTwips;
@@ -880,19 +903,6 @@ string ExportRtf(const QTextDocument& document) {
                 cellxPositions.push_back(cumulative);
             }
 
-    // Collect border colors from all cells
-    for (int r = 0; r < rowCount; ++r) {
-        for (int c = 0; c < colCount; ++c) {
-            QTextTableCell cell = table->cellAt(r, c);
-            if (!cell.isValid()) continue;
-            QTextTableCellFormat cf(cell.format().toTableCellFormat());
-            CollectBorderColor(cf.leftBorderBrush(), colorList);
-            CollectBorderColor(cf.topBorderBrush(), colorList);
-            CollectBorderColor(cf.rightBorderBrush(), colorList);
-            CollectBorderColor(cf.bottomBorderBrush(), colorList);
-        }
-    }
-
             for (int r = 0; r < rowCount; ++r) {
                 out << "{\\trowd ";
                 for (int pos : cellxPositions) {
@@ -953,6 +963,11 @@ string ExportRtf(const QTextDocument& document) {
                     }
 
                     QTextTableCellFormat cf(cell.format().toTableCellFormat());
+
+                    // Emit cell shading (stored as property — Qt has no cell background API)
+                    QColor shading = ParseRgbString(cell.format().property(UserPropCellShading).toString());
+                    int shadingIdx = LookupColorIndex(shading, colorList);
+                    if (shadingIdx > 0) out << "\\clshdn" << shadingIdx << ' ';
 
                     // Emit cell padding
                     for (TableSide side : kTableSides) {

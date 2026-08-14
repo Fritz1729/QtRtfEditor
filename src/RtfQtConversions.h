@@ -28,6 +28,7 @@ constexpr int UserPropBlockPntextFontFamily = 1014;
 constexpr int UserPropUlStyle = 1011;
 constexpr int UserPropUlColorIndex = 1012;
 constexpr int UserPropSlMult = 1013;
+constexpr int UserPropCellShading = 1015;
 
 // QByteArray <-> std::vector<uint8_t> conversion helpers (for RtfImage::data)
 inline std::vector<uint8_t> ByteArrayToVector(const QByteArray& ba) {

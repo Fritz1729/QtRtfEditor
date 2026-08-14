@@ -69,6 +69,11 @@ A `static_assert` in the .cpp file verifies the entry count matches `kRtfControl
 
 ## Control Word Coverage
 
+Status legend:
+- **Full roundtrip** — parsed, rendered in Qt, and re-emitted.
+- **Roundtrip** — parsed and re-emitted, but not rendered in Qt (stored as a user property) or rendered only approximately; see the note.
+- **Parser only** — parsed but not exported.
+
 ### Character Formatting (fully implemented: parser + import + export)
 
 | Control Word | Action | Status |
@@ -78,10 +83,10 @@ A `static_assert` in the .cpp file verifies the entry count matches `kRtfControl
 | `\ul` / `\ul0` / `\ulnone` | SetUlStyle | Full roundtrip |
 | `\uld` | SetUlStyle::Dotted | Full roundtrip |
 | `\uldash` | SetUlStyle::Dashed | Full roundtrip |
-| `\uldashd` | SetUlStyle::DashDot | Full roundtrip (renders as DashDotLine) |
-| `\uldashdd` | SetUlStyle::DashDotDot | Full roundtrip (renders as DashDotDotLine) |
-| `\uldb` | SetUlStyle::Double | Full roundtrip (renders as solid underline) |
-| `\ulth` | SetUlStyle::Thick | Full roundtrip (renders as wave underline) |
+| `\uldashd` | SetUlStyle::DashDot | Roundtrip (renders as DashDotLine) |
+| `\uldashdd` | SetUlStyle::DashDotDot | Roundtrip (renders as DashDotDotLine) |
+| `\uldb` | SetUlStyle::Double | Roundtrip (renders as solid underline) |
+| `\ulth` | SetUlStyle::Thick | Roundtrip (renders as wave underline) |
 | `\sub` / `\sub0` | ToggleCharProp::Subscript | Full roundtrip |
 | `\super` / `\super0` | ToggleCharProp::Superscript | Full roundtrip |
 | `\strike` / `\strike0` | ToggleCharProp::Strike | Full roundtrip |
@@ -91,14 +96,14 @@ A `static_assert` in the .cpp file verifies the entry count matches `kRtfControl
 | `\fsN` | SetCharProp::FontSize | Full roundtrip |
 | `\cfN` | SetCharProp::ColorIndex | Full roundtrip |
 | `\cbN` | SetCharProp::BgColorIndex | Full roundtrip |
-| `\upN` | SetCharProp::UpOffset | Full roundtrip (stored as user property, Qt renders as boolean) |
-| `\dnN` | SetCharProp::DnOffset | Full roundtrip (stored as user property, Qt renders as boolean) |
+| `\upN` | SetCharProp::UpOffset | Roundtrip (stored as user property, Qt renders as boolean) |
+| `\dnN` | SetCharProp::DnOffset | Roundtrip (stored as user property, Qt renders as boolean) |
 | `\expndN` / `\expndtwN` | SetCharProp::Expnd | Full roundtrip |
 | `\caps` / `\caps0` | SetCapitalization::AllCaps | Full roundtrip |
 | `\scaps` / `\scaps0` | SetCapitalization::SmallCaps | Full roundtrip |
-| `\ulcN` | SetCharProp::UlColorIndex | Full roundtrip (stored as RGB user property, no Qt rendering API) |
-| `\highlightN` | SetCharProp::HighlightIndex | Parser + export (stored as user property, no Qt rendering API) |
-| `\langN` | SetCharProp::LangId | Parser + export (stored as user property, no Qt rendering API in 6.11) |
+| `\ulcN` | SetCharProp::UlColorIndex | Roundtrip (stored as RGB user property, not rendered) |
+| `\highlightN` | SetCharProp::HighlightIndex | Roundtrip (stored as user property, not rendered) |
+| `\langN` | SetCharProp::LangId | Roundtrip (stored as user property, not rendered) |
 
 ### Paragraph Formatting (fully implemented: parser + import + export)
 
@@ -111,7 +116,7 @@ A `static_assert` in the .cpp file verifies the entry count matches `kRtfControl
 | `\sbN` | SetParaProp::SpaceBefore | Full roundtrip |
 | `\saN` | SetParaProp::SpaceAfter | Full roundtrip |
 | `\slN` | SetParaProp::LineHeight | Full roundtrip |
-| `\slmultN` | SetParaProp::SlMult | Full roundtrip (stored as block user property, no Qt rendering API) |
+| `\slmultN` | SetParaProp::SlMult | Roundtrip (stored as block user property, not rendered) |
 | `\txN` | SetParaProp::TabStop | Full roundtrip |
 | `\par` | EmitParagraph | Full roundtrip |
 | `\pard` | HeaderMetadata (reset) | Full roundtrip |
@@ -207,7 +212,7 @@ A `static_assert` in the .cpp file verifies the entry count matches `kRtfControl
 | `\cell` | TableCtrlWord::Cell | Full roundtrip |
 | `\row` | TableCtrlWord::Row | Full roundtrip |
 | `\intbl` | TableCtrlWord::Intbl | Full roundtrip |
-| `\clshdnN` | TableCtrlWord::ClShading | Parser only (no Qt cell background API) |
+| `\clshdnN` | TableCtrlWord::ClShading | Roundtrip (color stored as cell property, not rendered) |
 | `\clvertalt/c/b` | TableCtrlWord | Full roundtrip |
 | `\clbrdrl/t/r/b` | TableCtrlWord | Full roundtrip |
 | `\brdrs` | TableCtrlWord::BrdrSolid | Full roundtrip |

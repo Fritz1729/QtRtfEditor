@@ -387,6 +387,15 @@ void FlushTableRows(QTextCursor& cursor, std::vector<const RtfTableRowEntry*>& t
                     default: cellFmt.setVerticalAlignment(QTextCharFormat::AlignTop); break;
                 }
 
+                // Cell shading — Qt has no cell background API; store for roundtrip
+                if (cellData.shadingColor >= 0) {
+                    QColor shading = ResolveColor(cellData.shadingColor, doc);
+                    if (shading.isValid()) {
+                        cellFmt.setProperty(UserPropCellShading,
+                            QString("%1,%2,%3").arg(shading.red()).arg(shading.green()).arg(shading.blue()));
+                    }
+                }
+
                 // Apply padding — cell padding takes precedence, fall back to row padding
                 for (TableSide side : kTableSides) {
                     double effPad = ComputeEffectivePadding(cellData.padding[side], rowEntry->rowPadding[side]);
